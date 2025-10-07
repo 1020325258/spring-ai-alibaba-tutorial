@@ -5,10 +5,14 @@
   <groupId>org.example</groupId>
   <artifactId>spring-ai-alibaba-tutorial</artifactId>
   <version>1.0-SNAPSHOT</version>
-  <packaging>jar</packaging>
+  <packaging>pom</packaging>
 
   <name>spring-ai-alibaba-tutorial</name>
   <url>http://maven.apache.org</url>
+  <modules>
+    <module>01-spring-ai-alibaba-evaluation</module>
+    <module>02-spring-ai-alibaba-evaluation</module>
+  </modules>
 
   <properties>
     <java.version>21</java.version>
@@ -20,48 +24,4 @@
     <spring-boot.version>3.4.8</spring-boot.version>
     <maven-compiler-plugin.version>3.11.0</maven-compiler-plugin.version>
   </properties>
-
-  <dependencies>
-
-    <dependency>
-      <groupId>org.springframework.boot</groupId>
-      <artifactId>spring-boot-starter-web</artifactId>
-      <version>${spring-boot.version}</version>
-    </dependency>
-
-    <dependency>
-      <groupId>com.alibaba.cloud.ai</groupId>
-      <artifactId>spring-ai-alibaba-starter-dashscope</artifactId>
-      <version>${spring-ai-alibaba.version}</version>
-    </dependency>
-    <dependency>
-      <groupId>com.alibaba.cloud.ai</groupId>
-      <artifactId>spring-ai-alibaba-starter-tool-calling-jinacrawler</artifactId>
-      <version>${spring-ai-alibaba.version}</version>
-    </dependency>
-    <dependency>
-      <groupId>com.alibaba.cloud.ai</groupId>
-      <artifactId>spring-ai-alibaba-graph-core</artifactId>
-      <version>${spring-ai-alibaba.version}</version>
-    </dependency>
-    <dependency>
-      <groupId>com.alibaba.cloud.ai</groupId>
-      <artifactId>spring-ai-alibaba-starter-tool-calling-searches</artifactId>
-      <version>${spring-ai-alibaba.version}</version>
-    </dependency>
-
-    <!-- 添加Spring AI MCP starter依赖 -->
-    <dependency>
-      <groupId>org.springframework.ai</groupId>
-      <artifactId>spring-ai-starter-mcp-client</artifactId>
-      <version>${spring-ai.version}</version>
-    </dependency>
-
-    <dependency>
-      <groupId>junit</groupId>
-      <artifactId>junit</artifactId>
-      <version>3.8.1</version>
-      <scope>test</scope>
-    </dependency>
-  </dependencies>
 </project>

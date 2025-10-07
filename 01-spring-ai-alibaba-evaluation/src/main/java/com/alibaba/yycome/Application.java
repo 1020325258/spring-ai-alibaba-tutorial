@@ -1,4 +1,4 @@
-package com.alibaba.yycom;
+package com.alibaba.yycome;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
