@@ -1,0 +1,33 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: 01-spring-ai-alibaba-graph
+
+  ai:
+    dashscope:
+      api-key: ${AI_DASHSCOPE_API_KEY}
+      chat:
+        options:
+#          model: qwen-plus
+          model: qwen3-max
+
+
+     # 可观测性
+    # 由于提示词通常较大，且比较敏感，因此默认值为 false
+#    chat:
+#      observations:
+#        log-prompt: true
+#        log-completion: true
+#
+#
+#
+logging:
+  level:
+    org:
+      springframework:
+        ai:
+          chat:
+            client:
+              advisor: DEBUG
