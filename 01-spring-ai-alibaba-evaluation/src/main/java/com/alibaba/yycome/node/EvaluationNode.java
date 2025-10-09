@@ -2,10 +2,8 @@ package com.alibaba.yycome.node;
 
 import com.alibaba.cloud.ai.graph.OverAllState;
 import com.alibaba.cloud.ai.graph.action.NodeAction;
-import com.alibaba.yycome.model.dto.EvaluationResult;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.messages.UserMessage;
-import org.springframework.ai.converter.BeanOutputConverter;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -14,11 +12,8 @@ public class EvaluationNode implements NodeAction {
 
     public ChatClient evaluationAgent;
 
-    private final BeanOutputConverter<EvaluationResult> converter;
-
     public EvaluationNode(ChatClient evaluationAgent) {
         this.evaluationAgent = evaluationAgent;
-        this.converter = new BeanOutputConverter<>(EvaluationResult.class);
     }
 
     @Override
