@@ -1,0 +1,38 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: 03-spring-ai-alibaba-mcp
+
+  ai:
+    dashscope:
+      api-key: ${AI_DASHSCOPE_API_KEY}
+      chat:
+        options:
+          #          model: qwen-plus
+          model: qwen3-max
+
+    mcp:
+      client:
+#        stdio:
+#          servers-configuration: classpath:/mcp-server-config.json
+        enabled: true
+        sse:
+          connections:
+            server1:
+              url: https://dashscope.aliyuncs.com
+              sse-endpoint: /api/v1/mcps/WebParser/sse
+
+logging:
+  level:
+    io:
+      modelcontextprotocol:
+        client: DEBUG
+        spec: DEBUG
+    org:
+      springframework:
+        ai:
+          chat:
+            client:
+              advisor: DEBUG

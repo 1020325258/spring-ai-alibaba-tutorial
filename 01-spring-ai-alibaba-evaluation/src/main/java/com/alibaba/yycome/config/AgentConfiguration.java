@@ -14,7 +14,7 @@ public class AgentConfiguration {
     private Resource evaluationPrompt;
 
     @Bean
-    public ChatClient analysisAgent(ChatClient.Builder builder) {
+    public ChatClient evaluationAgent(ChatClient.Builder builder) {
         return builder
                 .defaultSystem(ResourceUtil.loadResourceAsString(evaluationPrompt))
                 .build();

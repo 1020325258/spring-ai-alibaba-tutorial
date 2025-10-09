@@ -33,8 +33,8 @@ public class Test {
         Disposable errorInStreamProcessing = nodeOutputFlux.doOnNext(output -> {
             String nodeName = output.node();
             String content = "";
-            if (nodeName.equals("analysis")) {
-                content = output.state().value("analysis_content", "");
+            if (nodeName.equals("evaluation")) {
+                content = output.state().value("evaluation_content", "");
             } else if (nodeName.equals("rag")) {
                 content = output.state().value("rag_content", "");
             }

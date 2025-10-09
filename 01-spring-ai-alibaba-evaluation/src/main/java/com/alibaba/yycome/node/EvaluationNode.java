@@ -3,7 +3,6 @@ package com.alibaba.yycome.node;
 import com.alibaba.cloud.ai.graph.OverAllState;
 import com.alibaba.cloud.ai.graph.action.NodeAction;
 import com.alibaba.yycome.model.dto.EvaluationResult;
-import io.vertx.ext.auth.User;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.converter.BeanOutputConverter;
@@ -11,21 +10,22 @@ import org.springframework.ai.converter.BeanOutputConverter;
 import java.util.HashMap;
 import java.util.Map;
 
-public class AnalysisNode implements NodeAction {
+public class EvaluationNode implements NodeAction {
 
-    public ChatClient analysisAgent;
+    public ChatClient evaluationAgent;
 
     private final BeanOutputConverter<EvaluationResult> converter;
 
-    public AnalysisNode(ChatClient analysisAgent) {
-        this.analysisAgent = analysisAgent;
+    public EvaluationNode(ChatClient evaluationAgent) {
+        this.evaluationAgent = evaluationAgent;
         this.converter = new BeanOutputConverter<>(EvaluationResult.class);
     }
 
     @Override
     public Map<String, Object> apply(OverAllState state) throws Exception {
-        System.out.println("执行了 analysis");
         Map<String, Object> result = new HashMap<>();
+        String query = state.value("query", "");
+        String answer = state.value("answer", "");
         String input = """
                 SQL更新流程如下：
                 1. **连接与认证**：连接器接收客户端连接，并进行认证和授权。
@@ -40,13 +40,12 @@ public class AnalysisNode implements NodeAction {
                 5. **持久化**：后台IO线程不定期将BufferPool中的脏页（已修改但未写入磁盘的数据）刷入磁盘，完成最终持久化。
                 该流程确保了事务的原子性、一致性、隔离性和持久性（ACID），并通过 redo log 和 binlog 的两阶段提交机制保证了主从复制和崩溃恢复的一致性。
                 """;
-        UserMessage userMessage = new UserMessage(input);
-        String content = analysisAgent.prompt().messages(userMessage).call().content();
-        result.put("analysis_content", content);
-
-//        EvaluationResult convert = converter.convert(content);
-//        System.out.println("反序列化后结果：" + convert.toString());
-
+        UserMessage userMessage = new UserMessage(
+                        "用户输入的问题为:" + query + "\n"
+                + "生成的内容为:" + answer
+        );
+        String content = evaluationAgent.prompt().messages(userMessage).call().content();
+        result.put("evaluation_content", content);
         return result;
     }
 }

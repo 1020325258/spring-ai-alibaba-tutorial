@@ -18,9 +18,9 @@ import reactor.core.publisher.Sinks;
 @SpringBootTest
 public class Test {
 
-    @Qualifier("analysisGraph")
+    @Qualifier("evaluationGraph")
     @Autowired
-    public StateGraph analysisGraph;
+    public StateGraph evaluationGraph;
 
     Logger logger = LoggerFactory.getLogger(Test.class);
 
@@ -29,13 +29,13 @@ public class Test {
 
         Sinks.Many<ServerSentEvent<String>> sink = Sinks.many().unicast().onBackpressureBuffer();
 
-        CompiledGraph compile = analysisGraph.compile();
+        CompiledGraph compile = evaluationGraph.compile();
         Flux<NodeOutput> nodeOutputFlux = compile.fluxStream();
         Disposable errorInStreamProcessing = nodeOutputFlux.doOnNext(output -> {
             String nodeName = output.node();
             String content = "";
-            if (nodeName.equals("analysis")) {
-                content = output.state().value("analysis_content", "");
+            if (nodeName.equals("evaluation")) {
+                content = output.state().value("evaluation", "");
             }
             logger.info("node name:" + nodeName + " content:" + content);
             sink.tryEmitNext(ServerSentEvent.builder(nodeName + "处理结果:" + content).build());
