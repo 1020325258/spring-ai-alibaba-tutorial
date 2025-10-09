@@ -4,6 +4,7 @@ import com.alibaba.cloud.ai.graph.CompiledGraph;
 import com.alibaba.cloud.ai.graph.NodeOutput;
 import com.alibaba.cloud.ai.graph.StateGraph;
 import com.alibaba.cloud.ai.graph.exception.GraphStateException;
+import com.alibaba.yycome.service.GraphProcessor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -41,28 +42,10 @@ public class EvaluationController {
 
         // 执行图，获取 Flux 流
         Flux<NodeOutput> nodeOutputFlux = compiledGraph.fluxStream(inputs);
-        CompletableFuture.runAsync(() -> {
-            // 处理 Flux 流，从 State 获取各个节点的输出
-            nodeOutputFlux.doOnNext(output -> {
-                String nodeName = output.node();
-                String content = "";
-                if (nodeName.equals("evaluation")) {
-                    content = output.state().value("evaluation_content", "");
-                }
-                logger.info("node name:" + nodeName + " content:" + content);
-                sink.tryEmitNext(ServerSentEvent.builder(nodeName + "处理结果:" + content).build());
-            }).doOnComplete(() -> {
-                logger.info("Stream processing completed.");
-                sink.tryEmitComplete();
-            }).doOnError(e -> {
-                logger.error("Error in stream processing", e);
-                sink.tryEmitNext(
-                        // 服务端异常时，给前端发送消息
-                        ServerSentEvent.builder("服务端处理异常")
-                                .build());
-                sink.tryEmitError(e);
-            }).subscribe();
-        });
+
+        // 处理节点输出的 Flux 流，给前端响应结果
+        GraphProcessor graphProcessor = new GraphProcessor(nodeOutputFlux, sink);
+        graphProcessor.process();
 
         return sink.asFlux()
                 .doOnCancel(() -> logger.info("Client disconnected from stream"))
