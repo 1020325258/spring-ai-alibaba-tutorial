@@ -33,7 +33,8 @@ public class AgentConfiguration {
                 .withIndexName("面试解析生成")
                 // 最小相关性分数阈值
                 .withRerankMinScore(0.6f)
-                .withEnableRewrite(true)
+                // 是否允许答案进行重写
+                .withEnableRewrite(false)
                 .build());
         return builder.defaultAdvisors(List.of(new DocumentRetrievalAdvisor(documentRetriever), new SimpleLoggerAdvisor())).build();
     }

@@ -19,14 +19,13 @@ public class RagNode implements NodeAction {
 
     @Override
     public Map<String, Object> apply(OverAllState state) throws Exception {
-
         Map<String, Object> result = new HashMap<>();
 
-        Message userMessage = new UserMessage(
-                """
-                        sql 的更新流程是什么？
-                        """
-        );
+        // 获取用户输入
+        String query = state.value("query", "");
+        Message userMessage = new UserMessage(query);
+
+        // 调用大模型获取结果
         String content = ragAgent.prompt().messages(userMessage).call().content();
 
         result.put("rag_content", content);
