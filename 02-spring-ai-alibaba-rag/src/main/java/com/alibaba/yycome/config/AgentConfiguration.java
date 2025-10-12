@@ -36,6 +36,7 @@ public class AgentConfiguration {
                 // 是否允许答案进行重写
                 .withEnableRewrite(false)
                 .build());
-        return builder.defaultAdvisors(List.of(new DocumentRetrievalAdvisor(documentRetriever), new SimpleLoggerAdvisor())).build();
+        DocumentRetrievalAdvisor documentRetrievalAdvisor = new DocumentRetrievalAdvisor(documentRetriever);
+        return builder.defaultAdvisors(List.of(documentRetrievalAdvisor, new SimpleLoggerAdvisor())).build();
     }
 }
