@@ -1,6 +1,5 @@
 package com.alibaba.yycome;
 
-import com.alibaba.yycome.config.OpenMeteoService;
 import com.alibaba.yycome.config.WeatherService;
 import org.springframework.ai.tool.ToolCallbackProvider;
 import org.springframework.ai.tool.method.MethodToolCallbackProvider;
