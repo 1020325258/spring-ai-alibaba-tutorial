@@ -16,7 +16,7 @@ import java.util.Map;
 
 @SpringBootApplication
 public class Application {
-    private String userInput1 = "北京的天气如何？";
+    private String userInput1 = "mysql的面试题有哪些？";
 
     @Autowired
     private Map<String, ToolCallbackProvider> tooolCallbacks;
