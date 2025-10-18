@@ -18,9 +18,6 @@ import java.util.Map;
 public class Application {
     private String userInput1 = "mysql的面试题有哪些？";
 
-    @Autowired
-    private Map<String, ToolCallbackProvider> tooolCallbacks;
-
     @Bean
     public CommandLineRunner predefinedQuestions(ChatClient.Builder chatClientBuilder, ToolCallbackProvider tools,
                                                  ConfigurableApplicationContext context) {
