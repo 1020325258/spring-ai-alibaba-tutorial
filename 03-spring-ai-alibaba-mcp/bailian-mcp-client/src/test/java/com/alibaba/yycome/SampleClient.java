@@ -36,8 +36,9 @@ public class SampleClient {
     }
 
     public void run() {
-
+        // 创建 McpClient
         var client = McpClient.sync(transport).build();
+        // 初始化与 MCP Server 的连接
         client.initialize();
         client.ping();
 
@@ -45,7 +46,7 @@ public class SampleClient {
         ListToolsResult toolsList = client.listTools();
         System.out.println("可用工具 = " + toolsList);
 
-        // 获取北京的天气预报
+        // 调用 Tool
         CallToolResult weatherForecastResult = client.callTool(new CallToolRequest("webSearchSogou",
                 Map.of("search_query", "mysql的面试题有哪些？")));
         System.out.println("搜索结果: " + weatherForecastResult);

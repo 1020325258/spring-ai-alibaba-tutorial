@@ -23,8 +23,9 @@ spring:
         sse:
           connections:
             server1:
-              url: https://dashscope.aliyuncs.com/ # 本地
+              url: https://dashscope.aliyuncs.com/
               sse-endpoint: /api/v1/mcps/zhipu-websearch/sse
+              # 定义百炼平台鉴权 header
               headers:
                 Authorization: Bearer ${AI_DASHSCOPE_API_KEY}
 

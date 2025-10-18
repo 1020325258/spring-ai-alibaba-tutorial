@@ -23,10 +23,10 @@ import org.springframework.web.reactive.function.client.WebClient;
  * @author brianxiadong
  */
 public class ClientSse {
-
 	public static void main(String[] args) {
+		// 定义 Transport
 		var transport = new WebFluxSseClientTransport(WebClient.builder().defaultHeader("Authorization", "Bearer " + System.getenv("AI_DASHSCOPE_API_KEY")).baseUrl("https://dashscope.aliyuncs.com"), new ObjectMapper(), "/api/v1/mcps/zhipu-websearch/sse");
+		// 创建 McpClient
 		new SampleClient(transport).run();
 	}
-
 }
