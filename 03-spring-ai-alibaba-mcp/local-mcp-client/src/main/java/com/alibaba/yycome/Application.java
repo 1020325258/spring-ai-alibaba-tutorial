@@ -14,6 +14,7 @@ import org.springframework.context.annotation.Bean;
 @SpringBootApplication
 public class Application {
     private String userInput1 = "北京的天气如何？";
+    private String userInput2 = "张三同学的成绩如何？";
     @Bean
     public CommandLineRunner predefinedQuestions(ChatClient.Builder chatClientBuilder, ToolCallbackProvider tools,
                                                  ConfigurableApplicationContext context) {
@@ -26,6 +27,9 @@ public class Application {
 
             System.out.println("\n>>> QUESTION: " + userInput1);
             System.out.println("\n>>> ASSISTANT: " + chatClient.prompt(userInput1).call().content());
+
+            System.out.println("\n>>> QUESTION: " + userInput2);
+            System.out.println("\n>>> ASSISTANT: " + chatClient.prompt(userInput2).call().content());
 
             context.close();
         };
