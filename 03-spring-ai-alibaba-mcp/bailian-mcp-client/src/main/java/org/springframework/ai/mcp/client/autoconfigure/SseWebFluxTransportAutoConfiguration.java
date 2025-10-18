@@ -39,7 +39,7 @@ public class SseWebFluxTransportAutoConfiguration {
 
         for(Map.Entry<String, McpSseClientProperties.SseParameters> serverParameters : sseProperties.getConnections().entrySet()) {
             WebClient.Builder webClientBuilder = webClientBuilderTemplate.clone().baseUrl(((McpSseClientProperties.SseParameters)serverParameters.getValue()).url())
-                    // 添加请求头
+                    // 取出 application.yml 中定义的鉴权 header 放入 WebbClient 中，发送请求时携带
                     .defaultHeaders((headers) ->
                             {
                                 if (serverParameters.getValue().headers() != null) {
