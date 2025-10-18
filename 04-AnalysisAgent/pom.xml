@@ -7,10 +7,10 @@
         <version>1.0-SNAPSHOT</version>
     </parent>
 
-    <artifactId>02-spring-ai-alibaba-rag</artifactId>
+    <artifactId>04-AnalysisAgent</artifactId>
     <packaging>jar</packaging>
 
-    <name>02-spring-ai-alibaba-rag</name>
+    <name>04-AnalysisAgent</name>
     <url>http://maven.apache.org</url>
 
     <properties>

@@ -1,0 +1,40 @@
+server:
+  port: 8888
+  servlet:
+    encoding:
+      charset: UTF-8
+      enabled: true
+      force: true
+
+spring:
+  application:
+    name: mcp
+  main:
+    web-application-type: none
+  ai:
+    dashscope:
+      api-key: ${AI_DASHSCOPE_API_KEY}
+      chat:
+        options:
+          #          model: qwen-plus
+          model: qwen3-max
+    mcp:
+      client:
+        sse:
+          connections:
+            server1:
+              url: https://dashscope.aliyuncs.com/ # 本地
+              sse-endpoint: /api/v1/mcps/zhipu-websearch/sse
+              headers:
+                Authorization: Bearer ${AI_DASHSCOPE_API_KEY}
+
+  mandatory-file-encoding: UTF-8
+
+# 调试日志
+logging:
+  level:
+    io:
+      modelcontextprotocol:
+        client: DEBUG
+        spec: DEBUG
+

@@ -13,8 +13,8 @@
     <name>03-spring-ai-alibaba-mcp</name>
     <url>http://maven.apache.org</url>
     <modules>
-        <module>mcp-client</module>
-        <module>mcp-server</module>
+        <module>local-mcp-client</module>
+        <module>local-mcp-server</module>
     </modules>
 
     <properties>
