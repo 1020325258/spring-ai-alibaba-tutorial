@@ -35,8 +35,8 @@ public class GraphProcessor {
                     content = "START";
                 } else if (StateGraph.END.equals(nodeName)) {
                     content = "END";
-                } else if (nodeName.equals("evaluation")) {
-                    content = output.state().value("evaluation_content", "");
+                } else if (nodeName.equals("planner")) {
+                    content = output.state().value("planner_content", "");
                 }
                 logger.info("node name:" + nodeName + " content:" + content);
                 sink.tryEmitNext(ServerSentEvent.builder(nodeName + "处理结果:" + content).build());
