@@ -31,11 +31,12 @@ public class AnalysisController {
     }
 
     @GetMapping("/analysis")
-    public Flux<ServerSentEvent<String>> analysis(@RequestParam("query") String query) {
+    public Flux<ServerSentEvent<String>> analysis(@RequestParam("query") String query, @RequestParam("autoAcceptPlan") Boolean autoAcceptPlan) {
         Sinks.Many<ServerSentEvent<String>> sink = Sinks.many().unicast().onBackpressureBuffer();
 
         Map<String, Object> inputs = new HashMap<>();
         inputs.put("query", query);
+        inputs.put("autoAcceptPlan", autoAcceptPlan);
 
         // 执行图，获取 Flux 流
         Flux<NodeOutput> nodeOutputFlux = compiledGraph.fluxStream(inputs);

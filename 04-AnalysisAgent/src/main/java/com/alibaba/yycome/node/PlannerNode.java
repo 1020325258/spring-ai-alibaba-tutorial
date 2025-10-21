@@ -3,6 +3,8 @@ package com.alibaba.yycome.node;
 import com.alibaba.cloud.ai.graph.OverAllState;
 import com.alibaba.cloud.ai.graph.action.NodeAction;
 import com.alibaba.yycome.entity.Plan;
+import com.alibaba.yycome.enums.StateKeyEnum;
+import com.alibaba.yycome.util.PromptTemplateUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.client.ChatClient;
@@ -28,21 +30,18 @@ public class PlannerNode implements NodeAction {
 
     @Override
     public Map<String, Object> apply(OverAllState state) throws Exception {
-        Map<String, Object> resultMap = new HashMap<>();
-        String query = state.value("query", "");
+        Map<String, Object> result = new HashMap<>();
+        String query = state.value(StateKeyEnum.QUERY.getKey(), "");
 
         List<Message> messages = new ArrayList<>();
+        // 添加系统提示词
+        messages.add(PromptTemplateUtil.getPlannerMessage(state));
+        // 添加用户问题
         messages.add(new UserMessage(query));
+
         String content = plannerAgent.prompt().messages(messages).call().content();
         logger.info("planner output:" + content);
-
-        BeanOutputConverter<Plan> converter = new BeanOutputConverter<>(new ParameterizedTypeReference<Plan>() {});
-        try {
-            Plan plan = converter.convert(content);
-        } catch (Exception e) {
-            logger.info("planner convert error", e);
-        }
-        resultMap.put("planner_content", content);
-        return resultMap;
+        result.put(StateKeyEnum.PLANNER_CONTENT.getKey(), content);
+        return result;
     }
 }

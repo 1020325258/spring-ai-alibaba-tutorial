@@ -10,14 +10,14 @@ import org.springframework.core.io.Resource;
 @Configuration
 public class AgentConfiguration {
 
-    @Value("classpath:prompts/planner.md")
-    private Resource plannerPrompt;
-
     @Bean
     public ChatClient plannerAgent(ChatClient.Builder builder) {
-        return builder
-                .defaultSystem(ResourceUtil.loadResourceAsString(plannerPrompt))
-                .build();
+        return builder.build();
+    }
+
+    @Bean
+    public ChatClient planAcceptAgent(ChatClient.Builder builder) {
+        return builder.build();
     }
 
 }

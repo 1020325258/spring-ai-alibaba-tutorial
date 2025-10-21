@@ -7,6 +7,8 @@ import com.alibaba.cloud.ai.graph.StateGraph;
 import com.alibaba.cloud.ai.graph.action.AsyncNodeAction;
 import com.alibaba.cloud.ai.graph.exception.GraphStateException;
 import com.alibaba.cloud.ai.graph.state.strategy.ReplaceStrategy;
+import com.alibaba.yycome.enums.StateKeyEnum;
+import com.alibaba.yycome.node.PlanAcceptNode;
 import com.alibaba.yycome.node.PlannerNode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -25,22 +27,28 @@ public class GraphConfiguration {
     @Autowired
     private ChatClient plannerAgent;
 
+    @Autowired
+    private ChatClient planAcceptAgent;
+
     @Bean
     public StateGraph analysisGraph() throws GraphStateException {
 
         KeyStrategyFactory keyStrategyFactory = () -> {
             HashMap<String, KeyStrategy> keyStrategyHashMap = new HashMap<>();
             // 用户输入
-            keyStrategyHashMap.put("query", new ReplaceStrategy());
-            keyStrategyHashMap.put("final_answer", new ReplaceStrategy());
-            keyStrategyHashMap.put("planner_output", new ReplaceStrategy());
+            keyStrategyHashMap.put(StateKeyEnum.QUERY.getKey(), new ReplaceStrategy());
+            keyStrategyHashMap.put(StateKeyEnum.AUTO_ACCEPT_PLAN.getKey(), new ReplaceStrategy());
+            keyStrategyHashMap.put(StateKeyEnum.FINAL_ANSWER.getKey(), new ReplaceStrategy());
+            keyStrategyHashMap.put(StateKeyEnum.PLANNER_CONTENT.getKey(), new ReplaceStrategy());
             return keyStrategyHashMap;
         };
 
         StateGraph stateGraph = new StateGraph("Evaluation Graph", keyStrategyFactory)
                 .addNode("planner", AsyncNodeAction.node_async(new PlannerNode(plannerAgent)))
+                .addNode("plan_accept", AsyncNodeAction.node_async(new PlanAcceptNode(planAcceptAgent)))
                 .addEdge(StateGraph.START, "planner")
-                .addEdge("planner", StateGraph.END);
+                .addEdge("planner", "plan_accept")
+                .addEdge("plan_accept", StateGraph.END);
 
         GraphRepresentation graphRepresentation = stateGraph.getGraph(GraphRepresentation.Type.PLANTUML);
         logger.info("\n\n");
