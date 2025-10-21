@@ -107,8 +107,23 @@ public class Plan {
 			this.executionStatus = executionStatus;
 		}
 
-
-
+//		public List<ReflectionResult> getReflectionHistory() {
+//			if (reflectionHistory == null) {
+//				reflectionHistory = new ArrayList<>();
+//			}
+//			return reflectionHistory;
+//		}
+//
+//		public void setReflectionHistory(List<ReflectionResult> reflectionHistory) {
+//			this.reflectionHistory = reflectionHistory;
+//		}
+//
+//		/**
+//		 * 添加反思记录
+//		 */
+//		public void addReflectionRecord(ReflectionResult record) {
+//			getReflectionHistory().add(record);
+//		}
 
 	}
 

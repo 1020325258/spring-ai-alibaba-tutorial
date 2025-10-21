@@ -2,7 +2,6 @@ package com.alibaba.yycome.node;
 
 import com.alibaba.cloud.ai.graph.OverAllState;
 import com.alibaba.cloud.ai.graph.action.NodeAction;
-import com.alibaba.yycome.entity.Plan;
 import com.alibaba.yycome.enums.StateKeyEnum;
 import com.alibaba.yycome.util.PromptTemplateUtil;
 import org.slf4j.Logger;
@@ -10,8 +9,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.messages.UserMessage;
-import org.springframework.ai.converter.BeanOutputConverter;
-import org.springframework.core.ParameterizedTypeReference;
 
 import java.util.ArrayList;
 import java.util.HashMap;

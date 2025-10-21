@@ -35,6 +35,7 @@ public class PlanAcceptNode implements NodeAction {
             if (autoAcceptPlan) {
                 // 将计划存入 State
                 result.put(StateKeyEnum.PLAN.getKey(), plan);
+                logger.info("Plan auto accept: {}", plan);
             } else {
                 // todo 增加人员反馈节点
             }

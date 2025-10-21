@@ -2,6 +2,10 @@ package com.alibaba.yycome.service;
 
 import com.alibaba.cloud.ai.graph.NodeOutput;
 import com.alibaba.cloud.ai.graph.StateGraph;
+import com.alibaba.fastjson.JSON;
+import com.alibaba.yycome.enums.StateKeyEnum;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.codec.ServerSentEvent;
@@ -36,7 +40,9 @@ public class GraphProcessor {
                 } else if (StateGraph.END.equals(nodeName)) {
                     content = "END";
                 } else if (nodeName.equals("planner")) {
-                    content = output.state().value("planner_content", "");
+                    content = output.state().value(StateKeyEnum.PLANNER_CONTENT.getKey(), "");
+                } else if (nodeName.equals("plan_accept")) {
+                    content = JSON.toJSONString(output.state().value(StateKeyEnum.PLAN.getKey()));
                 }
                 logger.info("node name:" + nodeName + " content:" + content);
                 sink.tryEmitNext(ServerSentEvent.builder(nodeName + "处理结果:" + content).build());
