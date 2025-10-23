@@ -39,8 +39,8 @@ public class McpService {
         McpSchema.CallToolResult weatherForecastResult = client.callTool(new McpSchema.CallToolRequest("webSearchSogou",
                 Map.of("search_query", query)));
         System.out.println("搜索结果: " + weatherForecastResult);
+        client.closeGracefully();
         return weatherForecastResult.content();
-//        client.closeGracefully();
     }
 
 }

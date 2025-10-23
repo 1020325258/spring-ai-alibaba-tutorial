@@ -3,8 +3,15 @@ package com.alibaba.yycome;
 import com.alibaba.cloud.ai.toolcalling.aliyunaisearch.AliyunAiSearchService;
 import com.alibaba.cloud.ai.toolcalling.baidusearch.BaiduAiSearchService;
 import com.alibaba.cloud.ai.toolcalling.common.interfaces.SearchService;
+import com.alibaba.fastjson.JSON;
+import com.alibaba.yycome.entity.SearchResult;
 import com.alibaba.yycome.service.McpService;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.modelcontextprotocol.spec.McpSchema;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.text.StringEscapeUtils;
 import org.junit.jupiter.api.Test;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -30,6 +37,26 @@ public class McpTest {
         String query2 = "\"收集面试中关于事务隔离级别的常见错误回答（如混淆幻读与不可重复读、误认为 REPEATABLE READ 能完全避免幻读）、典型变体问题（如‘RR 级别下是否会出现幻读？’‘如何手动避免幻读？’），并分析面试官通过此题考察的维度（数据库基础、并发控制理解、实战调优意识）。";
         System.out.println(searchAgent.prompt(query2).call().content());
 
+    }
+
+    @Test
+    public void testMcpService() throws JsonProcessingException {
+        List<McpSchema.Content> query = mcpService.query("mysql 的面试题有哪些？");
+        for (McpSchema.Content content : query) {
+            String type = content.type();
+            if ("text".equals(type)) {
+                String text = ((McpSchema.TextContent) content).text();
+                ObjectMapper mapper = new ObjectMapper();
+                Object o = mapper.readValue(text, Object.class);
+                // 去除双引号
+                text = text.substring(1, text.length() - 1);
+                // 取出转义
+                text = StringEscapeUtils.unescapeJson(text);
+                System.out.println(text);
+                List<SearchResult> results = mapper.readValue(text, new TypeReference<List<SearchResult>>() {});
+                System.out.println(results);
+            }
+        }
     }
 
     @Autowired
