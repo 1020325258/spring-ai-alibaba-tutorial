@@ -52,10 +52,12 @@ public class SearchNode implements NodeAction {
             List<SearchResult> searchResults = mcpService.query(title);
             List<Message> messages = new ArrayList<>();
             messages.add(new UserMessage(
-                    "IMPORTANT: DO NOT include inline citations in the text. Instead, track all sources and include a References section at the end using link reference format. Include an empty line between each citation for better readability. Use this format for each reference:\n- [Source Title](URL)\n\n- [Another Source](URL)"));
+                    "重要说明：不要在正文中插入行内引用（inline citations）。\n" +
+                            "请在文末单独添加 References（参考文献） 部分，并使用 链接引用格式（link reference format）。\n" +
+                            "在每个引用之间留出一个空行，以保持良好的可读性。"));
             messages.add(new UserMessage(
                     "搜索结果：" + searchResults.stream().map(r -> {
-                        return String.format("标题: %s\n内容: %s\n", r.getTitle(), r.getContent());
+                        return String.format("标题: %s\n内容: %s\n链接: %s\n", r.getTitle(), r.getContent(), r.getLink());
                     }).collect(Collectors.joining("\n\n"))));
             searchContent.add(searchAgent.prompt().messages(messages)
                     .call()
