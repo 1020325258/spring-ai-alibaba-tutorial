@@ -13,7 +13,7 @@ public enum StateKeyEnum {
     PLANNER_CONTENT("planner_content", "计划节点输出内容"),
     MAX_STEP_NUM("max_step_num", "planner 节点输出计划的最大步骤数"),
     PLAN("plan", "Agent 最终需执行的 Plan"),
-    SEARCH_CONTENT("search_agent5", "SearchNode 节点输出结果"),
+    SEARCH_CONTENT("search_content", "SearchNode 节点输出结果"),
     ;
 
     private final String key;

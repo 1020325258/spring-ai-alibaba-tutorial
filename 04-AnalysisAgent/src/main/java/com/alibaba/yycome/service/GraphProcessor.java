@@ -43,6 +43,8 @@ public class GraphProcessor {
                     content = output.state().value(StateKeyEnum.PLANNER_CONTENT.getKey(), "");
                 } else if (nodeName.equals("plan_accept")) {
                     content = JSON.toJSONString(output.state().value(StateKeyEnum.PLAN.getKey()));
+                } else if (nodeName.equals("search_node")) {
+                    content = JSON.toJSONString(output.state().value(StateKeyEnum.SEARCH_CONTENT.getKey()));
                 }
                 logger.info("node name:" + nodeName + " content:" + content);
                 sink.tryEmitNext(ServerSentEvent.builder(nodeName + "处理结果:" + content).build());

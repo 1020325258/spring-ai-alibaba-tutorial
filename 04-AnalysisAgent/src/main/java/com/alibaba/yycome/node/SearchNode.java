@@ -11,6 +11,7 @@ import org.apache.commons.lang3.ObjectUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.messages.UserMessage;
 
 import java.util.*;
@@ -49,11 +50,14 @@ public class SearchNode implements NodeAction {
             }
             String title = step.getTitle();
             List<SearchResult> searchResults = mcpService.query(title);
-            UserMessage userMessage = new UserMessage(
+            List<Message> messages = new ArrayList<>();
+            messages.add(new UserMessage(
+                    "IMPORTANT: DO NOT include inline citations in the text. Instead, track all sources and include a References section at the end using link reference format. Include an empty line between each citation for better readability. Use this format for each reference:\n- [Source Title](URL)\n\n- [Another Source](URL)"));
+            messages.add(new UserMessage(
                     "搜索结果：" + searchResults.stream().map(r -> {
                         return String.format("标题: %s\n内容: %s\n", r.getTitle(), r.getContent());
-                    }).collect(Collectors.joining("\n\n")));
-            searchContent.add(searchAgent.prompt().messages(Collections.singletonList(userMessage))
+                    }).collect(Collectors.joining("\n\n"))));
+            searchContent.add(searchAgent.prompt().messages(messages)
                     .call()
                     .content());
             logger.info("SearchNode 输出结果: {}", searchContent);

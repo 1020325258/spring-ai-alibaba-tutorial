@@ -24,7 +24,7 @@ public class AgentConfiguration {
     @Bean
     public ChatClient searchAgent(ChatClient.Builder builder, ToolCallbackProvider tools) {
         return builder
-                .defaultToolCallbacks(tools)
+//                .defaultToolCallbacks(tools)
                 .build();
     }
 

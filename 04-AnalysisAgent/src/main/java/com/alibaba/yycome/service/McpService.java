@@ -39,9 +39,12 @@ public class McpService {
     }
 
     public List<SearchResult> query(String query) {
+
+        logger.info("McpService query: " + query);
+
         // 列出并展示可用的工具
-        McpSchema.ListToolsResult toolsList = mcpSyncClient.listTools();
-        System.out.println("可用工具 = " + toolsList);
+//        McpSchema.ListToolsResult toolsList = mcpSyncClient.listTools();
+//        System.out.println("可用工具 = " + toolsList);
 
         // 调用 Tool
         McpSchema.CallToolResult weatherForecastResult = mcpSyncClient.callTool(new McpSchema.CallToolRequest("webSearchSogou",
@@ -49,7 +52,7 @@ public class McpService {
 
         List<SearchResult> results = processSearchResult(weatherForecastResult.content());
 
-        logger.info("McpService 搜索结果: {}", weatherForecastResult.content());
+        logger.info("McpService searchResult: {}", weatherForecastResult.content());
         return results;
     }
 

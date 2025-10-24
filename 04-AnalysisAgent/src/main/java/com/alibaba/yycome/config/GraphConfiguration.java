@@ -10,6 +10,8 @@ import com.alibaba.cloud.ai.graph.state.strategy.ReplaceStrategy;
 import com.alibaba.yycome.enums.StateKeyEnum;
 import com.alibaba.yycome.node.PlanAcceptNode;
 import com.alibaba.yycome.node.PlannerNode;
+import com.alibaba.yycome.node.SearchNode;
+import com.alibaba.yycome.service.McpService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.client.ChatClient;
@@ -30,6 +32,12 @@ public class GraphConfiguration {
     @Autowired
     private ChatClient planAcceptAgent;
 
+    @Autowired
+    private ChatClient searchAgent;
+
+    @Autowired
+    private McpService mcpService;
+
     @Bean
     public StateGraph analysisGraph() throws GraphStateException {
 
@@ -40,15 +48,18 @@ public class GraphConfiguration {
             keyStrategyHashMap.put(StateKeyEnum.AUTO_ACCEPT_PLAN.getKey(), new ReplaceStrategy());
             keyStrategyHashMap.put(StateKeyEnum.FINAL_ANSWER.getKey(), new ReplaceStrategy());
             keyStrategyHashMap.put(StateKeyEnum.PLANNER_CONTENT.getKey(), new ReplaceStrategy());
+            keyStrategyHashMap.put(StateKeyEnum.SEARCH_CONTENT.getKey(), new ReplaceStrategy());
             return keyStrategyHashMap;
         };
 
         StateGraph stateGraph = new StateGraph("Evaluation Graph", keyStrategyFactory)
                 .addNode("planner", AsyncNodeAction.node_async(new PlannerNode(plannerAgent)))
                 .addNode("plan_accept", AsyncNodeAction.node_async(new PlanAcceptNode(planAcceptAgent)))
+                .addNode("search_node", AsyncNodeAction.node_async(new SearchNode(searchAgent, mcpService)))
                 .addEdge(StateGraph.START, "planner")
                 .addEdge("planner", "plan_accept")
-                .addEdge("plan_accept", StateGraph.END);
+                .addEdge("plan_accept", "search_node")
+                .addEdge("search_node", StateGraph.END);
 
         GraphRepresentation graphRepresentation = stateGraph.getGraph(GraphRepresentation.Type.PLANTUML);
         logger.info("\n\n");
