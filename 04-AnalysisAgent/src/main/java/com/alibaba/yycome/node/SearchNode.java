@@ -44,13 +44,13 @@ public class SearchNode implements NodeAction {
         }
 
         List<String> searchContent = new ArrayList<>();
+        List<Message> messages = new ArrayList<>();
         for (Plan.Step step : plan.getSteps()) {
             if (!Plan.StepType.RESEARCH.equals(step.getStepType())) {
                 continue;
             }
             String title = step.getTitle();
             List<SearchResult> searchResults = mcpService.query(title);
-            List<Message> messages = new ArrayList<>();
             messages.add(new UserMessage(
                     "重要说明：不要在正文中插入行内引用（inline citations）。\n" +
                             "请在文末单独添加 References（参考文献） 部分，并使用 链接引用格式（link reference format）。\n" +
@@ -59,11 +59,11 @@ public class SearchNode implements NodeAction {
                     "搜索结果：" + searchResults.stream().map(r -> {
                         return String.format("标题: %s\n内容: %s\n链接: %s\n", r.getTitle(), r.getContent(), r.getLink());
                     }).collect(Collectors.joining("\n\n"))));
-            searchContent.add(searchAgent.prompt().messages(messages)
-                    .call()
-                    .content());
-            logger.info("SearchNode 输出结果: {}", searchContent);
         }
+        searchAgent.prompt().messages(messages)
+                .call()
+                .content();
+        logger.info("SearchNode 输出结果: {}", searchContent);
         result.put(StateKeyEnum.SEARCH_CONTENT.getKey(), searchContent);
         return result;
     }
