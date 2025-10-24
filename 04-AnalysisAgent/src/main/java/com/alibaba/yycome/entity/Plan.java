@@ -27,7 +27,7 @@ import java.util.List;
  * @author ViliamSun
  * @since 2025/5/18 17:48
  */
-public class Plan {
+public class  Plan {
 
 	private String title;
 

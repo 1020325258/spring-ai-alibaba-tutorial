@@ -41,22 +41,8 @@ public class McpTest {
 
     @Test
     public void testMcpService() throws JsonProcessingException {
-        List<McpSchema.Content> query = mcpService.query("mysql 的面试题有哪些？");
-        for (McpSchema.Content content : query) {
-            String type = content.type();
-            if ("text".equals(type)) {
-                String text = ((McpSchema.TextContent) content).text();
-                ObjectMapper mapper = new ObjectMapper();
-                Object o = mapper.readValue(text, Object.class);
-                // 去除双引号
-                text = text.substring(1, text.length() - 1);
-                // 取出转义
-                text = StringEscapeUtils.unescapeJson(text);
-                System.out.println(text);
-                List<SearchResult> results = mapper.readValue(text, new TypeReference<List<SearchResult>>() {});
-                System.out.println(results);
-            }
-        }
+        List<SearchResult> query = mcpService.query("mysql 的面试题有哪些？");
+        query.stream().forEach(System.out::println);
     }
 
     @Autowired
