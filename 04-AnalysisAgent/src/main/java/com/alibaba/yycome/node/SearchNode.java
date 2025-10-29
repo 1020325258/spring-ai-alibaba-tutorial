@@ -52,11 +52,11 @@ public class SearchNode implements NodeAction {
             if (!Plan.StepType.RESEARCH.equals(step.getStepType())) {
                 continue;
             }
-            String title = step.getTitle();
+            String title = step.getQuery();
             List<SearchResult> searchResults = mcpService.query(title);
             messages.add(new UserMessage(
                     "搜索结果：" + searchResults.stream().map(r -> {
-                        return String.format("标题: %s\n内容: %s\n链接: %s\n", r.getTitle(), r.getContent(), r.getLink());
+                        return String.format("查询问题: %s\n内容: %s\n链接: %s\n", r.getTitle(), r.getContent(), r.getLink());
                     }).collect(Collectors.joining("\n\n"))));
         }
         String searchContent = searchAgent.prompt().messages(messages)

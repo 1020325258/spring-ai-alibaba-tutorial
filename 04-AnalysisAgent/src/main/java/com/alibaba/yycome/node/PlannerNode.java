@@ -38,7 +38,9 @@ public class PlannerNode implements NodeAction {
 
         String content = plannerAgent.prompt().messages(messages).call().content();
         logger.info("planner output:" + content);
-        result.put(StateKeyEnum.PLANNER_CONTENT.getKey(), content);
+//        result.put(StateKeyEnum.PLANNER_CONTENT.getKey(), content);
+        result.put(StateKeyEnum.PLANNER_CONTENT.getKey(), "[{'query': '你好'}, {]");
+
         return result;
     }
 }

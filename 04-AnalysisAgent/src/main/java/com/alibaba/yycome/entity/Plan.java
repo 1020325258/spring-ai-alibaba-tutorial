@@ -47,7 +47,7 @@ public class  Plan {
 	@NoArgsConstructor
 	public static class Step {
 
-		private String title;
+		private String query;
 
 		private String description;
 
