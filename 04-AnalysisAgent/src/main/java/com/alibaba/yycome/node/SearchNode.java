@@ -44,10 +44,6 @@ public class SearchNode implements NodeAction {
         }
 
         List<Message> messages = new ArrayList<>();
-        messages.add(new UserMessage(
-                "重要说明：不要在正文中插入行内引用（inline citations）。\n" +
-                        "请在文末单独添加 References（参考文献） 部分，并使用 链接引用格式（link reference format）。\n" +
-                        "在每个引用之间留出一个空行，以保持良好的可读性。"));
         for (Plan.Step step : plan.getSteps()) {
             if (!Plan.StepType.RESEARCH.equals(step.getStepType())) {
                 continue;
