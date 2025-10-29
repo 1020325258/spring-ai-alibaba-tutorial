@@ -18,6 +18,10 @@ package com.alibaba.yycome.entity;
 
 import com.fasterxml.jackson.annotation.JsonAlias;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import io.quarkus.arc.All;
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -27,21 +31,21 @@ import java.util.List;
  * @author ViliamSun
  * @since 2025/5/18 17:48
  */
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
 public class  Plan {
 
 	private String title;
-
-	@JsonProperty("has_enough_context")
-	private boolean hasEnoughContext;
 
 	private String thought;
 
 	private List<Step> steps;
 
+	@Data
+	@AllArgsConstructor
+	@NoArgsConstructor
 	public static class Step {
-
-		@JsonProperty("need_web_search")
-		private boolean needWebSearch;
 
 		private String title;
 
@@ -58,73 +62,6 @@ public class  Plan {
 		 * 反思历史记录，记录每次反思的评估过程和结果
 		 */
 //		private List<ReflectionResult> reflectionHistory;
-
-		public boolean isNeedWebSearch() {
-			return needWebSearch;
-		}
-
-		public void setNeedWebSearch(boolean needWebSearch) {
-			this.needWebSearch = needWebSearch;
-		}
-
-		public String getTitle() {
-			return title;
-		}
-
-		public void setTitle(String title) {
-			this.title = title;
-		}
-
-		public String getDescription() {
-			return description;
-		}
-
-		public void setDescription(String description) {
-			this.description = description;
-		}
-
-		public StepType getStepType() {
-			return stepType;
-		}
-
-		public void setStepType(StepType stepType) {
-			this.stepType = stepType;
-		}
-
-		public String getExecutionRes() {
-			return executionRes;
-		}
-
-		public void setExecutionRes(String executionRes) {
-			this.executionRes = executionRes;
-		}
-
-		public String getExecutionStatus() {
-			return executionStatus;
-		}
-
-		public void setExecutionStatus(String executionStatus) {
-			this.executionStatus = executionStatus;
-		}
-
-//		public List<ReflectionResult> getReflectionHistory() {
-//			if (reflectionHistory == null) {
-//				reflectionHistory = new ArrayList<>();
-//			}
-//			return reflectionHistory;
-//		}
-//
-//		public void setReflectionHistory(List<ReflectionResult> reflectionHistory) {
-//			this.reflectionHistory = reflectionHistory;
-//		}
-//
-//		/**
-//		 * 添加反思记录
-//		 */
-//		public void addReflectionRecord(ReflectionResult record) {
-//			getReflectionHistory().add(record);
-//		}
-
 	}
 
 	public enum StepType {
@@ -138,37 +75,4 @@ public class  Plan {
 		PROCESSING
 
 	}
-
-	public String getTitle() {
-		return title;
-	}
-
-	public void setTitle(String title) {
-		this.title = title;
-	}
-
-	public String getThought() {
-		return thought;
-	}
-
-	public void setThought(String thought) {
-		this.thought = thought;
-	}
-
-	public List<Step> getSteps() {
-		return steps;
-	}
-
-	public void setSteps(List<Step> steps) {
-		this.steps = steps;
-	}
-
-	public void setHasEnoughContext(boolean hasEnoughContext) {
-		this.hasEnoughContext = hasEnoughContext;
-	}
-
-	public boolean isHasEnoughContext() {
-		return hasEnoughContext;
-	}
-
 }
