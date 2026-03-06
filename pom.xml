@@ -15,6 +15,7 @@
     <module>03-spring-ai-alibaba-mcp</module>
     <module>03-spring-ai-alibaba-mcp/bailian-mcp-client</module>
     <module>04-AnalysisAgent</module>
+    <module>05-SREmate</module>
   </modules>
 
   <properties>
@@ -27,4 +28,36 @@
     <spring-boot.version>3.4.8</spring-boot.version>
     <maven-compiler-plugin.version>3.11.0</maven-compiler-plugin.version>
   </properties>
+
+  <dependencyManagement>
+    <dependencies>
+      <!-- Spring Boot BOM -->
+      <dependency>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-dependencies</artifactId>
+        <version>${spring-boot.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+
+      <!-- Spring AI Alibaba -->
+      <dependency>
+        <groupId>com.alibaba.cloud.ai</groupId>
+        <artifactId>spring-ai-alibaba-starter-dashscope</artifactId>
+        <version>${spring-ai-alibaba.version}</version>
+      </dependency>
+    </dependencies>
+  </dependencyManagement>
+
+  <build>
+    <pluginManagement>
+      <plugins>
+        <plugin>
+          <groupId>org.springframework.boot</groupId>
+          <artifactId>spring-boot-maven-plugin</artifactId>
+          <version>${spring-boot.version}</version>
+        </plugin>
+      </plugins>
+    </pluginManagement>
+  </build>
 </project>

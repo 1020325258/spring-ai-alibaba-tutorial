@@ -1,0 +1,49 @@
+server:
+  port: 8080
+  servlet:
+    encoding:
+      charset: UTF-8
+      enabled: true
+      force: true
+
+spring:
+  application:
+    name: sremate-agent
+
+  # Spring AI Alibaba配置
+  ai:
+    dashscope:
+      api-key: ${AI_DASHSCOPE_API_KEY}
+      chat:
+        options:
+          model: qwen3-max
+
+  # MySQL数据源配置（用于查询业务数据）
+  datasource:
+    sre:
+      jdbc-url: ${DB_URL:jdbc:mysql://localhost:3306/sre_db?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai}
+      username: ${DB_USERNAME:root}
+      password: ${DB_PASSWORD:root}
+      driver-class-name: com.mysql.cj.jdbc.Driver
+      hikari:
+        maximum-pool-size: 5
+        minimum-idle: 2
+        connection-timeout: 30000
+        idle-timeout: 600000
+        max-lifetime: 1800000
+
+  mandatory-file-encoding: UTF-8
+
+# 日志配置
+logging:
+  level:
+    root: INFO
+    com.yycome.sremate: DEBUG
+    org.springframework.ai: DEBUG
+
+# Actuator配置
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
