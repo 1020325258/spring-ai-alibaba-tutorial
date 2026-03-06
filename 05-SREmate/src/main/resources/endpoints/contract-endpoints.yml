@@ -1,0 +1,34 @@
+endpoints:
+  - id: sign-order-list
+    name: 查询可签约子单列表(S单)
+    description: |
+      根据项目订单ID查询该订单下所有可签约的子单（也称S单、签约单）列表。
+      当用户询问以下问题时使用此接口：
+      - "查询某订单下的子单/S单/签约单"
+      - "查看订单的子单列表"
+      - "某订单有哪些可签约的子单"
+      - "查询826022518000001562的子单"
+      注意：子单、S单、签约单是同义词，都指代可签约的子订单。
+    category: contract
+    urlTemplate: "http://utopia-nrs-sales-project.nrs-escrow.ttb.test.ke.com/home/contract/getSignOrderList/V3?projectOrderId=${projectOrderId}"
+    method: GET
+    parameters:
+      - name: host
+        type: string
+        description: 服务地址，如 utopia-nrs-sales-project.nrs-escrow.ttb.test.ke.com
+        required: true
+        defaultValue: "utopia-nrs-sales-project.nrs-escrow.ttb.test.ke.com"
+      - name: projectOrderId
+        type: string
+        description: 项目订单ID，用户提供的订单号
+        required: true
+        example: "826022518000001562"
+    headers:
+      X-NRS-User-Id: "1000000000000000"
+      Content-Type: "application/json"
+    timeout: 15
+    examples:
+      - "查询826022518000001562订单下的子单"
+      - "查询826022518000001562的子单"
+      - "查看订单826022518000001562的签约单列表"
+      - "项目订单826022518000001562有哪些可签约的S单"

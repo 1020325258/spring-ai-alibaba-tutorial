@@ -24,9 +24,10 @@ public class AgentConfiguration {
      * 创建SRE Agent
      */
     @Bean
-    public ChatClient sreAgent(ChatClient.Builder builder) {
+    public ChatClient sreAgent(ChatClient.Builder builder, ToolCallbackProvider sreTools) {
         return builder
                 .defaultSystem(sreAgentPrompt)
+                .defaultToolCallbacks(sreTools)
                 .build();
     }
 

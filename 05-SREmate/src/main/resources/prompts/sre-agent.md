@@ -24,15 +24,34 @@
   - description: 查询描述
 - 使用场景：需要查询数据库状态时使用
 
-### 3. callHttpEndpoint
-调用HTTP接口获取系统状态或诊断信息。
+### 3. callPredefinedEndpoint（推荐）
+调用预定义的接口，用于获取系统状态、诊断信息或业务数据。
+- 参数：
+  - endpointId: 预定义接口的标识
+  - params: 从用户输入中提取的参数值
+- 常用接口：
+  - sign-order-list: 查询项目订单的子单/S单列表（签约业务相关）
+  - health-check: 应用健康检查
+  - metrics: 应用性能指标
+- 使用场景：
+  - 用户询问"查询某订单的子单"、"子单列表"、"S单"等签约相关问题时，使用sign-order-list接口
+  - 需要检查应用健康状态或性能指标时使用health-check或metrics接口
+
+### 4. listAvailableEndpoints
+列出所有可用的预定义接口，帮助选择合适的接口进行调用。
+- 参数：
+  - category: 分类名称（可选），如 system、database、monitoring、contract
+- 使用场景：不确定有哪些接口可用时，先调用此工具查看
+
+### 5. callHttpEndpoint（传统方式）
+调用HTTP接口获取系统状态或诊断信息（需要完整URL）。
 - 参数：
   - url: 接口地址
   - method: HTTP方法（GET/POST）
   - params: 请求参数（POST请求使用）
-- 使用场景：需要调用监控接口或其他HTTP接口时使用
+- 使用场景：需要调用不在预定义列表中的HTTP接口时使用
 
-### 4. listSkillCategories
+### 6. listSkillCategories
 列出所有Skills分类，帮助用户了解可用的知识库类别。
 - 使用场景：当用户不确定问题类型时，可以列出所有分类供参考
 

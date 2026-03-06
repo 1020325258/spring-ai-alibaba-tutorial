@@ -10,10 +10,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 class SkillServiceUnitTest {
 
     private SkillService skillService;
+    private CacheService cacheService;
 
     @BeforeEach
     void setUp() {
-        skillService = new SkillService();
+        cacheService = new CacheService();
+        skillService = new SkillService(cacheService);
     }
 
     @Test
