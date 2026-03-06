@@ -15,6 +15,10 @@
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <!-- 覆盖父POM版本，将此模块升级至最新版本 -->
+        <spring-ai-alibaba.version>1.1.2.0</spring-ai-alibaba.version>
+        <spring-ai.version>1.1.2</spring-ai.version>
+        <spring-boot.version>3.5.8</spring-boot.version>
     </properties>
 
     <dependencies>
@@ -110,6 +114,19 @@
             <scope>test</scope>
         </dependency>
     </dependencies>
+
+    <dependencyManagement>
+        <dependencies>
+            <!-- 覆盖父POM中的Spring Boot BOM，升级至3.5.8 -->
+            <dependency>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-dependencies</artifactId>
+                <version>${spring-boot.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
 
     <build>
         <plugins>
