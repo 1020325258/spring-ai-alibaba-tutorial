@@ -70,7 +70,7 @@ public class SkillService {
                             return false;
                         }
                     })
-                    .collect(Collectors.toList());
+                    .toList();
 
             // 根据关键词匹配
             List<String> matchedContents = new ArrayList<>();
