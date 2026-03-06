@@ -132,6 +132,17 @@
             <artifactId>h2</artifactId>
             <scope>test</scope>
         </dependency>
+
+        <!--
+            spring-ai-model:1.1.2 的 POM 是空壳（stub），未声明传递依赖。
+            jsonschema-module-jackson 被 MethodToolCallbackProvider 在运行时用于
+            生成 @Tool 方法参数的 JSON Schema，必须显式引入。
+        -->
+        <dependency>
+            <groupId>com.github.victools</groupId>
+            <artifactId>jsonschema-module-jackson</artifactId>
+            <version>4.38.0</version>
+        </dependency>
     </dependencies>
 
     <build>
