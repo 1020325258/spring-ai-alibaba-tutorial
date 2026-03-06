@@ -4,9 +4,11 @@ import com.alibaba.cloud.ai.graph.GraphRepresentation;
 import com.alibaba.cloud.ai.graph.KeyStrategy;
 import com.alibaba.cloud.ai.graph.KeyStrategyFactory;
 import com.alibaba.cloud.ai.graph.StateGraph;
+import com.alibaba.cloud.ai.graph.action.AsyncEdgeAction;
 import com.alibaba.cloud.ai.graph.action.AsyncNodeAction;
 import com.alibaba.cloud.ai.graph.exception.GraphStateException;
 import com.alibaba.cloud.ai.graph.state.strategy.ReplaceStrategy;
+import com.alibaba.yycome.dispatcher.PlanAcceptDispatcher;
 import com.alibaba.yycome.enums.StateKeyEnum;
 import com.alibaba.yycome.node.PlanAcceptNode;
 import com.alibaba.yycome.node.PlannerNode;
@@ -20,6 +22,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 import java.util.HashMap;
+import java.util.Map;
 
 @Configuration
 public class GraphConfiguration {
@@ -58,7 +61,8 @@ public class GraphConfiguration {
                 .addNode("search_node", AsyncNodeAction.node_async(new SearchNode(searchAgent, mcpService)))
                 .addEdge(StateGraph.START, "planner")
                 .addEdge("planner", "plan_accept")
-                .addEdge("plan_accept", "search_node")
+                .addConditionalEdges("plan_accept", AsyncEdgeAction.edge_async(new PlanAcceptDispatcher()),
+                        Map.of("search_node", "search_node", "planner", "planner", StateGraph.END, StateGraph.END))
                 .addEdge("search_node", StateGraph.END);
 
         GraphRepresentation graphRepresentation = stateGraph.getGraph(GraphRepresentation.Type.PLANTUML);

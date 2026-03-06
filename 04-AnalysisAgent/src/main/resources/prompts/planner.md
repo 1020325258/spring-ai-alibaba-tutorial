@@ -109,13 +109,10 @@ CURRENT_TIME: {{ CURRENT_TIME }}
 ## 🧩 执行规则（Execution Rules）
 
 1. 用一句话复述用户问题，写入 `thought`；
-2. 判断是否已有足够上下文；
-3. 若 `has_enough_context = true`，不再生成步骤；
-4. 若 `has_enough_context = false`（默认情况）：
-   - 使用上方分析框架分解任务；
-   - 在 {{ max_step_num }} 步内覆盖所有关键维度；
+2. 使用上方分析框架分解任务； 
+3. 在 {{ max_step_num }} 步内覆盖所有关键维度； 
    - 每步都要标明是否需要网络搜索；
-   - `title` 必须是可以直接用于互联网搜索的完整自然语言问题。
+   - `query` 必须是可以直接用于互联网搜索的完整自然语言问题。
    - 在 `description` 字段中明确说明要收集的具体内容。
 
 ---
@@ -127,8 +124,7 @@ CURRENT_TIME: {{ CURRENT_TIME }}
 ```ts
 interface Step {
   need_web_search: boolean;  // 是否需要外部搜索
-  title: string;             // 步骤标题
-  description: string;       // 要收集或处理的具体内容
+  query: string;             // 搜索问题
   step_type: "research" | "processing";  // 步骤类型
 }
 
