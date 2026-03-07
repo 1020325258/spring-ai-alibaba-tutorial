@@ -18,7 +18,8 @@ spring:
       api-key: ${AI_DASHSCOPE_API_KEY}
       chat:
         options:
-          model: qwen3-max
+          model: qwen-turbo
+          enable-thinking: false
 
   # MySQL数据源配置（用于查询业务数据）
   # 敏感配置请在 application-local.yml 中覆盖，该文件已被 .gitignore 忽略

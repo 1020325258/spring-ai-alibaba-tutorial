@@ -1,5 +1,6 @@
 package com.yycome.sremate.tools;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.tool.annotation.Tool;
@@ -8,8 +9,12 @@ import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 /**
  * MySQL查询工具
@@ -22,13 +27,17 @@ public class MySQLQueryTool {
 
     private final JdbcTemplate jdbcTemplate;
     private final HttpQueryTool httpQueryTool;
+    private final ObjectMapper objectMapper;
+
+    // 用于并行 DB 子查询的线程池，大小与连接池对齐
+    private final ExecutorService dbQueryExecutor = Executors.newFixedThreadPool(5);
 
     /**
      * 执行MySQL查询
      *
-     * @param sql 要执行的SQL语句（仅支持SELECT查询）
+     * @param sql         要执行的SQL语句（仅支持SELECT查询）
      * @param description 查询描述
-     * @return 查询结果
+     * @return JSON格式查询结果
      */
     @Tool(description = "执行MySQL查询，用于排查数据库相关问题。" +
             "仅支持SELECT查询，禁止执行INSERT、UPDATE、DELETE等修改操作。" +
@@ -36,70 +45,46 @@ public class MySQLQueryTool {
     public String executeQuery(String sql, String description) {
         log.info("调用MySQLQueryTool - 描述: {}, SQL: {}", description, sql);
 
-        // 安全检查：只允许SELECT查询
         String trimmedSql = sql.trim().toUpperCase();
         if (!trimmedSql.startsWith("SELECT") && !trimmedSql.startsWith("SHOW")) {
-            return "错误：仅支持SELECT和SHOW查询，禁止执行修改操作";
+            return toErrorJson("仅支持SELECT和SHOW查询，禁止执行修改操作");
         }
 
         try {
             List<Map<String, Object>> results = jdbcTemplate.queryForList(sql);
+            List<Map<String, Object>> limited = results.size() > 10 ? results.subList(0, 10) : results;
 
-            if (results.isEmpty()) {
-                return "查询结果为空";
-            }
+            Map<String, Object> response = new LinkedHashMap<>();
+            response.put("description", description);
+            response.put("sql", sql);
+            response.put("total", results.size());
+            response.put("rows", limited);
 
-            // 格式化输出
-            StringBuilder result = new StringBuilder();
-            result.append(String.format("查询: %s\n", description));
-            result.append(String.format("SQL: %s\n", sql));
-            result.append(String.format("返回 %d 条记录:\n\n", results.size()));
-
-            for (int i = 0; i < results.size(); i++) {
-                Map<String, Object> row = results.get(i);
-                result.append(String.format("记录 %d:\n", i + 1));
-                row.forEach((key, value) ->
-                    result.append(String.format("  %s: %s\n", key, value))
-                );
-                result.append("\n");
-
-                // 限制输出数量，避免结果过大
-                if (i >= 9) {
-                    result.append("...(仅显示前10条记录)\n");
-                    break;
-                }
-            }
-
-            return result.toString();
-
+            return objectMapper.writeValueAsString(response);
         } catch (Exception e) {
             log.error("MySQL查询执行失败", e);
-            return "查询执行失败: " + e.getMessage();
+            return toErrorJson(e.getMessage());
         }
     }
 
     /**
-     * 根据合同编号查询 platform_instance_id（原始值）
+     * 根据合同编号查询 platform_instance_id（原始值，内部复用）
      */
     private Long findPlatformInstanceId(String contractCode) {
         List<Map<String, Object>> results = jdbcTemplate.queryForList(
                 "SELECT platform_instance_id FROM contract WHERE contract_code = ? LIMIT 1",
                 contractCode);
-        if (results.isEmpty()) {
-            return null;
-        }
+        if (results.isEmpty()) return null;
         Object val = results.get(0).get("platform_instance_id");
-        if (val == null) {
-            return null;
-        }
+        if (val == null) return null;
         return Long.parseLong(val.toString());
     }
 
     /**
-     * 根据合同编号查询 platform_instance_id（供 LLM 单步使用）
+     * 根据合同编号查询 platform_instance_id
      *
      * @param contractCode 合同编号（contract_code）
-     * @return platform_instance_id 文本描述
+     * @return JSON格式结果
      */
     @Tool(description = "根据合同编号（contract_code）查询合同的 platform_instance_id。" +
             "若只需要 instanceId 而不需要版式数据时使用此工具。" +
@@ -110,20 +95,23 @@ public class MySQLQueryTool {
         try {
             Long instanceId = findPlatformInstanceId(contractCode);
             if (instanceId == null) {
-                return "未找到合同编号为 " + contractCode + " 的合同记录";
+                return toErrorJson("未找到合同编号为 " + contractCode + " 的合同记录");
             }
-            return "contract_code=" + contractCode + " 对应的 platform_instance_id 为: " + instanceId;
+            Map<String, Object> result = new LinkedHashMap<>();
+            result.put("contractCode", contractCode);
+            result.put("platformInstanceId", instanceId);
+            return objectMapper.writeValueAsString(result);
         } catch (Exception e) {
             log.error("查询 platform_instance_id 失败", e);
-            return "查询失败: " + e.getMessage();
+            return toErrorJson(e.getMessage());
         }
     }
 
     /**
-     * 根据项目订单号查询所有合同，并聚合 contract_node、contract_user、contract_field_sharding 数据
+     * 根据项目订单号查询所有合同，聚合 contract_node、contract_user、contract_field_sharding 数据
      *
      * @param projectOrderId 项目订单号
-     * @return 聚合后的合同数据
+     * @return JSON格式聚合合同数据
      */
     @Tool(description = "根据项目订单号（project_order_id）查询该订单下的所有合同，" +
             "并聚合每份合同的节点记录（contract_node）、参与人信息（contract_user）" +
@@ -133,74 +121,68 @@ public class MySQLQueryTool {
     public String queryContractsByOrderId(String projectOrderId) {
         log.info("queryContractsByOrderId - projectOrderId: {}", projectOrderId);
         try {
-            // 1. 查询该订单下所有合同
             List<Map<String, Object>> contracts = jdbcTemplate.queryForList(
                     "SELECT contract_code, type, status, platform_instance_id, amount, ctime " +
                     "FROM contract WHERE project_order_id = ? AND del_status = 0",
                     projectOrderId);
 
             if (contracts.isEmpty()) {
-                return "订单 " + projectOrderId + " 下未找到合同记录";
+                return toErrorJson("订单 " + projectOrderId + " 下未找到合同记录");
             }
 
-            StringBuilder sb = new StringBuilder();
-            sb.append(String.format("订单 %s 共有 %d 份合同:\n\n", projectOrderId, contracts.size()));
+            List<Map<String, Object>> result = new ArrayList<>();
 
-            for (int i = 0; i < contracts.size(); i++) {
-                Map<String, Object> contract = contracts.get(i);
+            for (Map<String, Object> contract : contracts) {
                 String contractCode = String.valueOf(contract.get("contract_code"));
 
-                sb.append(String.format("【合同 %d】%s\n", i + 1, contractCode));
-                sb.append(String.format("  类型: %s  状态: %s  金额: %s  创建时间: %s\n",
-                        contract.get("type"), contract.get("status"),
-                        contract.get("amount"), contract.get("ctime")));
-                if (contract.get("platform_instance_id") != null) {
-                    sb.append(String.format("  platform_instance_id: %s\n", contract.get("platform_instance_id")));
-                }
+                Map<String, Object> item = new LinkedHashMap<>();
+                item.put("contractCode", contractCode);
+                item.put("type", contract.get("type"));
+                item.put("status", contract.get("status"));
+                item.put("amount", contract.get("amount"));
+                item.put("platformInstanceId", contract.get("platform_instance_id"));
+                item.put("ctime", String.valueOf(contract.get("ctime")));
 
-                // 2. 查询节点记录
-                List<Map<String, Object>> nodes = jdbcTemplate.queryForList(
-                        "SELECT node_type, fire_time FROM contract_node " +
-                        "WHERE contract_code = ? AND del_status = 0 ORDER BY fire_time",
-                        contractCode);
-                if (!nodes.isEmpty()) {
-                    sb.append("  节点记录:\n");
-                    nodes.forEach(n -> sb.append(String.format(
-                            "    node_type=%s  fire_time=%s\n", n.get("node_type"), n.get("fire_time"))));
-                }
-
-                // 3. 查询参与人
-                List<Map<String, Object>> users = jdbcTemplate.queryForList(
-                        "SELECT role_type, name, phone, is_sign, is_auth " +
-                        "FROM contract_user WHERE contract_code = ? AND del_status = 0",
-                        contractCode);
-                if (!users.isEmpty()) {
-                    sb.append("  参与人:\n");
-                    users.forEach(u -> sb.append(String.format(
-                            "    role_type=%s  name=%s  phone=%s  is_sign=%s  is_auth=%s\n",
-                            u.get("role_type"), u.get("name"), u.get("phone"),
-                            u.get("is_sign"), u.get("is_auth"))));
-                }
-
-                // 4. 查询扩展字段（分库分表：合同号数字部分 % 10）
+                // 三张关联表并行查询
                 String shardTable = resolveFieldShardingTable(contractCode);
-                List<Map<String, Object>> fields = jdbcTemplate.queryForList(
-                        "SELECT field_key, field_value FROM " + shardTable +
-                        " WHERE contract_code = ? AND del_status = 0 LIMIT 20",
-                        contractCode);
-                if (!fields.isEmpty()) {
-                    sb.append(String.format("  扩展字段（%s）:\n", shardTable));
-                    fields.forEach(f -> sb.append(String.format(
-                            "    %s = %s\n", f.get("field_key"), f.get("field_value"))));
-                }
 
-                sb.append("\n");
+                CompletableFuture<List<Map<String, Object>>> nodesFuture = CompletableFuture.supplyAsync(
+                        () -> jdbcTemplate.queryForList(
+                                "SELECT node_type, fire_time FROM contract_node " +
+                                "WHERE contract_code = ? AND del_status = 0 ORDER BY fire_time",
+                                contractCode), dbQueryExecutor);
+
+                CompletableFuture<List<Map<String, Object>>> usersFuture = CompletableFuture.supplyAsync(
+                        () -> jdbcTemplate.queryForList(
+                                "SELECT role_type, name, phone, is_sign, is_auth " +
+                                "FROM contract_user WHERE contract_code = ? AND del_status = 0",
+                                contractCode), dbQueryExecutor);
+
+                CompletableFuture<List<Map<String, Object>>> fieldsFuture = CompletableFuture.supplyAsync(
+                        () -> jdbcTemplate.queryForList(
+                                "SELECT field_key, field_value FROM " + shardTable +
+                                " WHERE contract_code = ? AND del_status = 0 LIMIT 20",
+                                contractCode), dbQueryExecutor);
+
+                CompletableFuture.allOf(nodesFuture, usersFuture, fieldsFuture).join();
+
+                item.put("contract_node", nodesFuture.join());
+                item.put("contract_user", usersFuture.join());
+
+                Map<String, Object> fieldMap = new LinkedHashMap<>();
+                fieldsFuture.join().forEach(f -> fieldMap.put(
+                        String.valueOf(f.get("field_key")),
+                        tryParseJson(f.get("field_value"))));
+                item.put("contract_field_sharding", fieldMap);
+                item.put("contract_field_sharding_table", shardTable);
+
+                result.add(item);
             }
 
-            return sb.toString();
+            return objectMapper.writeValueAsString(result);
         } catch (Exception e) {
             log.error("queryContractsByOrderId 失败", e);
-            return "查询合同列表失败: " + e.getMessage();
+            return toErrorJson(e.getMessage());
         }
     }
 
@@ -218,7 +200,7 @@ public class MySQLQueryTool {
      * 根据合同编号查询版式 form_id（自动串联数据库查询与 HTTP 接口调用）
      *
      * @param contractCode 合同编号（contract_code），如 C1772854666284956
-     * @return 版式接口响应（含 form_id）
+     * @return 版式接口原始响应
      */
     @Tool(description = "根据合同编号（contract_code）查询合同对应的版式 form_id。" +
             "该工具自动完成两步操作：1) 从数据库查询合同的 platform_instance_id；" +
@@ -230,7 +212,7 @@ public class MySQLQueryTool {
         try {
             Long instanceId = findPlatformInstanceId(contractCode);
             if (instanceId == null) {
-                return "未找到合同编号为 " + contractCode + " 的合同记录，无法查询版式";
+                return toErrorJson("未找到合同编号为 " + contractCode + " 的合同记录，无法查询版式");
             }
             log.info("queryContractFormId - contractCode: {}, instanceId: {}", contractCode, instanceId);
             Map<String, String> params = new HashMap<>();
@@ -238,7 +220,31 @@ public class MySQLQueryTool {
             return httpQueryTool.callPredefinedEndpoint("contract-form-data", params);
         } catch (Exception e) {
             log.error("查询合同版式失败", e);
-            return "查询合同版式失败: " + e.getMessage();
+            return toErrorJson(e.getMessage());
+        }
+    }
+
+    /**
+     * 若值是合法的 JSON 对象或数组字符串，解析后返回；否则原样返回。
+     */
+    private Object tryParseJson(Object value) {
+        if (!(value instanceof String str)) return value;
+        str = str.trim();
+        if (!(str.startsWith("{") || str.startsWith("["))) return value;
+        try {
+            return objectMapper.readValue(str, Object.class);
+        } catch (Exception e) {
+            return value;
+        }
+    }
+
+    private String toErrorJson(String message) {
+        try {
+            Map<String, String> err = new LinkedHashMap<>();
+            err.put("error", message);
+            return objectMapper.writeValueAsString(err);
+        } catch (Exception ex) {
+            return "{\"error\":\"" + message + "\"}";
         }
     }
 }

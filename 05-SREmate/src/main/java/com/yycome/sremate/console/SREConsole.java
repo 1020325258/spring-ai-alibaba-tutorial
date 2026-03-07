@@ -44,6 +44,9 @@ public class SREConsole implements CommandLineRunner {
     private final List<Message> conversationHistory = new ArrayList<>();
     private TraceSession currentSession;
 
+    /** 保留的最大消息条数（user + assistant 各算 1 条，10 条 = 5 轮对话） */
+    private static final int MAX_HISTORY = 10;
+
     @Override
     public void run(String... args) throws Exception {
         // 安装JAnsi
@@ -117,9 +120,11 @@ public class SREConsole implements CommandLineRunner {
                 // 添加用户消息到历史
                 conversationHistory.add(new UserMessage(input));
 
-                // 调用Agent（流式输出）
+                // 调用Agent
                 System.out.println(Ansi.ansi().fg(Ansi.Color.GREEN).a("\nSRE助手: ").reset());
 
+                long startMs = System.currentTimeMillis();
+                final long[] firstTokenMs = {-1};
                 StringBuilder responseBuilder = new StringBuilder();
 
                 sreAgent.prompt()
@@ -127,20 +132,30 @@ public class SREConsole implements CommandLineRunner {
                         .stream()
                         .content()
                         .doOnNext(chunk -> {
-                            // 实时输出每个chunk
+                            if (firstTokenMs[0] < 0) {
+                                firstTokenMs[0] = System.currentTimeMillis();
+                            }
                             System.out.print(chunk);
                             responseBuilder.append(chunk);
                         })
-                        .doOnComplete(() -> {
-                            // 输出完成，换行
-                            System.out.println();
-                        })
+                        .doOnComplete(() -> System.out.println())
                         .blockLast();
+
+                long totalMs = System.currentTimeMillis() - startMs;
+                long ttfbMs  = firstTokenMs[0] < 0 ? totalMs : firstTokenMs[0] - startMs;
+                System.out.println(Ansi.ansi().fg(Ansi.Color.CYAN)
+                        .a(String.format("⏱ 首字节: %dms  总耗时: %dms", ttfbMs, totalMs)).reset());
 
                 String response = responseBuilder.toString();
 
-                // 添加助手消息到历史
+                // JSON 响应自动复制到剪贴板
+                copyToClipboardIfJson(response);
+
+                // 添加助手消息到历史，并裁剪超出部分
                 conversationHistory.add(new AssistantMessage(response));
+                if (conversationHistory.size() > MAX_HISTORY) {
+                    conversationHistory.subList(0, conversationHistory.size() - MAX_HISTORY).clear();
+                }
 
             } catch (UserInterruptException e) {
                 // 处理Ctrl+C
@@ -176,6 +191,23 @@ public class SREConsole implements CommandLineRunner {
             System.out.println(Ansi.ansi().fg(Ansi.Color.CYAN).a("\n" + traceChain).reset());
         } else {
             System.out.println(Ansi.ansi().fg(Ansi.Color.YELLOW).a("\n暂无追踪数据").reset());
+        }
+    }
+
+    /**
+     * 若响应内容是 JSON（以 { 或 [ 开头），自动复制到系统剪贴板
+     */
+    private void copyToClipboardIfJson(String response) {
+        String trimmed = response.trim();
+        if (!trimmed.startsWith("{") && !trimmed.startsWith("[")) return;
+        try {
+            Process process = Runtime.getRuntime().exec(new String[]{"pbcopy"});
+            process.getOutputStream().write(trimmed.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            process.getOutputStream().close();
+            process.waitFor();
+            System.out.println(Ansi.ansi().fg(Ansi.Color.YELLOW).a("✓ JSON 已复制到剪贴板").reset());
+        } catch (Exception e) {
+            // 剪贴板复制失败不影响主流程
         }
     }
 }
