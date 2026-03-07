@@ -24,17 +24,31 @@
   - description: 查询描述
 - 使用场景：需要查询数据库状态时使用
 
+### 2a. queryContractFormId（推荐）
+根据合同编号（contract_code）一键查询版式 form_id。
+- 参数：
+  - contractCode: 合同编号，如 C1772854666284956
+- 使用场景：用户询问"查询某合同的版式"、"合同的form_id是什么"时**优先**使用此工具
+- 内部自动完成：查库获取 platform_instance_id → 调用版式接口返回 form_id
+
+### 2b. queryContractInstanceId
+根据合同编号查询 platform_instance_id（仅当只需要 instanceId 而不需要版式数据时使用）。
+- 参数：
+  - contractCode: 合同编号
+
 ### 3. callPredefinedEndpoint（推荐）
 调用预定义的接口，用于获取系统状态、诊断信息或业务数据。
 - 参数：
   - endpointId: 预定义接口的标识
   - params: 从用户输入中提取的参数值
 - 常用接口：
-  - sign-order-list: 查询项目订单的子单/S单列表（签约业务相关）
+  - sign-order-list: 查询项目订单的子单/S单列表（签约业务相关），参数 projectOrderId
+  - contract-form-data: 根据合同实例ID查询版式 form_id，参数 instanceId（当已知 instanceId 时直接使用，否则优先用 queryContractFormId）
   - health-check: 应用健康检查
   - metrics: 应用性能指标
 - 使用场景：
   - 用户询问"查询某订单的子单"、"子单列表"、"S单"等签约相关问题时，使用sign-order-list接口
+  - 已有 instanceId 需要查询版式时，使用 contract-form-data 接口
   - 需要检查应用健康状态或性能指标时使用health-check或metrics接口
 
 ### 4. listAvailableEndpoints

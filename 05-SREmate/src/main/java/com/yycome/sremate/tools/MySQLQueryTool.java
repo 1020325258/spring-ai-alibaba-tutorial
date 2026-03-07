@@ -6,6 +6,7 @@ import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -19,6 +20,7 @@ import java.util.Map;
 public class MySQLQueryTool {
 
     private final JdbcTemplate jdbcTemplate;
+    private final HttpQueryTool httpQueryTool;
 
     /**
      * 执行MySQL查询
@@ -76,28 +78,71 @@ public class MySQLQueryTool {
     }
 
     /**
-     * 根据合同编号查询 platform_instance_id
+     * 根据合同编号查询 platform_instance_id（原始值）
+     */
+    private Long findPlatformInstanceId(String contractCode) {
+        List<Map<String, Object>> results = jdbcTemplate.queryForList(
+                "SELECT platform_instance_id FROM contract WHERE contract_code = ? LIMIT 1",
+                contractCode);
+        if (results.isEmpty()) {
+            return null;
+        }
+        Object val = results.get(0).get("platform_instance_id");
+        if (val == null) {
+            return null;
+        }
+        return Long.parseLong(val.toString());
+    }
+
+    /**
+     * 根据合同编号查询 platform_instance_id（供 LLM 单步使用）
      *
      * @param contractCode 合同编号（contract_code）
-     * @return platform_instance_id，供后续调用版式查询接口使用
+     * @return platform_instance_id 文本描述
      */
     @Tool(description = "根据合同编号（contract_code）查询合同的 platform_instance_id。" +
-            "返回的 platform_instance_id 可作为 instanceId 传入版式查询接口（contract-form-data）以获取对应的 form_id。" +
+            "若只需要 instanceId 而不需要版式数据时使用此工具。" +
+            "如需同时获取 form_id，请直接使用 queryContractFormId。" +
             "contractCode 参数为合同编号字符串。")
     public String queryContractInstanceId(String contractCode) {
         log.info("queryContractInstanceId - contractCode: {}", contractCode);
         try {
-            List<Map<String, Object>> results = jdbcTemplate.queryForList(
-                    "SELECT platform_instance_id FROM contract WHERE contract_code = ? LIMIT 1",
-                    contractCode);
-            if (results.isEmpty()) {
+            Long instanceId = findPlatformInstanceId(contractCode);
+            if (instanceId == null) {
                 return "未找到合同编号为 " + contractCode + " 的合同记录";
             }
-            Object instanceId = results.get(0).get("platform_instance_id");
             return "contract_code=" + contractCode + " 对应的 platform_instance_id 为: " + instanceId;
         } catch (Exception e) {
             log.error("查询 platform_instance_id 失败", e);
             return "查询失败: " + e.getMessage();
+        }
+    }
+
+    /**
+     * 根据合同编号查询版式 form_id（自动串联数据库查询与 HTTP 接口调用）
+     *
+     * @param contractCode 合同编号（contract_code），如 C1772854666284956
+     * @return 版式接口响应（含 form_id）
+     */
+    @Tool(description = "根据合同编号（contract_code）查询合同对应的版式 form_id。" +
+            "该工具自动完成两步操作：1) 从数据库查询合同的 platform_instance_id；" +
+            "2) 以 platform_instance_id 作为 instanceId 调用版式查询接口获取 form_id。" +
+            "当用户询问\"查询某合同的版式\"、\"查合同的form_id\"、\"合同编号XXX的版式是什么\"时使用此工具。" +
+            "contractCode 参数为合同编号字符串，如 C1772854666284956。")
+    public String queryContractFormId(String contractCode) {
+        log.info("queryContractFormId - contractCode: {}", contractCode);
+        try {
+            Long instanceId = findPlatformInstanceId(contractCode);
+            if (instanceId == null) {
+                return "未找到合同编号为 " + contractCode + " 的合同记录，无法查询版式";
+            }
+            log.info("queryContractFormId - contractCode: {}, instanceId: {}", contractCode, instanceId);
+            Map<String, String> params = new HashMap<>();
+            params.put("instanceId", instanceId.toString());
+            return httpQueryTool.callPredefinedEndpoint("contract-form-data", params);
+        } catch (Exception e) {
+            log.error("查询合同版式失败", e);
+            return "查询合同版式失败: " + e.getMessage();
         }
     }
 }

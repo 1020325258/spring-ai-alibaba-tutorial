@@ -43,11 +43,13 @@ public class HttpQueryTool {
      */
     @Tool(description = "调用预定义的接口，用于获取系统状态、诊断信息或业务数据。" +
             "endpointId参数是预定义接口的标识，常用接口包括：" +
-            "- sign-order-list: 查询项目订单的子单/S单列表（签约业务相关）" +
+            "- sign-order-list: 查询项目订单的子单/S单列表（签约业务相关），参数 projectOrderId" +
+            "- contract-form-data: 根据合同实例ID查询版式 form_id，参数 instanceId（即 platform_instance_id）" +
             "- health-check: 应用健康检查" +
             "- metrics: 应用性能指标" +
             "params参数是从用户输入中提取的参数值。" +
-            "当用户询问\"查询某订单的子单\"、\"子单列表\"、\"S单\"等签约相关问题时，使用sign-order-list接口，参数projectOrderId为订单号。")
+            "当用户询问\"查询某订单的子单\"、\"子单列表\"、\"S单\"等签约相关问题时，使用sign-order-list接口，参数projectOrderId为订单号。" +
+            "当已有 instanceId 需要查询版式时，使用 contract-form-data 接口，参数 instanceId 为合同实例ID。")
     public String callPredefinedEndpoint(String endpointId, Map<String, String> params) {
         log.info("[TOOL_CALL] callPredefinedEndpoint - endpointId: {}, params: {}", endpointId, params);
 
