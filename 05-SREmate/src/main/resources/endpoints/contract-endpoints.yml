@@ -32,3 +32,33 @@ endpoints:
       - "查询826022518000001562的子单"
       - "查看订单826022518000001562的签约单列表"
       - "项目订单826022518000001562有哪些可签约的S单"
+
+  - id: contract-form-data
+    name: 查询合同版式表单数据
+    description: |
+      根据合同实例ID查询对应的版式表单ID（form_id）及表单数据。
+      当用户询问以下问题时使用此接口：
+      - "查询某合同的版式"
+      - "查询合同实例的form_id"
+      - "某合同实例的版式是什么"
+      - "查询instanceId为xxx的表单数据"
+      - "合同版式查询"
+      注意：instanceId 是合同实例ID，form_id 是版式标识符。
+    category: contract
+    urlTemplate: "http://utopia-nrs-sales-project.nrs-escrow.ttb.test.ke.com/api/contract/command/getFormData?instanceId=${instanceId}"
+    method: GET
+    parameters:
+      - name: instanceId
+        type: string
+        description: 合同实例ID
+        required: true
+        example: "116894442"
+    headers:
+      X-NRS-User-Id: "1000000000000000"
+      Content-Type: "application/json"
+    timeout: 15
+    examples:
+      - "查询合同实例116894442的版式"
+      - "查询instanceId为116894442的form_id"
+      - "合同116894442的版式是什么"
+      - "获取合同实例116894442的表单数据"
