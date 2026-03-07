@@ -74,4 +74,30 @@ public class MySQLQueryTool {
             return "查询执行失败: " + e.getMessage();
         }
     }
+
+    /**
+     * 根据合同编号查询 platform_instance_id
+     *
+     * @param contractCode 合同编号（contract_code）
+     * @return platform_instance_id，供后续调用版式查询接口使用
+     */
+    @Tool(description = "根据合同编号（contract_code）查询合同的 platform_instance_id。" +
+            "返回的 platform_instance_id 可作为 instanceId 传入版式查询接口（contract-form-data）以获取对应的 form_id。" +
+            "contractCode 参数为合同编号字符串。")
+    public String queryContractInstanceId(String contractCode) {
+        log.info("queryContractInstanceId - contractCode: {}", contractCode);
+        try {
+            List<Map<String, Object>> results = jdbcTemplate.queryForList(
+                    "SELECT platform_instance_id FROM contract WHERE contract_code = ? LIMIT 1",
+                    contractCode);
+            if (results.isEmpty()) {
+                return "未找到合同编号为 " + contractCode + " 的合同记录";
+            }
+            Object instanceId = results.get(0).get("platform_instance_id");
+            return "contract_code=" + contractCode + " 对应的 platform_instance_id 为: " + instanceId;
+        } catch (Exception e) {
+            log.error("查询 platform_instance_id 失败", e);
+            return "查询失败: " + e.getMessage();
+        }
+    }
 }
