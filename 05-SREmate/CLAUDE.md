@@ -98,6 +98,29 @@ public String queryXxxFull(String key) {
 
 ---
 
+## 分库分表处理规范
+
+`contract_field_sharding` 按合同号取模分为 10 张表（`_0` 至 `_9`）。
+
+**分片规则**：去除合同号中的非数字字符，取数字部分对 10 取模。
+
+```java
+// 统一使用此私有方法计算表名，禁止在方法内硬编码表后缀
+private String resolveFieldShardingTable(String contractCode) {
+    String digits = contractCode.replaceAll("[^0-9]", "");
+    int shard = (int) (Long.parseLong(digits) % 10);
+    return "contract_field_sharding_" + shard;
+}
+```
+
+示例：`C1772854666284956` → 数字部分 `1772854666284956` → `% 10 = 6` → `contract_field_sharding_6`
+
+**查询时注意**：
+- 表名由代码动态拼接，SQL 中不可用 `?` 绑定表名，需先调用 `resolveFieldShardingTable` 解析
+- 扩展字段可能较多，查询时加 `LIMIT` 避免返回内容过大（当前限制 20 条）
+
+---
+
 ## 更新 LLM 系统提示词
 
 新增工具或接口后，同步更新 `src/main/resources/prompts/sre-agent.md`：

@@ -24,7 +24,14 @@
   - description: 查询描述
 - 使用场景：需要查询数据库状态时使用
 
-### 2a. queryContractFormId（推荐）
+### 2a. queryContractsByOrderId
+根据项目订单号查询该订单下所有合同，并聚合关联数据。
+- 参数：
+  - projectOrderId: 项目订单号，如 826030619000001899
+- 使用场景：用户询问"某订单有哪些合同"、"查询订单合同列表"、"订单下合同详情"时使用
+- 返回：每份合同的基本信息 + 节点记录（contract_node）+ 参与人（contract_user）+ 扩展字段（contract_field_sharding）
+
+### 2b. queryContractFormId（推荐）
 根据合同编号（contract_code）一键查询版式 form_id。
 - 参数：
   - contractCode: 合同编号，如 C1772854666284956

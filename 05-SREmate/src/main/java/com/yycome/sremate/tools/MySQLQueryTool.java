@@ -6,6 +6,7 @@ import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -116,6 +117,101 @@ public class MySQLQueryTool {
             log.error("查询 platform_instance_id 失败", e);
             return "查询失败: " + e.getMessage();
         }
+    }
+
+    /**
+     * 根据项目订单号查询所有合同，并聚合 contract_node、contract_user、contract_field_sharding 数据
+     *
+     * @param projectOrderId 项目订单号
+     * @return 聚合后的合同数据
+     */
+    @Tool(description = "根据项目订单号（project_order_id）查询该订单下的所有合同，" +
+            "并聚合每份合同的节点记录（contract_node）、参与人信息（contract_user）" +
+            "以及扩展字段（contract_field_sharding，分库分表，按合同号数字部分取模10确定表后缀）。" +
+            "当用户询问\"某订单有哪些合同\"、\"查询订单的合同列表\"、\"订单下的合同详情\"时使用此工具。" +
+            "projectOrderId 参数为项目订单号字符串，如 826030619000001899。")
+    public String queryContractsByOrderId(String projectOrderId) {
+        log.info("queryContractsByOrderId - projectOrderId: {}", projectOrderId);
+        try {
+            // 1. 查询该订单下所有合同
+            List<Map<String, Object>> contracts = jdbcTemplate.queryForList(
+                    "SELECT contract_code, type, status, platform_instance_id, amount, ctime " +
+                    "FROM contract WHERE project_order_id = ? AND del_status = 0",
+                    projectOrderId);
+
+            if (contracts.isEmpty()) {
+                return "订单 " + projectOrderId + " 下未找到合同记录";
+            }
+
+            StringBuilder sb = new StringBuilder();
+            sb.append(String.format("订单 %s 共有 %d 份合同:\n\n", projectOrderId, contracts.size()));
+
+            for (int i = 0; i < contracts.size(); i++) {
+                Map<String, Object> contract = contracts.get(i);
+                String contractCode = String.valueOf(contract.get("contract_code"));
+
+                sb.append(String.format("【合同 %d】%s\n", i + 1, contractCode));
+                sb.append(String.format("  类型: %s  状态: %s  金额: %s  创建时间: %s\n",
+                        contract.get("type"), contract.get("status"),
+                        contract.get("amount"), contract.get("ctime")));
+                if (contract.get("platform_instance_id") != null) {
+                    sb.append(String.format("  platform_instance_id: %s\n", contract.get("platform_instance_id")));
+                }
+
+                // 2. 查询节点记录
+                List<Map<String, Object>> nodes = jdbcTemplate.queryForList(
+                        "SELECT node_type, fire_time FROM contract_node " +
+                        "WHERE contract_code = ? AND del_status = 0 ORDER BY fire_time",
+                        contractCode);
+                if (!nodes.isEmpty()) {
+                    sb.append("  节点记录:\n");
+                    nodes.forEach(n -> sb.append(String.format(
+                            "    node_type=%s  fire_time=%s\n", n.get("node_type"), n.get("fire_time"))));
+                }
+
+                // 3. 查询参与人
+                List<Map<String, Object>> users = jdbcTemplate.queryForList(
+                        "SELECT role_type, name, phone, is_sign, is_auth " +
+                        "FROM contract_user WHERE contract_code = ? AND del_status = 0",
+                        contractCode);
+                if (!users.isEmpty()) {
+                    sb.append("  参与人:\n");
+                    users.forEach(u -> sb.append(String.format(
+                            "    role_type=%s  name=%s  phone=%s  is_sign=%s  is_auth=%s\n",
+                            u.get("role_type"), u.get("name"), u.get("phone"),
+                            u.get("is_sign"), u.get("is_auth"))));
+                }
+
+                // 4. 查询扩展字段（分库分表：合同号数字部分 % 10）
+                String shardTable = resolveFieldShardingTable(contractCode);
+                List<Map<String, Object>> fields = jdbcTemplate.queryForList(
+                        "SELECT field_key, field_value FROM " + shardTable +
+                        " WHERE contract_code = ? AND del_status = 0 LIMIT 20",
+                        contractCode);
+                if (!fields.isEmpty()) {
+                    sb.append(String.format("  扩展字段（%s）:\n", shardTable));
+                    fields.forEach(f -> sb.append(String.format(
+                            "    %s = %s\n", f.get("field_key"), f.get("field_value"))));
+                }
+
+                sb.append("\n");
+            }
+
+            return sb.toString();
+        } catch (Exception e) {
+            log.error("queryContractsByOrderId 失败", e);
+            return "查询合同列表失败: " + e.getMessage();
+        }
+    }
+
+    /**
+     * 根据合同号计算分片表名
+     * 规则：去除合同号中的非数字字符，取数字部分 % 10
+     */
+    private String resolveFieldShardingTable(String contractCode) {
+        String digits = contractCode.replaceAll("[^0-9]", "");
+        int shard = (int) (Long.parseLong(digits) % 10);
+        return "contract_field_sharding_" + shard;
     }
 
     /**
