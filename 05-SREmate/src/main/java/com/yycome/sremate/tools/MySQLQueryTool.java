@@ -287,6 +287,84 @@ public class MySQLQueryTool {
     }
 
     /**
+     * 查询合同主表基本信息
+     */
+    private Map<String, Object> fetchContractBase(String contractCode) {
+        List<Map<String, Object>> rows = jdbcTemplate.queryForList(
+                "SELECT contract_code, type, status, platform_instance_id, amount, project_order_id, ctime " +
+                "FROM contract WHERE contract_code = ? AND del_status = 0 LIMIT 1",
+                contractCode);
+        if (rows.isEmpty()) return null;
+        Map<String, Object> row = rows.get(0);
+        Map<String, Object> base = new LinkedHashMap<>();
+        base.put("contractCode", row.get("contract_code"));
+        base.put("type", row.get("type"));
+        base.put("status", row.get("status"));
+        base.put("amount", row.get("amount"));
+        base.put("platformInstanceId", row.get("platform_instance_id"));
+        base.put("projectOrderId", row.get("project_order_id"));
+        base.put("ctime", String.valueOf(row.get("ctime")));
+        return base;
+    }
+
+    /**
+     * 查询合同节点记录
+     */
+    private List<Map<String, Object>> fetchNodes(String contractCode) {
+        return jdbcTemplate.queryForList(
+                "SELECT node_type, fire_time FROM contract_node " +
+                "WHERE contract_code = ? AND del_status = 0 ORDER BY fire_time",
+                contractCode);
+    }
+
+    /**
+     * 查询合同操作日志
+     */
+    private List<Map<String, Object>> fetchLogs(String contractCode) {
+        return jdbcTemplate.queryForList(
+                "SELECT operator, operate_type, content, ctime FROM contract_log " +
+                "WHERE contract_code = ? AND del_status = 0 ORDER BY ctime DESC LIMIT 50",
+                contractCode);
+    }
+
+    /**
+     * 查询合同参与人（签约人）
+     */
+    private List<Map<String, Object>> fetchUsers(String contractCode) {
+        return jdbcTemplate.queryForList(
+                "SELECT role_type, name, phone, is_sign, is_auth " +
+                "FROM contract_user WHERE contract_code = ? AND del_status = 0",
+                contractCode);
+    }
+
+    /**
+     * 查询合同扩展字段（分表）
+     */
+    private Map<String, Object> fetchFields(String contractCode) {
+        String shardTable = resolveFieldShardingTable(contractCode);
+        List<Map<String, Object>> rows = jdbcTemplate.queryForList(
+                "SELECT field_key, field_value FROM " + shardTable +
+                " WHERE contract_code = ? AND del_status = 0 LIMIT 20",
+                contractCode);
+        Map<String, Object> fieldMap = new LinkedHashMap<>();
+        rows.forEach(f -> fieldMap.put(
+                String.valueOf(f.get("field_key")),
+                tryParseJson(f.get("field_value"))));
+        fieldMap.put("_shardTable", shardTable);
+        return fieldMap;
+    }
+
+    /**
+     * 查询合同报价关联记录
+     */
+    private List<Map<String, Object>> fetchQuotations(String contractCode) {
+        return jdbcTemplate.queryForList(
+                "SELECT * FROM contract_quotation_relation " +
+                "WHERE contract_code = ? AND del_status = 0",
+                contractCode);
+    }
+
+    /**
      * 根据合同编号查询版式 form_id（自动串联数据库查询与 HTTP 接口调用）
      *
      * @param contractCode 合同编号（contract_code），如 C1772854666284956
