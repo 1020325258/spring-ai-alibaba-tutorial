@@ -1,8 +1,8 @@
 package com.yycome.sremate.aspect;
 
-import com.yycome.sremate.domain.TracingContext;
-import com.yycome.sremate.service.MetricsCollector;
-import com.yycome.sremate.service.TracingService;
+import com.yycome.sremate.infrastructure.service.MetricsCollector;
+import com.yycome.sremate.infrastructure.service.TracingService;
+import com.yycome.sremate.infrastructure.service.model.TracingContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.aspectj.lang.ProceedingJoinPoint;

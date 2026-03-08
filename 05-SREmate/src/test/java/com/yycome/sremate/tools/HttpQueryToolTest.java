@@ -1,8 +1,8 @@
 package com.yycome.sremate.tools;
 
-import com.yycome.sremate.domain.EndpointParameter;
-import com.yycome.sremate.domain.EndpointTemplate;
-import com.yycome.sremate.service.EndpointTemplateService;
+import com.yycome.sremate.infrastructure.gateway.EndpointTemplateService;
+import com.yycome.sremate.infrastructure.gateway.model.EndpointParameter;
+import com.yycome.sremate.infrastructure.gateway.model.EndpointTemplate;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -26,12 +26,12 @@ class HttpQueryToolTest {
     @Mock
     private EndpointTemplateService endpointTemplateService;
 
-    private HttpQueryTool httpQueryTool;
+    private com.yycome.sremate.trigger.agent.HttpEndpointTool httpQueryTool;
 
     @BeforeEach
     void setUp() {
         WebClient.Builder webClientBuilder = WebClient.builder();
-        httpQueryTool = new HttpQueryTool(webClientBuilder, endpointTemplateService);
+        httpQueryTool = new com.yycome.sremate.trigger.agent.HttpEndpointTool(webClientBuilder, endpointTemplateService);
     }
 
     @Test

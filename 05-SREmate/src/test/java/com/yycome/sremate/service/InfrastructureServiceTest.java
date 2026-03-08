@@ -1,8 +1,11 @@
 package com.yycome.sremate.service;
 
-import com.yycome.sremate.domain.PerformanceReport;
-import com.yycome.sremate.domain.TraceSession;
-import com.yycome.sremate.domain.TracingContext;
+import com.yycome.sremate.infrastructure.service.CacheService;
+import com.yycome.sremate.infrastructure.service.MetricsCollector;
+import com.yycome.sremate.infrastructure.service.TracingService;
+import com.yycome.sremate.infrastructure.service.model.PerformanceReport;
+import com.yycome.sremate.infrastructure.service.model.TraceSession;
+import com.yycome.sremate.infrastructure.service.model.TracingContext;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -16,15 +19,15 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 class InfrastructureServiceTest {
 
-    private TracingService tracingService;
-    private CacheService cacheService;
-    private MetricsCollector metricsCollector;
+    private com.yycome.sremate.infrastructure.service.TracingService tracingService;
+    private com.yycome.sremate.infrastructure.service.CacheService cacheService;
+    private com.yycome.sremate.infrastructure.service.MetricsCollector metricsCollector;
 
     @BeforeEach
     void setUp() {
-        tracingService = new TracingService();
-        cacheService = new CacheService();
-        metricsCollector = new MetricsCollector(new SimpleMeterRegistry());
+        tracingService = new com.yycome.sremate.infrastructure.service.TracingService();
+        cacheService = new com.yycome.sremate.infrastructure.service.CacheService();
+        metricsCollector = new com.yycome.sremate.infrastructure.service.MetricsCollector(new SimpleMeterRegistry());
     }
 
     @Test

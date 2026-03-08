@@ -1,6 +1,7 @@
 package com.yycome.sremate.service;
 
-import com.yycome.sremate.domain.EndpointTemplate;
+import com.yycome.sremate.infrastructure.gateway.EndpointTemplateService;
+import com.yycome.sremate.infrastructure.gateway.model.EndpointTemplate;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -16,11 +17,11 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  */
 class EndpointTemplateServiceTest {
 
-    private EndpointTemplateService endpointTemplateService;
+    private com.yycome.sremate.infrastructure.gateway.EndpointTemplateService endpointTemplateService;
 
     @BeforeEach
     void setUp() {
-        endpointTemplateService = new EndpointTemplateService();
+        endpointTemplateService = new com.yycome.sremate.infrastructure.gateway.EndpointTemplateService();
         endpointTemplateService.init();
     }
 

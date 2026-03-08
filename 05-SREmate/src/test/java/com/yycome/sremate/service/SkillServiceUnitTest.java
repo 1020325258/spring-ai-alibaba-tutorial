@@ -3,6 +3,8 @@ package com.yycome.sremate.service;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import com.yycome.sremate.infrastructure.service.CacheService;
+import com.yycome.sremate.infrastructure.service.SkillService;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
