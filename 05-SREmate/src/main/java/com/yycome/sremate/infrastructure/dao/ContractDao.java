@@ -129,4 +129,87 @@ public class ContractDao {
         int shard = (int) (Long.parseLong(digits) % 10);
         return "contract_field_sharding_" + shard;
     }
+
+    /**
+     * 根据合同编号查询配置相关字段
+     * 返回 project_order_id、business_type、gb_code、company_code、type
+     */
+    public Map<String, Object> fetchContractConfigFields(String contractCode) {
+        List<Map<String, Object>> rows = jdbcTemplate.queryForList(
+                "SELECT project_order_id, business_type, gb_code, company_code, type " +
+                "FROM contract WHERE contract_code = ? AND del_status = 0 LIMIT 1",
+                contractCode);
+        if (rows.isEmpty()) return null;
+        Map<String, Object> row = rows.get(0);
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("projectOrderId", row.get("project_order_id"));
+        result.put("businessType", row.get("business_type"));
+        result.put("gbCode", row.get("gb_code"));
+        result.put("companyCode", row.get("company_code"));
+        result.put("type", row.get("type"));
+        return result;
+    }
+
+    /**
+     * 根据订单号和合同类型查询配置相关字段
+     * 返回 business_type、gb_code、company_code
+     */
+    public Map<String, Object> fetchContractConfigFieldsByOrderIdAndType(String projectOrderId, String contractType) {
+        List<Map<String, Object>> rows = jdbcTemplate.queryForList(
+                "SELECT business_type, gb_code, company_code " +
+                "FROM contract WHERE project_order_id = ? AND type = ? AND del_status = 0 LIMIT 1",
+                projectOrderId, contractType);
+        if (rows.isEmpty()) return null;
+        Map<String, Object> row = rows.get(0);
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("businessType", row.get("business_type"));
+        result.put("gbCode", row.get("gb_code"));
+        result.put("companyCode", row.get("company_code"));
+        return result;
+    }
+
+    /**
+     * 根据订单号查询所有合同类型
+     */
+    public List<String> fetchContractTypesByOrderId(String projectOrderId) {
+        List<Map<String, Object>> rows = jdbcTemplate.queryForList(
+                "SELECT DISTINCT type FROM contract WHERE project_order_id = ? AND del_status = 0",
+                projectOrderId);
+        return rows.stream()
+                .map(row -> String.valueOf(row.get("type")))
+                .toList();
+    }
+
+    /**
+     * 根据订单号查询 project_config_snap 表的 contract_config_id
+     */
+    public String fetchContractConfigId(String projectOrderId) {
+        List<Map<String, Object>> rows = jdbcTemplate.queryForList(
+                "SELECT contract_config_id FROM project_config_snap " +
+                "WHERE project_order_id = ? AND del_status = 0 LIMIT 1",
+                projectOrderId);
+        if (rows.isEmpty()) return null;
+        Object val = rows.get(0).get("contract_config_id");
+        return val != null ? val.toString() : null;
+    }
+
+    /**
+     * 查询 contract_city_company_info 表数据
+     * 根据 business_type、gb_code、company_code、version、type、sign_channel_type 查询
+     * 过滤不需要的字段：show_platform、seal_code、fields_map、merge_launch_type
+     */
+    public List<Map<String, Object>> fetchCityCompanyInfo(String businessType, String gbCode, String companyCode, int version, String type) {
+        // 过滤不需要输出的字段
+        String selectFields = """
+                    id, business_type, gb_code, company_code, version, contract_type, audit_type,
+                    user_sign_type, form_id, form_key, second_form_id, second_form_key, third_form_id, third_form_key,
+                    ctime, mtime
+                    """;
+        List<Map<String, Object>> rows = jdbcTemplate.queryForList(
+                "SELECT " + selectFields + " FROM contract_city_company_info " +
+                "WHERE business_type = ? AND gb_code = ? AND company_code = ? AND version = ? AND contract_type = ? AND sign_channel_type = 1 AND del_status = 0",
+                businessType, gbCode, companyCode, version, type);
+
+        return rows;
+    }
 }

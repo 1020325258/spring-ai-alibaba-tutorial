@@ -140,27 +140,62 @@ private String resolveFieldShardingTable(String contractCode) {
 - 只写端到端集成测试，通过真实问题验证 Agent 完整链路响应
 - 必须加 `sre.console.enabled=false` 禁用交互命令行，否则测试启动会阻塞
 
+### 端到端测试规范（强制）
+
+**必须验证 Agent 正确识别意图并输出期望数据**，不能仅验证"工具被调用"。
+
 ```java
 @SpringBootTest(properties = "sre.console.enabled=false")
-@ActiveProfiles("local")   // 加载 application-local.yml
+@ActiveProfiles("local")
 class YourFeatureIT {
 
     @Autowired
     private ChatClient sreAgent;
 
     @Test
-    void askSomething_returnsExpectedData() {
+    void queryByContractCode_shouldReturnContractData() {
         String response = sreAgent.prompt()
-                .user("你的自然语言问题")
+                .user("C1772854666284956的合同配置表数据")
                 .call()
                 .content();
 
         System.out.println("=== Agent 回复 ===\n" + response);
-        assertThat(response).containsIgnoringCase("期望关键词");
-        assertThat(response).doesNotContain("查询失败");
+
+        // ✅ 正确：验证返回了期望的业务数据
+        assertThat(response).contains("contract_city_company_info");
+        assertThat(response).contains("projectOrderId");
+        assertThat(response).doesNotContain("未找到");
+        assertThat(response).doesNotContain("error");
+    }
+
+    @Test
+    void queryByOrderId_shouldUseProjectOrderId() {
+        String response = sreAgent.prompt()
+                .user("826030619000001899的合同配置")
+                .call()
+                .content();
+
+        System.out.println("=== Agent 回复 ===\n" + response);
+
+        // ✅ 验证 Agent 正确识别订单号，并使用正确的参数
+        assertThat(response).satisfiesAnyOf(
+            r -> assertThat(r).contains("contract_city_company_info"),
+            r -> assertThat(r).contains("needAskType"),  // 需要询问合同类型
+            r -> assertThat(r).contains("availableTypes")
+        );
+        // ❌ 不应该出现：说明 Agent 没有正确识别订单号
+        assertThat(response).doesNotContain("未找到编号");
     }
 }
 ```
+
+### 测试检查清单
+
+新增或修改 @Tool 工具后，端到端测试必须覆盖：
+
+1. **入参识别**：验证 Agent 能正确区分不同格式的输入（合同号 C 前缀 vs 订单号纯数字）
+2. **数据输出**：验证返回结果包含期望的业务字段
+3. **错误处理**：验证数据不存在时有合理的提示，而非代码异常
 
 运行指定集成测试：
 ```bash

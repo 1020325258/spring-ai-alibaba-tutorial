@@ -137,6 +137,72 @@ public class ContractTool {
         }
     }
 
+    /**
+     * 查询合同配置表（contract_city_company_info）
+     *
+     * @param contractOrOrderId 合同编号或订单号，自动识别格式：
+     *                          - 合同编号：C前缀+数字，如 C1772925348216431
+     *                          - 订单号：纯数字，如 826030619000001899
+     * @param contractType 合同类型，如 "正签"、"草签"、"补充协议"。
+     *                     - 使用合同编号查询时可不填（系统自动获取）
+     *                     - 使用订单号查询时必须填写
+     * @return JSON格式配置数据
+     */
+    @Tool(description = """
+            查询合同配置表（contract_city_company_info）数据。
+            当用户询问"合同配置表"、"配置表数据"、"合同配置"时使用此工具。
+
+            参数说明：
+            - contractOrOrderId：合同编号或订单号，直接填入用户提供的编号即可，系统会自动识别格式
+              - 如果用户说"C1772925348216431的合同配置"，填入 C1772925348216431
+              - 如果用户说"826030619000001899的合同配置"，填入 826030619000001899
+
+            - contractType：合同类型名称，支持的类型包括：
+              - 认购合同/认购/定金（类型1）
+              - 设计合同/设计（类型2）
+              - 正签合同/正签/正式合同（类型3）
+              - 套餐变更合同/变更合同/套餐变更/变更（类型4）
+              - 首期款合同/首期款协议/首期合同（类型5）
+              - 整装首期款合同/整装首期（类型6）
+              - 图纸（类型7）
+              - 销售合同/销售/个性化（类型8）
+              - 设计变更协议/设计变更（类型11）
+              - 补充协议/补充（类型29）
+              - 和解协议/和解（类型30）
+              - 使用合同编号查询时：可以不填，系统自动从合同表获取
+              - 使用订单号查询时：必须填写用户指定的类型名称
+              - 如果用户没有指定类型，请询问用户需要查询哪种合同类型
+
+            示例场景：
+            - "C1772925348216431的合同配置表数据" → contractOrOrderId=C1772925348216431, contractType可空
+            - "826030619000001899的正签合同配置" → contractOrOrderId=826030619000001899, contractType=正签
+            - "826030619000001899的合同配置" → contractOrOrderId=826030619000001899, 但需要询问contractType""")
+    public String queryContractConfig(String contractOrOrderId, String contractType) {
+        log.info("queryContractConfig - contractOrOrderId: {}, contractType: {}", contractOrOrderId, contractType);
+        try {
+            // 自动识别编号类型
+            String contractCode = null;
+            String projectOrderId = null;
+
+            if (contractOrOrderId != null && !contractOrOrderId.isBlank()) {
+                if (contractOrOrderId.toUpperCase().startsWith("C")) {
+                    contractCode = contractOrOrderId;
+                } else {
+                    projectOrderId = contractOrOrderId;
+                }
+            }
+
+            Map<String, Object> result = contractQueryService.queryContractConfig(contractCode, projectOrderId, contractType);
+            if (result == null) {
+                return toErrorJson("未找到编号 " + contractOrOrderId + " 对应的合同记录");
+            }
+            return contractQueryService.toJson(result);
+        } catch (Exception e) {
+            log.error("queryContractConfig 失败", e);
+            return toErrorJson(e.getMessage());
+        }
+    }
+
     private String toErrorJson(String message) {
         return "{\"error\":\"" + message.replace("\"", "\\\"") + "\"}";
     }
