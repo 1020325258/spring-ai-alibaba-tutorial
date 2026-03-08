@@ -16,9 +16,13 @@ import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.stereotype.Component;
+import reactor.core.Disposable;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
+import org.jline.terminal.Terminal.Signal;
 
 /**
  * SRE值班客服命令行交互
@@ -47,6 +51,11 @@ public class SREConsole implements CommandLineRunner {
     /** 保留的最大消息条数（user + assistant 各算 1 条，10 条 = 5 轮对话） */
     private static final int MAX_HISTORY = 10;
 
+    /** 当前正在进行的流式订阅，用于 Ctrl+C 中断 */
+    private final AtomicReference<Disposable> currentSubscription = new AtomicReference<>();
+    /** 标记当前流式响应是否被用户主动中断 */
+    private final AtomicBoolean interrupted = new AtomicBoolean(false);
+
     @Override
     public void run(String... args) throws Exception {
         // 安装JAnsi
@@ -64,16 +73,18 @@ public class SREConsole implements CommandLineRunner {
                 .history(new DefaultHistory())
                 .build();
 
+        // 用 jline 原生信号注册 Ctrl+C 处理（raw 模式下 sun.misc.Signal 收不到 SIGINT）
+        // 流式输出阶段：取消订阅；输入阶段：保留 jline 默认行为（抛 UserInterruptException）
+        terminal.handle(Signal.INT, sig -> {
+            Disposable sub = currentSubscription.get();
+            if (sub != null && !sub.isDisposed()) {
+                interrupted.set(true);
+                sub.dispose();
+            }
+        });
+
         // 欢迎信息
-        System.out.println(Ansi.ansi().fg(Ansi.Color.CYAN).a("╔════════════════════════════════════════════╗").reset());
-        System.out.println(Ansi.ansi().fg(Ansi.Color.CYAN).a("║      SRE值班客服Agent v2.0                  ║").reset());
-        System.out.println(Ansi.ansi().fg(Ansi.Color.CYAN).a("║      支持流式输出、追踪、缓存               ║").reset());
-        System.out.println(Ansi.ansi().fg(Ansi.Color.CYAN).a("╚════════════════════════════════════════════╝").reset());
-        System.out.println(Ansi.ansi().fg(Ansi.Color.GREEN).a("\n输入问题开始咨询，输入 'quit' 或 'exit' 退出").reset());
-        System.out.println(Ansi.ansi().fg(Ansi.Color.YELLOW).a("特殊命令:\n").reset());
-        System.out.println(Ansi.ansi().fg(Ansi.Color.YELLOW).a("  stats - 查看性能统计\n").reset());
-        System.out.println(Ansi.ansi().fg(Ansi.Color.YELLOW).a("  trace - 查看当前会话追踪链路\n").reset());
-        System.out.println(Ansi.ansi().fg(Ansi.Color.YELLOW).a("  使用 ↑↓ 键查看历史命令，Ctrl+C 取消当前输入\n").reset());
+        printBanner();
 
         while (true) {
             try {
@@ -126,8 +137,11 @@ public class SREConsole implements CommandLineRunner {
                 long startMs = System.currentTimeMillis();
                 final long[] firstTokenMs = {-1};
                 StringBuilder responseBuilder = new StringBuilder();
+                interrupted.set(false);
 
-                sreAgent.prompt()
+                // 用 CountDownLatch 阻塞主线程，同时保留 Disposable 供 Ctrl+C 中断
+                java.util.concurrent.CountDownLatch latch = new java.util.concurrent.CountDownLatch(1);
+                Disposable sub = sreAgent.prompt()
                         .messages(conversationHistory)
                         .stream()
                         .content()
@@ -138,8 +152,22 @@ public class SREConsole implements CommandLineRunner {
                             System.out.print(chunk);
                             responseBuilder.append(chunk);
                         })
-                        .doOnComplete(() -> System.out.println())
-                        .blockLast();
+                        .doOnComplete(() -> {
+                            System.out.println();
+                            latch.countDown();
+                        })
+                        .doOnError(e -> latch.countDown())
+                        .doOnCancel(latch::countDown)
+                        .subscribe();
+                currentSubscription.set(sub);
+                latch.await();
+                currentSubscription.set(null);
+
+                if (interrupted.get()) {
+                    System.out.println(Ansi.ansi().fg(Ansi.Color.YELLOW).a("\n[已中断]").reset());
+                    conversationHistory.remove(conversationHistory.size() - 1); // 移除本次未完成的 user 消息
+                    continue;
+                }
 
                 long totalMs = System.currentTimeMillis() - startMs;
                 long ttfbMs  = firstTokenMs[0] < 0 ? totalMs : firstTokenMs[0] - startMs;
@@ -192,6 +220,51 @@ public class SREConsole implements CommandLineRunner {
         } else {
             System.out.println(Ansi.ansi().fg(Ansi.Color.YELLOW).a("\n暂无追踪数据").reset());
         }
+    }
+
+    /**
+     * 炫酷启动 Banner
+     */
+    private void printBanner() {
+        System.out.println();
+        // ASCII art "SREmate" — 渐变色（CYAN → WHITE → BLUE）
+        System.out.println(Ansi.ansi().fg(Ansi.Color.CYAN).bold()
+                .a("  ███████╗██████╗ ███████╗███╗   ███╗ █████╗ ████████╗███████╗").reset());
+        System.out.println(Ansi.ansi().fg(Ansi.Color.CYAN).bold()
+                .a("  ██╔════╝██╔══██╗██╔════╝████╗ ████║██╔══██╗╚══██╔══╝██╔════╝").reset());
+        System.out.println(Ansi.ansi().bold()
+                .a("  ███████╗██████╔╝█████╗  ██╔████╔██║███████║   ██║   █████╗  ").reset());
+        System.out.println(Ansi.ansi().bold()
+                .a("  ╚════██║██╔══██╗██╔══╝  ██║╚██╔╝██║██╔══██║   ██║   ██╔══╝  ").reset());
+        System.out.println(Ansi.ansi().fg(Ansi.Color.BLUE).bold()
+                .a("  ███████║██║  ██║███████╗██║ ╚═╝ ██║██║  ██║   ██║   ███████╗").reset());
+        System.out.println(Ansi.ansi().fg(Ansi.Color.BLUE).bold()
+                .a("  ╚══════╝╚═╝  ╚═╝╚══════╝╚═╝     ╚═╝╚═╝  ╚═╝   ╚═╝   ╚══════╝").reset());
+        System.out.println();
+
+        // 分隔线 + 副标题
+        System.out.println(Ansi.ansi().fg(Ansi.Color.CYAN)
+                .a("  ──────────────────────────────────────────────────────────────").reset());
+        System.out.println(Ansi.ansi().fg(Ansi.Color.GREEN).bold()
+                .a("      智能 SRE 值班助手  ·  v2.0  ·  Powered by Qwen-Turbo      ").reset());
+        System.out.println(Ansi.ansi().fg(Ansi.Color.CYAN)
+                .a("  ──────────────────────────────────────────────────────────────").reset());
+        System.out.println();
+
+        // 命令列表
+        System.out.println(Ansi.ansi().fg(Ansi.Color.YELLOW).bold().a("  可用命令").reset()
+                .fg(Ansi.Color.WHITE).a("  ·  ·  ·  ·  ·  ·  ·  ·  ·  ·  ·  ·  ·  ·  ·  ·  ·  ·").reset());
+        System.out.println(Ansi.ansi().fg(Ansi.Color.WHITE).bold().a("  ├─ stats ").reset()
+                .fg(Ansi.Color.YELLOW).a(" 查看性能统计").reset());
+        System.out.println(Ansi.ansi().fg(Ansi.Color.WHITE).bold().a("  ├─ trace ").reset()
+                .fg(Ansi.Color.YELLOW).a(" 查看当前会话追踪链路").reset());
+        System.out.println(Ansi.ansi().fg(Ansi.Color.WHITE).bold().a("  ├─ quit  ").reset()
+                .fg(Ansi.Color.YELLOW).a(" 退出程序").reset());
+        System.out.println(Ansi.ansi().fg(Ansi.Color.WHITE).bold().a("  └─ ↑ / ↓ ").reset()
+                .fg(Ansi.Color.YELLOW).a(" 浏览历史命令  ·  Ctrl+C 取消当前输入").reset());
+        System.out.println();
+        System.out.println(Ansi.ansi().fg(Ansi.Color.GREEN).a("  请输入问题开始咨询...").reset());
+        System.out.println();
     }
 
     /**

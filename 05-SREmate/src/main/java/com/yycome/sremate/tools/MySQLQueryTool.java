@@ -143,7 +143,7 @@ public class MySQLQueryTool {
                 item.put("platformInstanceId", contract.get("platform_instance_id"));
                 item.put("ctime", String.valueOf(contract.get("ctime")));
 
-                // 三张关联表并行查询
+                // 四张关联表并行查询
                 String shardTable = resolveFieldShardingTable(contractCode);
 
                 CompletableFuture<List<Map<String, Object>>> nodesFuture = CompletableFuture.supplyAsync(
@@ -164,7 +164,13 @@ public class MySQLQueryTool {
                                 " WHERE contract_code = ? AND del_status = 0 LIMIT 20",
                                 contractCode), dbQueryExecutor);
 
-                CompletableFuture.allOf(nodesFuture, usersFuture, fieldsFuture).join();
+                CompletableFuture<List<Map<String, Object>>> quotationFuture = CompletableFuture.supplyAsync(
+                        () -> jdbcTemplate.queryForList(
+                                "SELECT * FROM contract_quotation_relation " +
+                                "WHERE contract_code = ? AND del_status = 0",
+                                contractCode), dbQueryExecutor);
+
+                CompletableFuture.allOf(nodesFuture, usersFuture, fieldsFuture, quotationFuture).join();
 
                 item.put("contract_node", nodesFuture.join());
                 item.put("contract_user", usersFuture.join());
@@ -175,6 +181,7 @@ public class MySQLQueryTool {
                         tryParseJson(f.get("field_value"))));
                 item.put("contract_field_sharding", fieldMap);
                 item.put("contract_field_sharding_table", shardTable);
+                item.put("contract_quotation_relation", quotationFuture.join());
 
                 result.add(item);
             }
