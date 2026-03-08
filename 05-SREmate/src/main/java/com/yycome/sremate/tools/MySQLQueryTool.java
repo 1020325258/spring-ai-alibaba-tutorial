@@ -68,6 +68,87 @@ public class MySQLQueryTool {
     }
 
     /**
+     * 根据合同编号查询合同完整数据，聚合 contract_node、contract_user、contract_field_sharding
+     *
+     * @param contractCode 合同编号（contract_code），如 C1772925352128725
+     * @return JSON格式聚合合同数据
+     */
+    @Tool(description = "根据合同编号（contract_code）查询该合同的完整数据，" +
+            "并聚合合同的节点记录（contract_node）、参与人信息（contract_user）" +
+            "以及扩展字段（contract_field_sharding）。" +
+            "当用户提供以字母C开头的合同编号（如 C1772925352128725）并询问\"合同数据\"、\"合同详情\"、" +
+            "\"查询该合同\"、\"这个合同的信息\"时使用此工具。" +
+            "contractCode 参数为合同编号字符串，格式为C前缀+数字，如 C1772925352128725。")
+    public String queryContractByCode(String contractCode) {
+        log.info("queryContractByCode - contractCode: {}", contractCode);
+        try {
+            List<Map<String, Object>> contracts = jdbcTemplate.queryForList(
+                    "SELECT contract_code, type, status, platform_instance_id, amount, project_order_id, ctime " +
+                    "FROM contract WHERE contract_code = ? AND del_status = 0 LIMIT 1",
+                    contractCode);
+
+            if (contracts.isEmpty()) {
+                return toErrorJson("未找到合同编号为 " + contractCode + " 的合同记录");
+            }
+
+            Map<String, Object> contract = contracts.get(0);
+            String code = String.valueOf(contract.get("contract_code"));
+            String shardTable = resolveFieldShardingTable(code);
+
+            Map<String, Object> item = new LinkedHashMap<>();
+            item.put("contractCode", code);
+            item.put("type", contract.get("type"));
+            item.put("status", contract.get("status"));
+            item.put("amount", contract.get("amount"));
+            item.put("platformInstanceId", contract.get("platform_instance_id"));
+            item.put("projectOrderId", contract.get("project_order_id"));
+            item.put("ctime", String.valueOf(contract.get("ctime")));
+
+            CompletableFuture<List<Map<String, Object>>> nodesFuture = CompletableFuture.supplyAsync(
+                    () -> jdbcTemplate.queryForList(
+                            "SELECT node_type, fire_time FROM contract_node " +
+                            "WHERE contract_code = ? AND del_status = 0 ORDER BY fire_time",
+                            code), dbQueryExecutor);
+
+            CompletableFuture<List<Map<String, Object>>> usersFuture = CompletableFuture.supplyAsync(
+                    () -> jdbcTemplate.queryForList(
+                            "SELECT role_type, name, phone, is_sign, is_auth " +
+                            "FROM contract_user WHERE contract_code = ? AND del_status = 0",
+                            code), dbQueryExecutor);
+
+            CompletableFuture<List<Map<String, Object>>> fieldsFuture = CompletableFuture.supplyAsync(
+                    () -> jdbcTemplate.queryForList(
+                            "SELECT field_key, field_value FROM " + shardTable +
+                            " WHERE contract_code = ? AND del_status = 0 LIMIT 20",
+                            code), dbQueryExecutor);
+
+            CompletableFuture<List<Map<String, Object>>> quotationFuture = CompletableFuture.supplyAsync(
+                    () -> jdbcTemplate.queryForList(
+                            "SELECT * FROM contract_quotation_relation " +
+                            "WHERE contract_code = ? AND del_status = 0",
+                            code), dbQueryExecutor);
+
+            CompletableFuture.allOf(nodesFuture, usersFuture, fieldsFuture, quotationFuture).join();
+
+            item.put("contract_node", nodesFuture.join());
+            item.put("contract_user", usersFuture.join());
+
+            Map<String, Object> fieldMap = new LinkedHashMap<>();
+            fieldsFuture.join().forEach(f -> fieldMap.put(
+                    String.valueOf(f.get("field_key")),
+                    tryParseJson(f.get("field_value"))));
+            item.put("contract_field_sharding", fieldMap);
+            item.put("contract_field_sharding_table", shardTable);
+            item.put("contract_quotation_relation", quotationFuture.join());
+
+            return objectMapper.writeValueAsString(item);
+        } catch (Exception e) {
+            log.error("queryContractByCode 失败", e);
+            return toErrorJson(e.getMessage());
+        }
+    }
+
+    /**
      * 根据合同编号查询 platform_instance_id（原始值，内部复用）
      */
     private Long findPlatformInstanceId(String contractCode) {
@@ -117,7 +198,9 @@ public class MySQLQueryTool {
             "并聚合每份合同的节点记录（contract_node）、参与人信息（contract_user）" +
             "以及扩展字段（contract_field_sharding，分库分表，按合同号数字部分取模10确定表后缀）。" +
             "当用户询问\"某订单有哪些合同\"、\"查询订单的合同列表\"、\"订单下的合同详情\"时使用此工具。" +
-            "projectOrderId 参数为项目订单号字符串，如 826030619000001899。")
+            "projectOrderId 参数为项目订单号字符串，格式为纯数字，如 826030619000001899。" +
+            "注意：若用户提供的编号以字母C开头（如 C1772925352128725），则该编号是合同编号而非订单号，" +
+            "此时不得调用本工具，应使用 queryContractByCode 工具。")
     public String queryContractsByOrderId(String projectOrderId) {
         log.info("queryContractsByOrderId - projectOrderId: {}", projectOrderId);
         try {
