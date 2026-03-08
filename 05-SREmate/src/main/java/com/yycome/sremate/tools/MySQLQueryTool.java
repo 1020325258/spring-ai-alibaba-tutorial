@@ -15,6 +15,7 @@ import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.stream.Stream;
 
 /**
  * MySQL查询工具
@@ -68,82 +69,64 @@ public class MySQLQueryTool {
     }
 
     /**
-     * 根据合同编号查询合同完整数据，聚合 contract_node、contract_user、contract_field_sharding
+     * 根据合同编号查询合同数据（支持4种查询类型）
      *
-     * @param contractCode 合同编号（contract_code），如 C1772925352128725
-     * @return JSON格式聚合合同数据
+     * @param contractCode 合同编号（contract_code），C前缀+数字，如 C1772925352128725
+     * @param dataType     查询类型：ALL / CONTRACT_NODE / CONTRACT_FIELD / CONTRACT_USER
+     * @return JSON格式聚合数据
      */
-    @Tool(description = "根据合同编号（contract_code）查询该合同的完整数据，" +
-            "并聚合合同的节点记录（contract_node）、参与人信息（contract_user）" +
-            "以及扩展字段（contract_field_sharding）。" +
-            "当用户提供以字母C开头的合同编号（如 C1772925352128725）并询问\"合同数据\"、\"合同详情\"、" +
-            "\"查询该合同\"、\"这个合同的信息\"时使用此工具。" +
-            "contractCode 参数为合同编号字符串，格式为C前缀+数字，如 C1772925352128725。")
-    public String queryContractByCode(String contractCode) {
-        log.info("queryContractByCode - contractCode: {}", contractCode);
+    @Tool(description = "根据合同编号（contract_code）查询合同数据。" +
+            "contractCode 参数为合同编号字符串，格式为C前缀+数字，如 C1772925352128725。" +
+            "dataType 参数控制查询范围，根据用户意图填写：" +
+            "- 用户说\"合同数据\"、\"合同详情\"、\"合同信息\" → 填 ALL（返回 contract + contract_node + contract_user + contract_quotation_relation + contract_field_sharding）；" +
+            "- 用户说\"合同节点\"、\"节点数据\"、\"操作日志\"、\"合同日志\" → 填 CONTRACT_NODE（返回 contract + contract_node + contract_log）；" +
+            "- 用户说\"合同字段\"、\"字段数据\" → 填 CONTRACT_FIELD（返回 contract + contract_field_sharding）；" +
+            "- 用户说\"签约人\"、\"合同用户\"、\"参与人\" → 填 CONTRACT_USER（返回 contract + contract_user）。" +
+            "注意：若用户提供的编号为纯数字（无C前缀），说明是订单号，应使用 queryContractsByOrderId 工具。")
+    public String queryContractData(String contractCode, String dataType) {
+        log.info("queryContractData - contractCode: {}, dataType: {}", contractCode, dataType);
         try {
-            List<Map<String, Object>> contracts = jdbcTemplate.queryForList(
-                    "SELECT contract_code, type, status, platform_instance_id, amount, project_order_id, ctime " +
-                    "FROM contract WHERE contract_code = ? AND del_status = 0 LIMIT 1",
-                    contractCode);
+            QueryDataType type = QueryDataType.valueOf(dataType.toUpperCase());
 
-            if (contracts.isEmpty()) {
+            CompletableFuture<Map<String, Object>> baseFuture = CompletableFuture.supplyAsync(
+                    () -> fetchContractBase(contractCode), dbQueryExecutor);
+
+            Map<String, CompletableFuture<?>> futures = new LinkedHashMap<>();
+            switch (type) {
+                case ALL -> {
+                    futures.put("contract_node", CompletableFuture.supplyAsync(() -> fetchNodes(contractCode), dbQueryExecutor));
+                    futures.put("contract_user", CompletableFuture.supplyAsync(() -> fetchUsers(contractCode), dbQueryExecutor));
+                    futures.put("contract_field_sharding", CompletableFuture.supplyAsync(() -> fetchFields(contractCode), dbQueryExecutor));
+                    futures.put("contract_quotation_relation", CompletableFuture.supplyAsync(() -> fetchQuotations(contractCode), dbQueryExecutor));
+                }
+                case CONTRACT_NODE -> {
+                    futures.put("contract_node", CompletableFuture.supplyAsync(() -> fetchNodes(contractCode), dbQueryExecutor));
+                    futures.put("contract_log", CompletableFuture.supplyAsync(() -> fetchLogs(contractCode), dbQueryExecutor));
+                }
+                case CONTRACT_FIELD ->
+                    futures.put("contract_field_sharding", CompletableFuture.supplyAsync(() -> fetchFields(contractCode), dbQueryExecutor));
+                case CONTRACT_USER ->
+                    futures.put("contract_user", CompletableFuture.supplyAsync(() -> fetchUsers(contractCode), dbQueryExecutor));
+            }
+
+            CompletableFuture.allOf(
+                    Stream.concat(Stream.of(baseFuture), futures.values().stream())
+                            .toArray(CompletableFuture[]::new)
+            ).join();
+
+            Map<String, Object> base = baseFuture.join();
+            if (base == null) {
                 return toErrorJson("未找到合同编号为 " + contractCode + " 的合同记录");
             }
 
-            Map<String, Object> contract = contracts.get(0);
-            String code = String.valueOf(contract.get("contract_code"));
-            String shardTable = resolveFieldShardingTable(code);
+            Map<String, Object> result = new LinkedHashMap<>(base);
+            futures.forEach((key, future) -> result.put(key, future.join()));
 
-            Map<String, Object> item = new LinkedHashMap<>();
-            item.put("contractCode", code);
-            item.put("type", contract.get("type"));
-            item.put("status", contract.get("status"));
-            item.put("amount", contract.get("amount"));
-            item.put("platformInstanceId", contract.get("platform_instance_id"));
-            item.put("projectOrderId", contract.get("project_order_id"));
-            item.put("ctime", String.valueOf(contract.get("ctime")));
-
-            CompletableFuture<List<Map<String, Object>>> nodesFuture = CompletableFuture.supplyAsync(
-                    () -> jdbcTemplate.queryForList(
-                            "SELECT node_type, fire_time FROM contract_node " +
-                            "WHERE contract_code = ? AND del_status = 0 ORDER BY fire_time",
-                            code), dbQueryExecutor);
-
-            CompletableFuture<List<Map<String, Object>>> usersFuture = CompletableFuture.supplyAsync(
-                    () -> jdbcTemplate.queryForList(
-                            "SELECT role_type, name, phone, is_sign, is_auth " +
-                            "FROM contract_user WHERE contract_code = ? AND del_status = 0",
-                            code), dbQueryExecutor);
-
-            CompletableFuture<List<Map<String, Object>>> fieldsFuture = CompletableFuture.supplyAsync(
-                    () -> jdbcTemplate.queryForList(
-                            "SELECT field_key, field_value FROM " + shardTable +
-                            " WHERE contract_code = ? AND del_status = 0 LIMIT 20",
-                            code), dbQueryExecutor);
-
-            CompletableFuture<List<Map<String, Object>>> quotationFuture = CompletableFuture.supplyAsync(
-                    () -> jdbcTemplate.queryForList(
-                            "SELECT * FROM contract_quotation_relation " +
-                            "WHERE contract_code = ? AND del_status = 0",
-                            code), dbQueryExecutor);
-
-            CompletableFuture.allOf(nodesFuture, usersFuture, fieldsFuture, quotationFuture).join();
-
-            item.put("contract_node", nodesFuture.join());
-            item.put("contract_user", usersFuture.join());
-
-            Map<String, Object> fieldMap = new LinkedHashMap<>();
-            fieldsFuture.join().forEach(f -> fieldMap.put(
-                    String.valueOf(f.get("field_key")),
-                    tryParseJson(f.get("field_value"))));
-            item.put("contract_field_sharding", fieldMap);
-            item.put("contract_field_sharding_table", shardTable);
-            item.put("contract_quotation_relation", quotationFuture.join());
-
-            return objectMapper.writeValueAsString(item);
+            return objectMapper.writeValueAsString(result);
+        } catch (IllegalArgumentException e) {
+            return toErrorJson("无效的 dataType 参数: " + dataType + "，可选值: ALL / CONTRACT_NODE / CONTRACT_FIELD / CONTRACT_USER");
         } catch (Exception e) {
-            log.error("queryContractByCode 失败", e);
+            log.error("queryContractData 失败", e);
             return toErrorJson(e.getMessage());
         }
     }
@@ -200,7 +183,7 @@ public class MySQLQueryTool {
             "当用户询问\"某订单有哪些合同\"、\"查询订单的合同列表\"、\"订单下的合同详情\"时使用此工具。" +
             "projectOrderId 参数为项目订单号字符串，格式为纯数字，如 826030619000001899。" +
             "注意：若用户提供的编号以字母C开头（如 C1772925352128725），则该编号是合同编号而非订单号，" +
-            "此时不得调用本工具，应使用 queryContractByCode 工具。")
+            "此时不得调用本工具，应使用 queryContractData 工具。")
     public String queryContractsByOrderId(String projectOrderId) {
         log.info("queryContractsByOrderId - projectOrderId: {}", projectOrderId);
         try {
