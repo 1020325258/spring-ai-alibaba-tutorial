@@ -305,7 +305,7 @@ public class MySQLQueryTool {
      */
     private List<Map<String, Object>> fetchLogs(String contractCode) {
         return jdbcTemplate.queryForList(
-                "SELECT operator, operate_type, content, ctime FROM contract_log " +
+                "SELECT type, content, remark, ctime, create_user_name, create_user_id FROM contract_log " +
                 "WHERE contract_code = ? AND del_status = 0 ORDER BY ctime DESC LIMIT 50",
                 contractCode);
     }
