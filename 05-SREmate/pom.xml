@@ -160,6 +160,32 @@
             <artifactId>spring-ai-template-st</artifactId>
             <version>${spring-ai.version}</version>
         </dependency>
+
+        <!-- Spring AI Elasticsearch VectorStore for RAG -->
+        <dependency>
+            <groupId>org.springframework.ai</groupId>
+            <artifactId>spring-ai-elasticsearch-store</artifactId>
+            <version>${spring-ai.version}</version>
+        </dependency>
+
+        <!-- Elasticsearch Java Client -->
+        <dependency>
+            <groupId>co.elastic.clients</groupId>
+            <artifactId>elasticsearch-java</artifactId>
+            <version>8.18.0</version>
+        </dependency>
+
+        <!-- Jakarta JSON Bind (required by Elasticsearch Java Client) -->
+        <dependency>
+            <groupId>jakarta.json.bind</groupId>
+            <artifactId>jakarta.json.bind-api</artifactId>
+            <version>3.0.0</version>
+        </dependency>
+        <dependency>
+            <groupId>org.eclipse</groupId>
+            <artifactId>yasson</artifactId>
+            <version>3.0.3</version>
+        </dependency>
     </dependencies>
 
     <build>

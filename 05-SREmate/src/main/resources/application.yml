@@ -20,6 +20,12 @@ spring:
         options:
           model: qwen-turbo
           enable-thinking: false
+    # VectorStore配置
+    vectorstore:
+      elasticsearch:
+        enabled: true
+        index-name: sremate_knowledge
+        initialization-mode: lazy
 
   # MySQL数据源配置（用于查询业务数据）
   # 敏感配置请在 application-local.yml 中覆盖，该文件已被 .gitignore 忽略
@@ -36,7 +42,22 @@ spring:
         idle-timeout: 600000
         max-lifetime: 1800000
 
+  # Elasticsearch配置（用于RAG知识库向量存储）
+  elasticsearch:
+    uris: ${ELASTICSEARCH_URI:http://localhost:9200}
+    username: ${ELASTICSEARCH_USERNAME:}
+    password: ${ELASTICSEARCH_PASSWORD:}
+
   mandatory-file-encoding: UTF-8
+
+# 知识库配置
+knowledge:
+  loader:
+    enabled: true
+    paths:
+      - classpath:knowledge/faq/
+      - classpath:knowledge/troubleshooting/
+      - classpath:knowledge/operations/
 
 # 日志配置
 logging:

@@ -17,7 +17,9 @@ import static org.assertj.core.api.Assertions.assertThat;
         "spring.datasource.sre.driver-class-name=org.h2.Driver",
         "spring.datasource.sre.username=sa",
         "spring.datasource.sre.password=",
-        "sre.console.enabled=false"
+        "sre.console.enabled=false",
+        "spring.ai.vectorstore.elasticsearch.enabled=false",
+        "knowledge.loader.enabled=false"
 })
 class SkillServiceTest {
 
