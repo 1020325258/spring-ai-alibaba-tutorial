@@ -18,16 +18,19 @@ import java.util.function.Supplier;
 @Service
 public class CacheService {
 
+    /** 默认缓存过期时间：5秒 */
+    private static final Duration DEFAULT_TTL = Duration.ofSeconds(5);
+
     private final Cache<String, CacheEntry> cache;
 
     public CacheService() {
         this.cache = Caffeine.newBuilder()
                 .maximumSize(1000)
-                .expireAfterWrite(10, TimeUnit.MINUTES)
+                .expireAfterWrite(DEFAULT_TTL.toMillis(), TimeUnit.MILLISECONDS)
                 .recordStats()
                 .build();
 
-        log.info("[CACHE] 缓存服务初始化完成");
+        log.info("[CACHE] 缓存服务初始化完成，默认过期时间: {}秒", DEFAULT_TTL.getSeconds());
     }
 
     public <T> T getOrCompute(String key, Supplier<T> supplier, Duration ttl) {
@@ -46,7 +49,7 @@ public class CacheService {
     }
 
     public <T> T getOrCompute(String key, Supplier<T> supplier) {
-        return getOrCompute(key, supplier, Duration.ofMinutes(10));
+        return getOrCompute(key, supplier, DEFAULT_TTL);
     }
 
     public <T> void put(String key, T value, Duration ttl) {
@@ -55,7 +58,7 @@ public class CacheService {
     }
 
     public <T> void put(String key, T value) {
-        put(key, value, Duration.ofMinutes(10));
+        put(key, value, DEFAULT_TTL);
     }
 
     public <T> T get(String key) {
