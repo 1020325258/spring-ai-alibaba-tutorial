@@ -1,5 +1,6 @@
 package com.yycome.sremate.infrastructure.dao;
 
+import com.yycome.sremate.infrastructure.util.DateTimeUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -36,7 +37,7 @@ public class ContractDao {
         base.put("amount", row.get("amount"));
         base.put("platformInstanceId", row.get("platform_instance_id"));
         base.put("projectOrderId", row.get("project_order_id"));
-        base.put("ctime", String.valueOf(row.get("ctime")));
+        base.put("ctime", DateTimeUtil.format(row.get("ctime")));
         return base;
     }
 
@@ -44,20 +45,38 @@ public class ContractDao {
      * 查询合同节点记录
      */
     public List<Map<String, Object>> fetchNodes(String contractCode) {
-        return jdbcTemplate.queryForList(
+        List<Map<String, Object>> rows = jdbcTemplate.queryForList(
                 "SELECT node_type, fire_time FROM contract_node " +
                 "WHERE contract_code = ? AND del_status = 0 ORDER BY fire_time",
                 contractCode);
+        // 格式化时间字段
+        return rows.stream().map(row -> {
+            Map<String, Object> result = new LinkedHashMap<>();
+            result.put("nodeType", row.get("node_type"));
+            result.put("fireTime", DateTimeUtil.format(row.get("fire_time")));
+            return result;
+        }).toList();
     }
 
     /**
      * 查询合同操作日志
      */
     public List<Map<String, Object>> fetchLogs(String contractCode) {
-        return jdbcTemplate.queryForList(
+        List<Map<String, Object>> rows = jdbcTemplate.queryForList(
                 "SELECT type, content, remark, ctime, create_user_name, create_user_id FROM contract_log " +
                 "WHERE contract_code = ? AND del_status = 0 ORDER BY ctime DESC LIMIT 50",
                 contractCode);
+        // 格式化时间字段
+        return rows.stream().map(row -> {
+            Map<String, Object> result = new LinkedHashMap<>();
+            result.put("type", row.get("type"));
+            result.put("content", row.get("content"));
+            result.put("remark", row.get("remark"));
+            result.put("ctime", DateTimeUtil.format(row.get("ctime")));
+            result.put("createUserName", row.get("create_user_name"));
+            result.put("createUserId", row.get("create_user_id"));
+            return result;
+        }).toList();
     }
 
     /**
@@ -210,6 +229,12 @@ public class ContractDao {
                 "WHERE business_type = ? AND gb_code = ? AND company_code = ? AND version = ? AND contract_type = ? AND sign_channel_type = 1 AND del_status = 0",
                 businessType, gbCode, companyCode, version, type);
 
-        return rows;
+        // 格式化时间字段
+        return rows.stream().map(row -> {
+            Map<String, Object> result = new LinkedHashMap<>(row);
+            result.put("ctime", DateTimeUtil.format(row.get("ctime")));
+            result.put("mtime", DateTimeUtil.format(row.get("mtime")));
+            return result;
+        }).toList();
     }
 }

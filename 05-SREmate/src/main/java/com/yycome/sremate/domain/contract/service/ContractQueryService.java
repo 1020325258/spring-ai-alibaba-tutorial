@@ -2,6 +2,7 @@ package com.yycome.sremate.domain.contract.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.yycome.sremate.infrastructure.dao.ContractDao;
+import com.yycome.sremate.infrastructure.util.DateTimeUtil;
 import com.yycome.sremate.trigger.agent.HttpEndpointTool;
 import com.yycome.sremate.types.enums.ContractTypeEnum;
 import com.yycome.sremate.types.enums.QueryDataType;
@@ -91,7 +92,7 @@ public class ContractQueryService {
             item.put("status", contract.get("status"));
             item.put("amount", contract.get("amount"));
             item.put("platformInstanceId", contract.get("platform_instance_id"));
-            item.put("ctime", String.valueOf(contract.get("ctime")));
+            item.put("ctime", DateTimeUtil.format(contract.get("ctime")));
 
             // 并行查询节点和用户信息
             CompletableFuture<List<Map<String, Object>>> nodesFuture = CompletableFuture.supplyAsync(
@@ -126,7 +127,7 @@ public class ContractQueryService {
             item.put("status", contract.get("status"));
             item.put("amount", contract.get("amount"));
             item.put("platformInstanceId", contract.get("platform_instance_id"));
-            item.put("ctime", String.valueOf(contract.get("ctime")));
+            item.put("ctime", DateTimeUtil.format(contract.get("ctime")));
 
             String shardTable = contractDao.resolveFieldShardingTable(contractCode);
 
