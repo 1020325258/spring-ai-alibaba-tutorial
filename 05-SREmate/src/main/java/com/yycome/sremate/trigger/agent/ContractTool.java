@@ -7,6 +7,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.stereotype.Component;
 
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -21,6 +22,7 @@ import java.util.Map;
 public class ContractTool {
 
     private final ContractQueryService contractQueryService;
+    private final HttpEndpointTool httpEndpointTool;
 
     /**
      * 根据合同编号查询合同数据（支持4种查询类型）
@@ -214,5 +216,45 @@ public class ContractTool {
 
     private String toErrorJson(String message) {
         return "{\"error\":\"" + message.replace("\"", "\\\"") + "\"}";
+    }
+
+    /**
+     * 根据订单号查询子单信息
+     *
+     * @param homeOrderNo       订单号（必填）
+     * @param quotationOrderNo  报价单号（可选）
+     * @param projectChangeNo   变更单号（可选）
+     * @return JSON格式子单信息
+     */
+    @Tool(description = """
+            根据订单号查询对应的子单信息，支持按报价单号和变更单号筛选。
+            当用户询问以下问题时使用此工具：
+            - "查询某订单下某报价单的子单信息"
+            - "某订单下某报价单对应的子单是什么"
+            - "查询订单xxx下报价单xxx的子单"
+
+            参数说明：
+            - homeOrderNo：订单号（必填），纯数字格式，如 826030611000000795
+            - quotationOrderNo：报价单号（可选），GBILL前缀+数字，如 GBILL260309110407580001
+            - projectChangeNo：变更单号（可选）
+
+            示例：
+            - "826030611000000795下GBILL260309110407580001的子单信息" → homeOrderNo=826030611000000795, quotationOrderNo=GBILL260309110407580001
+            - "查询订单826030611000000795的子单" → homeOrderNo=826030611000000795
+            """)
+    public String querySubOrderInfo(String homeOrderNo, String quotationOrderNo, String projectChangeNo) {
+        log.info("querySubOrderInfo - homeOrderNo: {}, quotationOrderNo: {}, projectChangeNo: {}",
+                homeOrderNo, quotationOrderNo, projectChangeNo);
+        try {
+            Map<String, String> params = new HashMap<>();
+            params.put("homeOrderNo", homeOrderNo);
+            params.put("quotationOrderNo", quotationOrderNo != null ? quotationOrderNo : "");
+            params.put("projectChangeNo", projectChangeNo != null ? projectChangeNo : "");
+
+            return httpEndpointTool.callPredefinedEndpoint("sub-order-info", params);
+        } catch (Exception e) {
+            log.error("querySubOrderInfo 失败", e);
+            return toErrorJson(e.getMessage());
+        }
     }
 }

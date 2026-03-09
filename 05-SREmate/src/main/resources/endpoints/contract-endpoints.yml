@@ -62,3 +62,45 @@ endpoints:
       - "查询instanceId为116894442的form_id"
       - "合同116894442的版式是什么"
       - "获取合同实例116894442的表单数据"
+
+  - id: sub-order-info
+    name: 查询子单基本信息
+    description: |
+      根据订单号查询对应的子单信息，支持按报价单号和变更单号筛选。
+      当用户询问以下问题时使用此接口：
+      - "查询某订单下某报价单的子单信息"
+      - "某订单下某报价单对应的子单是什么"
+      - "查询订单xxx下报价单xxx的子单"
+      - "826030611000000795下GBILL260309110407580001的子单信息"
+      参数说明：
+      - homeOrderNo：订单号（必填），纯数字格式
+      - quotationOrderNo：报价单号（可选），GBILL前缀+数字
+      - projectChangeNo：变更单号（可选）
+    category: contract
+    urlTemplate: "http://nrs-order-service.offline-beta.ttb.test.ke.com/api/subOrder/queryBaseInfoByHomeOrderNo?homeOrderNo=${homeOrderNo}&quotationOrderNo=${quotationOrderNo}&projectChangeNo=${projectChangeNo}"
+    method: GET
+    parameters:
+      - name: homeOrderNo
+        type: string
+        description: 订单号，纯数字格式
+        required: true
+        example: "826030611000000795"
+      - name: quotationOrderNo
+        type: string
+        description: 报价单号，GBILL前缀+数字，可选
+        required: false
+        example: "GBILL260309110407580001"
+      - name: projectChangeNo
+        type: string
+        description: 变更单号，可选
+        required: false
+        example: ""
+    headers:
+      X-NRS-User-Id: "1000000000000000"
+      Content-Type: "application/json"
+    timeout: 15
+    examples:
+      - "查询826030611000000795下GBILL260309110407580001的子单信息"
+      - "查询订单826030611000000795的子单"
+      - "826030611000000795订单下报价单GBILL260309110407580001对应的子单"
+
