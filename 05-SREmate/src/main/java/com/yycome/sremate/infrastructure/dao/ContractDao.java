@@ -110,10 +110,17 @@ public class ContractDao {
      * 查询合同报价关联记录
      */
     public List<Map<String, Object>> fetchQuotations(String contractCode) {
-        return jdbcTemplate.queryForList(
+        List<Map<String, Object>> rows = jdbcTemplate.queryForList(
                 "SELECT * FROM contract_quotation_relation " +
                 "WHERE contract_code = ? AND del_status = 0",
                 contractCode);
+        // 格式化时间字段
+        return rows.stream().map(row -> {
+            Map<String, Object> result = new LinkedHashMap<>(row);
+            result.put("ctime", DateTimeUtil.format(row.get("ctime")));
+            result.put("mtime", DateTimeUtil.format(row.get("mtime")));
+            return result;
+        }).toList();
     }
 
     /**
