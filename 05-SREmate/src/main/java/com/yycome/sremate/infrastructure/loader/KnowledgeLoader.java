@@ -22,7 +22,7 @@ import java.util.Map;
 
 /**
  * 知识库加载器
- * 启动时扫描 MD 文件，解析并入库
+ * 支持启动时自动加载和手动触发加载
  * 依赖 Elasticsearch VectorStore，仅当启用时加载
  */
 @Slf4j
@@ -39,13 +39,24 @@ public class KnowledgeLoader implements CommandLineRunner {
     @Value("${spring.ai.vectorstore.elasticsearch.index-name:sremate_knowledge}")
     private String indexName;
 
+    // 标记是否已加载
+    private volatile boolean loaded = false;
+
     @Override
     public void run(String... args) {
         if (!properties.getLoader().isEnabled()) {
-            log.info("知识库加载已禁用");
+            log.info("知识库自动加载已禁用，可调用手动加载接口触发");
             return;
         }
 
+        loadKnowledge();
+    }
+
+    /**
+     * 手动加载知识库（全量重建）
+     * @return 加载的文档数量
+     */
+    public int loadKnowledge() {
         log.info("开始加载知识库...");
 
         // 清空旧数据（全量重建）
@@ -58,10 +69,20 @@ public class KnowledgeLoader implements CommandLineRunner {
 
         if (!documents.isEmpty()) {
             vectorStore.add(documents);
+            loaded = true;
             log.info("知识库加载完成，共 {} 条文档", documents.size());
         } else {
             log.warn("未找到任何知识文档");
         }
+
+        return documents.size();
+    }
+
+    /**
+     * 检查知识库是否已加载
+     */
+    public boolean isLoaded() {
+        return loaded;
     }
 
     /**

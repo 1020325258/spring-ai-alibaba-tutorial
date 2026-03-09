@@ -74,7 +74,43 @@ public class ContractQueryService {
     }
 
     /**
-     * 根据项目订单号查询所有合同，聚合关联数据
+     * 根据项目订单号查询合同列表（精简版，不查询 contract_field_sharding 和 contract_quotation_relation）
+     * 适用于只需要知道"订单有哪些合同"的场景
+     */
+    public List<Map<String, Object>> queryListByOrderId(String projectOrderId) {
+        List<Map<String, Object>> contracts = contractDao.fetchContractsByOrderId(projectOrderId);
+        if (contracts.isEmpty()) return null;
+
+        List<Map<String, Object>> result = new ArrayList<>();
+        for (Map<String, Object> contract : contracts) {
+            String contractCode = String.valueOf(contract.get("contract_code"));
+
+            Map<String, Object> item = new LinkedHashMap<>();
+            item.put("contractCode", contractCode);
+            item.put("type", contract.get("type"));
+            item.put("status", contract.get("status"));
+            item.put("amount", contract.get("amount"));
+            item.put("platformInstanceId", contract.get("platform_instance_id"));
+            item.put("ctime", String.valueOf(contract.get("ctime")));
+
+            // 并行查询节点和用户信息
+            CompletableFuture<List<Map<String, Object>>> nodesFuture = CompletableFuture.supplyAsync(
+                    () -> contractDao.fetchNodes(contractCode), dbQueryExecutor);
+            CompletableFuture<List<Map<String, Object>>> usersFuture = CompletableFuture.supplyAsync(
+                    () -> contractDao.fetchUsers(contractCode), dbQueryExecutor);
+
+            CompletableFuture.allOf(nodesFuture, usersFuture).join();
+
+            item.put("contract_node", nodesFuture.join());
+            item.put("contract_user", usersFuture.join());
+
+            result.add(item);
+        }
+        return result;
+    }
+
+    /**
+     * 根据项目订单号查询所有合同，聚合完整关联数据（包含 contract_field_sharding 和 contract_quotation_relation）
      */
     public List<Map<String, Object>> queryByOrderId(String projectOrderId) {
         List<Map<String, Object>> contracts = contractDao.fetchContractsByOrderId(projectOrderId);

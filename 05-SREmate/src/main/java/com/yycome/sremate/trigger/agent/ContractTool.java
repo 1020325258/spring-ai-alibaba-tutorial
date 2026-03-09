@@ -56,16 +56,46 @@ public class ContractTool {
     }
 
     /**
-     * 根据项目订单号查询所有合同，聚合关联数据
+     * 根据项目订单号查询合同列表（精简版，不查询 contract_field_sharding）
+     *
+     * @param projectOrderId 项目订单号
+     * @return JSON格式合同列表
+     */
+    @Tool(description = """
+            根据项目订单号（project_order_id）查询该订单下的合同列表（精简版）。
+            只返回合同基本信息、节点记录（contract_node）和参与人信息（contract_user），
+            不查询扩展字段（contract_field_sharding）和报价关联（contract_quotation_relation）。
+            当用户询问"某订单有哪些合同"、"查询订单的合同列表"、"订单下有什么合同"时使用此工具。
+            projectOrderId 参数为项目订单号字符串，格式为纯数字，如 826030619000001899。
+            注意：若用户提供的编号以字母C开头（如 C1772925352128725），则该编号是合同编号而非订单号，
+            此时不得调用本工具，应使用 queryContractData 工具。""")
+    public String queryContractListByOrderId(String projectOrderId) {
+        log.info("queryContractListByOrderId - projectOrderId: {}", projectOrderId);
+        try {
+            List<Map<String, Object>> result = contractQueryService.queryListByOrderId(projectOrderId);
+            if (result == null) {
+                return toErrorJson("订单 " + projectOrderId + " 下未找到合同记录");
+            }
+            return contractQueryService.toJson(result);
+        } catch (Exception e) {
+            log.error("queryContractListByOrderId 失败", e);
+            return toErrorJson(e.getMessage());
+        }
+    }
+
+    /**
+     * 根据项目订单号查询所有合同完整详情（包含扩展字段和报价关联）
      *
      * @param projectOrderId 项目订单号
      * @return JSON格式聚合合同数据
      */
     @Tool(description = """
-            根据项目订单号（project_order_id）查询该订单下的所有合同，
-            并聚合每份合同的节点记录（contract_node）、参与人信息（contract_user）
-            以及扩展字段（contract_field_sharding，分库分表，按合同号数字部分取模10确定表后缀）。
-            当用户询问"某订单有哪些合同"、"查询订单的合同列表"、"订单下的合同详情"时使用此工具。
+            根据项目订单号（project_order_id）查询该订单下所有合同的完整详情。
+            返回每份合同的节点记录（contract_node）、参与人信息（contract_user）、
+            扩展字段（contract_field_sharding，分库分表，按合同号数字部分取模10确定表后缀）
+            以及报价关联（contract_quotation_relation）。
+            当用户询问"订单的合同详情"、"订单下合同的完整信息"、"合同的扩展字段"时使用此工具。
+            如果用户只是想知道订单有哪些合同，请使用 queryContractListByOrderId 工具（响应更快）。
             projectOrderId 参数为项目订单号字符串，格式为纯数字，如 826030619000001899。
             注意：若用户提供的编号以字母C开头（如 C1772925352128725），则该编号是合同编号而非订单号，
             此时不得调用本工具，应使用 queryContractData 工具。""")
