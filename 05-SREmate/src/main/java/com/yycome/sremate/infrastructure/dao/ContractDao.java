@@ -111,7 +111,8 @@ public class ContractDao {
      */
     public List<Map<String, Object>> fetchQuotations(String contractCode) {
         List<Map<String, Object>> rows = jdbcTemplate.queryForList(
-                "SELECT * FROM contract_quotation_relation " +
+                "SELECT contract_code, quotation_order_id, del_status, ctime, utime " +
+                "FROM contract_quotation_relation " +
                 "WHERE contract_code = ? AND del_status = 0",
                 contractCode);
         // 格式化时间字段
@@ -140,10 +141,21 @@ public class ContractDao {
      * 根据项目订单号查询合同基本列表
      */
     public List<Map<String, Object>> fetchContractsByOrderId(String projectOrderId) {
-        return jdbcTemplate.queryForList(
+        List<Map<String, Object>> rows = jdbcTemplate.queryForList(
                 "SELECT contract_code, type, status, platform_instance_id, amount, ctime " +
                 "FROM contract WHERE project_order_id = ? AND del_status = 0",
                 projectOrderId);
+        // 格式化时间字段
+        return rows.stream().map(row -> {
+            Map<String, Object> result = new LinkedHashMap<>();
+            result.put("contract_code", row.get("contract_code"));
+            result.put("type", row.get("type"));
+            result.put("status", row.get("status"));
+            result.put("platform_instance_id", row.get("platform_instance_id"));
+            result.put("amount", row.get("amount"));
+            result.put("ctime", DateTimeUtil.format(row.get("ctime")));
+            return result;
+        }).toList();
     }
 
     /**

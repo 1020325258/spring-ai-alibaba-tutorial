@@ -4,7 +4,6 @@ import com.yycome.sremate.infrastructure.service.CacheService;
 import com.yycome.sremate.infrastructure.service.MetricsCollector;
 import com.yycome.sremate.infrastructure.service.TracingService;
 import com.yycome.sremate.infrastructure.service.model.PerformanceReport;
-import com.yycome.sremate.infrastructure.service.model.TraceSession;
 import com.yycome.sremate.infrastructure.service.model.TracingContext;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
@@ -19,34 +18,42 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 class InfrastructureServiceTest {
 
-    private com.yycome.sremate.infrastructure.service.TracingService tracingService;
-    private com.yycome.sremate.infrastructure.service.CacheService cacheService;
-    private com.yycome.sremate.infrastructure.service.MetricsCollector metricsCollector;
+    private TracingService tracingService;
+    private CacheService cacheService;
+    private MetricsCollector metricsCollector;
 
     @BeforeEach
     void setUp() {
-        tracingService = new com.yycome.sremate.infrastructure.service.TracingService();
-        cacheService = new com.yycome.sremate.infrastructure.service.CacheService();
-        metricsCollector = new com.yycome.sremate.infrastructure.service.MetricsCollector(new SimpleMeterRegistry());
+        tracingService = new TracingService();
+        cacheService = new CacheService();
+        metricsCollector = new MetricsCollector(new SimpleMeterRegistry());
     }
 
     @Test
     void testTracingService() {
-        // 测试会话追踪
-        TraceSession session = tracingService.startSession("user1", "test query");
-        assertNotNull(session);
-        assertNotNull(session.getSessionId());
-        assertEquals("user1", session.getUserId());
-
         // 测试工具调用追踪
         TracingContext context = tracingService.startToolCall("testTool", Map.of("param", "value"));
         assertNotNull(context);
+        assertNotNull(context.getTraceId());
         assertEquals("testTool", context.getToolName());
 
         // 结束追踪
         tracingService.endToolCall(context, "result");
         assertTrue(context.isSuccess());
         assertTrue(context.getDuration() >= 0);
+
+        // 验证追踪记录已保存
+        assertFalse(tracingService.getRecentTraces().isEmpty());
+    }
+
+    @Test
+    void testTracingServiceFailure() {
+        // 测试失败的追踪
+        TracingContext context = tracingService.startToolCall("failingTool", Map.of("param", "value"));
+        tracingService.failToolCall(context, new RuntimeException("test error"));
+
+        assertFalse(context.isSuccess());
+        assertEquals("test error", context.getErrorMessage());
     }
 
     @Test

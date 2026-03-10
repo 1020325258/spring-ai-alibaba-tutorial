@@ -1,7 +1,9 @@
 package com.yycome.sremate.aspect;
 
+import com.yycome.sremate.infrastructure.service.DirectOutputHolder;
 import com.yycome.sremate.infrastructure.service.MetricsCollector;
 import com.yycome.sremate.infrastructure.service.TracingService;
+import com.yycome.sremate.infrastructure.service.model.ToolCallContext;
 import com.yycome.sremate.infrastructure.service.model.TracingContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -10,9 +12,9 @@ import org.aspectj.lang.annotation.Around;
 import org.aspectj.lang.annotation.Aspect;
 import org.springframework.stereotype.Component;
 
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * 可观测性切面
@@ -26,6 +28,17 @@ public class ObservabilityAspect {
 
     private final TracingService tracingService;
     private final MetricsCollector metricsCollector;
+    private final DirectOutputHolder directOutputHolder;
+
+    /** 数据查询类工具名称集合 */
+    private static final Set<String> DATA_QUERY_TOOLS = Set.of(
+            "queryContractData",
+            "queryContractsByOrderId",
+            "queryContractInstanceId",
+            "queryContractFormId",
+            "queryContractConfig",
+            "querySubOrderInfo"
+    );
 
     @Around("@annotation(org.springframework.ai.tool.annotation.Tool)")
     public Object logToolCall(ProceedingJoinPoint joinPoint) throws Throwable {
@@ -33,17 +46,29 @@ public class ObservabilityAspect {
         Object[] args = joinPoint.getArgs();
         long startTime = System.currentTimeMillis();
 
-        // 构建参数Map
+        // 构建参数Map（脱敏处理）
         Map<String, Object> params = buildParamsMap(args);
 
-        // 开始追踪
+        // 判断是否为数据查询类工具
+        boolean isDataQuery = DATA_QUERY_TOOLS.contains(toolName);
+
+        // 创建并绑定上下文
+        ToolCallContext callContext = ToolCallContext.start(toolName, params);
+        callContext.setDataQuery(isDataQuery);
+
+        // 开始追踪（保留原有 TracingService 兼容性）
         TracingContext tracing = tracingService.startToolCall(toolName, params);
 
-        log.info("[TOOL_CALL] 开始调用工具: {}, 参数: {}", toolName, Arrays.toString(args));
+        // 结构化日志：开始
+        log.info("[TOOL] {} | params={} | type={}",
+                toolName, params, isDataQuery ? "DATA_QUERY" : "KNOWLEDGE");
 
         try {
             Object result = joinPoint.proceed();
             long duration = System.currentTimeMillis() - startTime;
+
+            // 结束上下文
+            callContext.endSuccess(result);
 
             // 结束追踪
             tracingService.endToolCall(tracing, result);
@@ -51,12 +76,21 @@ public class ObservabilityAspect {
             // 记录性能指标
             metricsCollector.recordToolCall(toolName, duration, true);
 
-            log.info("[TOOL_CALL] 工具调用成功: {}, 耗时: {}ms",
-                    toolName, duration);
+            // 如果是数据查询类工具，将结果写入 DirectOutputHolder
+            if (isDataQuery && result instanceof String) {
+                directOutputHolder.set((String) result);
+            }
+
+            // 结构化日志：成功
+            log.info("[TOOL] {} | duration={}ms | success=true | preview={}",
+                    toolName, duration, truncatePreview(result));
 
             return result;
         } catch (Exception e) {
             long duration = System.currentTimeMillis() - startTime;
+
+            // 结束上下文
+            callContext.endFailure(e);
 
             // 记录失败
             tracingService.failToolCall(tracing, e);
@@ -64,9 +98,14 @@ public class ObservabilityAspect {
             // 记录性能指标
             metricsCollector.recordToolCall(toolName, duration, false);
 
-            log.error("[TOOL_CALL] 工具调用失败: {}, 耗时: {}ms, 错误: {}",
+            // 结构化日志：失败
+            log.error("[TOOL] {} | duration={}ms | success=false | error={}",
                     toolName, duration, e.getMessage());
+
             throw e;
+        } finally {
+            // 清理 ThreadLocal
+            ToolCallContext.clear();
         }
     }
 
@@ -81,5 +120,17 @@ public class ObservabilityAspect {
             }
         }
         return params;
+    }
+
+    /**
+     * 截断预览字符串
+     */
+    private String truncatePreview(Object result) {
+        if (result == null) return "null";
+        String str = result.toString();
+        if (str.length() > 100) {
+            return str.substring(0, 100) + "...(" + str.length() + "chars)";
+        }
+        return str;
     }
 }

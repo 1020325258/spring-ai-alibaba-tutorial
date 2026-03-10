@@ -1,8 +1,8 @@
 package com.yycome.sremate.trigger.agent;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.yycome.sremate.domain.contract.service.ContractQueryService;
 import com.yycome.sremate.types.enums.QueryDataType;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.stereotype.Component;
@@ -18,11 +18,19 @@ import java.util.Map;
  */
 @Slf4j
 @Component
-@RequiredArgsConstructor
 public class ContractTool {
 
     private final ContractQueryService contractQueryService;
     private final HttpEndpointTool httpEndpointTool;
+    private final ObjectMapper objectMapper;
+
+    public ContractTool(ContractQueryService contractQueryService,
+                        HttpEndpointTool httpEndpointTool,
+                        ObjectMapper objectMapper) {
+        this.contractQueryService = contractQueryService;
+        this.httpEndpointTool = httpEndpointTool;
+        this.objectMapper = objectMapper;
+    }
 
     /**
      * 根据合同编号查询合同数据（支持4种查询类型）
@@ -56,13 +64,6 @@ public class ContractTool {
             return toErrorJson(e.getMessage());
         }
     }
-
-    /**
-     * 根据项目订单号查询合同列表（精简版，不查询 contract_field_sharding）
-     *
-     * @param projectOrderId 项目订单号
-     * @return JSON格式合同列表
-     */
 
     /**
      * 根据项目订单号查询所有合同完整详情（包含扩展字段和报价关联）
@@ -215,7 +216,12 @@ public class ContractTool {
     }
 
     private String toErrorJson(String message) {
-        return "{\"error\":\"" + message.replace("\"", "\\\"") + "\"}";
+        try {
+            return objectMapper.writeValueAsString(Map.of("error", message));
+        } catch (Exception e) {
+            // 降级处理：若 ObjectMapper 失败，返回简单错误
+            return "{\"error\":\"" + message.replace("\"", "'") + "\"}";
+        }
     }
 
     /**

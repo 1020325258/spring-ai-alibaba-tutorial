@@ -1,8 +1,8 @@
 package com.yycome.sremate.trigger.console;
 
+import com.yycome.sremate.infrastructure.service.DirectOutputHolder;
 import com.yycome.sremate.infrastructure.service.MetricsCollector;
 import com.yycome.sremate.infrastructure.service.TracingService;
-import com.yycome.sremate.infrastructure.service.model.TraceSession;
 import org.fusesource.jansi.Ansi;
 import org.fusesource.jansi.AnsiConsole;
 import org.jline.reader.*;
@@ -45,8 +45,10 @@ public class SREConsole implements CommandLineRunner {
     @Autowired
     private MetricsCollector metricsCollector;
 
+    @Autowired
+    private DirectOutputHolder directOutputHolder;
+
     private final List<Message> conversationHistory = new ArrayList<>();
-    private TraceSession currentSession;
 
     /** 保留的最大消息条数（user + assistant 各算 1 条，10 条 = 5 轮对话） */
     private static final int MAX_HISTORY = 10;
@@ -87,10 +89,6 @@ public class SREConsole implements CommandLineRunner {
                 );
 
                 if ("quit".equalsIgnoreCase(input) || "exit".equalsIgnoreCase(input)) {
-                    if (currentSession != null) {
-                        tracingService.endSession(currentSession.getSessionId());
-                    }
-
                     System.out.println(Ansi.ansi().fg(Ansi.Color.CYAN).a("\n" + metricsCollector.getReportSummary()).reset());
                     System.out.println(Ansi.ansi().fg(Ansi.Color.CYAN).a("\n再见！感谢使用SRE值班客服Agent。").reset());
                     break;
@@ -108,10 +106,6 @@ public class SREConsole implements CommandLineRunner {
 
                 if (input.trim().isEmpty()) {
                     continue;
-                }
-
-                if (currentSession == null) {
-                    currentSession = tracingService.startSession("user", input);
                 }
 
                 conversationHistory.add(new UserMessage(input));
@@ -186,12 +180,8 @@ public class SREConsole implements CommandLineRunner {
     }
 
     private void showTrace() {
-        if (currentSession != null) {
-            String traceChain = tracingService.visualizeTraceChain(currentSession.getSessionId());
-            System.out.println(Ansi.ansi().fg(Ansi.Color.CYAN).a("\n" + traceChain).reset());
-        } else {
-            System.out.println(Ansi.ansi().fg(Ansi.Color.YELLOW).a("\n暂无追踪数据").reset());
-        }
+        String traceOutput = tracingService.visualizeRecentTraces(20);
+        System.out.println(Ansi.ansi().fg(Ansi.Color.CYAN).a("\n" + traceOutput).reset());
     }
 
     private void printBanner() {
@@ -223,7 +213,7 @@ public class SREConsole implements CommandLineRunner {
         System.out.println(Ansi.ansi().fg(Ansi.Color.WHITE).bold().a("  ├─ stats ").reset()
                 .fg(Ansi.Color.YELLOW).a(" 查看性能统计").reset());
         System.out.println(Ansi.ansi().fg(Ansi.Color.WHITE).bold().a("  ├─ trace ").reset()
-                .fg(Ansi.Color.YELLOW).a(" 查看当前会话追踪链路").reset());
+                .fg(Ansi.Color.YELLOW).a(" 查看最近工具调用记录").reset());
         System.out.println(Ansi.ansi().fg(Ansi.Color.WHITE).bold().a("  ├─ quit  ").reset()
                 .fg(Ansi.Color.YELLOW).a(" 退出程序").reset());
         System.out.println(Ansi.ansi().fg(Ansi.Color.WHITE).bold().a("  └─ ↑ / ↓ ").reset()

@@ -1,17 +1,17 @@
 package com.yycome.sremate.domain.contract.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.yycome.sremate.domain.contract.gateway.FormDataGateway;
 import com.yycome.sremate.infrastructure.dao.ContractDao;
-import com.yycome.sremate.infrastructure.util.DateTimeUtil;
-import com.yycome.sremate.trigger.agent.HttpEndpointTool;
 import com.yycome.sremate.types.enums.ContractTypeEnum;
 import com.yycome.sremate.types.enums.QueryDataType;
+import jakarta.annotation.PreDestroy;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -26,15 +26,27 @@ import java.util.stream.Stream;
  */
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class ContractQueryService {
 
     private final ContractDao contractDao;
-    private final HttpEndpointTool httpEndpointTool;
+    private final FormDataGateway formDataGateway;
     private final ObjectMapper objectMapper;
 
-    // 用于并行 DB 子查询的线程池，大小与连接池对齐
+    /** 用于并行 DB 子查询的线程池，大小与连接池对齐 */
     private final ExecutorService dbQueryExecutor = Executors.newFixedThreadPool(5);
+
+    @Autowired
+    public ContractQueryService(ContractDao contractDao, FormDataGateway formDataGateway, ObjectMapper objectMapper) {
+        this.contractDao = contractDao;
+        this.formDataGateway = formDataGateway;
+        this.objectMapper = objectMapper;
+    }
+
+    @PreDestroy
+    public void destroy() {
+        dbQueryExecutor.shutdown();
+        log.info("ContractQueryService 线程池已关闭");
+    }
 
     /**
      * 根据合同编号和查询类型聚合合同数据
@@ -75,42 +87,6 @@ public class ContractQueryService {
     }
 
     /**
-     * 根据项目订单号查询合同列表（精简版，不查询 contract_field_sharding 和 contract_quotation_relation）
-     * 适用于只需要知道"订单有哪些合同"的场景
-     */
-    public List<Map<String, Object>> queryListByOrderId(String projectOrderId) {
-        List<Map<String, Object>> contracts = contractDao.fetchContractsByOrderId(projectOrderId);
-        if (contracts.isEmpty()) return null;
-
-        List<Map<String, Object>> result = new ArrayList<>();
-        for (Map<String, Object> contract : contracts) {
-            String contractCode = String.valueOf(contract.get("contract_code"));
-
-            Map<String, Object> item = new LinkedHashMap<>();
-            item.put("contractCode", contractCode);
-            item.put("type", contract.get("type"));
-            item.put("status", contract.get("status"));
-            item.put("amount", contract.get("amount"));
-            item.put("platformInstanceId", contract.get("platform_instance_id"));
-            item.put("ctime", DateTimeUtil.format(contract.get("ctime")));
-
-            // 并行查询节点和用户信息
-            CompletableFuture<List<Map<String, Object>>> nodesFuture = CompletableFuture.supplyAsync(
-                    () -> contractDao.fetchNodes(contractCode), dbQueryExecutor);
-            CompletableFuture<List<Map<String, Object>>> usersFuture = CompletableFuture.supplyAsync(
-                    () -> contractDao.fetchUsers(contractCode), dbQueryExecutor);
-
-            CompletableFuture.allOf(nodesFuture, usersFuture).join();
-
-            item.put("contract_node", nodesFuture.join());
-            item.put("contract_user", usersFuture.join());
-
-            result.add(item);
-        }
-        return result;
-    }
-
-    /**
      * 根据项目订单号查询所有合同，聚合完整关联数据（包含 contract_field_sharding 和 contract_quotation_relation）
      */
     public List<Map<String, Object>> queryByOrderId(String projectOrderId) {
@@ -121,13 +97,7 @@ public class ContractQueryService {
         for (Map<String, Object> contract : contracts) {
             String contractCode = String.valueOf(contract.get("contract_code"));
 
-            Map<String, Object> item = new LinkedHashMap<>();
-            item.put("contractCode", contractCode);
-            item.put("type", contract.get("type"));
-            item.put("status", contract.get("status"));
-            item.put("amount", contract.get("amount"));
-            item.put("platformInstanceId", contract.get("platform_instance_id"));
-            item.put("ctime", DateTimeUtil.format(contract.get("ctime")));
+            Map<String, Object> item = buildContractBaseItem(contract);
 
             String shardTable = contractDao.resolveFieldShardingTable(contractCode);
 
@@ -154,6 +124,20 @@ public class ContractQueryService {
     }
 
     /**
+     * 构建合同基础信息项（从 DAO 返回的原始 Map）
+     */
+    private Map<String, Object> buildContractBaseItem(Map<String, Object> contract) {
+        Map<String, Object> item = new LinkedHashMap<>();
+        item.put("contractCode", contract.get("contract_code"));
+        item.put("type", contract.get("type"));
+        item.put("status", contract.get("status"));
+        item.put("amount", contract.get("amount"));
+        item.put("platformInstanceId", contract.get("platform_instance_id"));
+        item.put("ctime", contract.get("ctime"));  // ctime 已在 DAO 层格式化
+        return item;
+    }
+
+    /**
      * 查询合同的 platform_instance_id
      */
     public Long queryInstanceId(String contractCode) {
@@ -161,14 +145,12 @@ public class ContractQueryService {
     }
 
     /**
-     * 查询合同版式 form_id（查库获取 instanceId + 调用 HTTP 网关）
+     * 查询合同版式 form_id（查库获取 instanceId + 调用网关）
      */
     public String queryFormId(String contractCode) {
         Long instanceId = contractDao.findPlatformInstanceId(contractCode);
         if (instanceId == null) return null;
-        Map<String, String> params = new HashMap<>();
-        params.put("instanceId", instanceId.toString());
-        return httpEndpointTool.callPredefinedEndpoint("contract-form-data", params);
+        return formDataGateway.queryFormData(instanceId.toString());
     }
 
     /**
