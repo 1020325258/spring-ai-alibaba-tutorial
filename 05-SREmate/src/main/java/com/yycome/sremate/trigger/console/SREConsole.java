@@ -116,13 +116,32 @@ public class SREConsole implements CommandLineRunner {
                 final long[] firstTokenMs = {-1};
                 StringBuilder responseBuilder = new StringBuilder();
                 interrupted.set(false);
+                directOutputHolder.clear();
 
                 java.util.concurrent.CountDownLatch latch = new java.util.concurrent.CountDownLatch(1);
+                // 标记是否已触发直接输出旁路
+                java.util.concurrent.atomic.AtomicBoolean directOutputUsed = new java.util.concurrent.atomic.AtomicBoolean(false);
+
                 Disposable sub = sreAgent.prompt()
                         .messages(conversationHistory)
                         .stream()
                         .content()
                         .doOnNext(chunk -> {
+                            // 首个 token 到达时，工具调用已全部完成。
+                            // 若 DirectOutputHolder 有值，说明这是数据查询请求，直接输出结果，跳过 LLM 归纳。
+                            if (firstTokenMs[0] < 0 && directOutputHolder.hasOutput()) {
+                                firstTokenMs[0] = System.currentTimeMillis();
+                                directOutputUsed.set(true);
+                                String directOutput = directOutputHolder.getAndClear();
+                                System.out.println(directOutput);
+                                responseBuilder.append(directOutput);
+                                Disposable current = currentSubscription.get();
+                                if (current != null) current.dispose();
+                                return;
+                            }
+                            // 已走直接输出路径，忽略后续 LLM token
+                            if (directOutputUsed.get()) return;
+
                             if (firstTokenMs[0] < 0) {
                                 firstTokenMs[0] = System.currentTimeMillis();
                             }

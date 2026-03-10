@@ -24,7 +24,7 @@ spring:
     # VectorStore配置
     vectorstore:
       elasticsearch:
-        enabled: true
+        enabled: false
         index-name: sremate_knowledge
         initialization-mode: lazy
 

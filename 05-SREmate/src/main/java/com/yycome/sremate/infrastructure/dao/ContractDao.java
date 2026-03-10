@@ -111,7 +111,7 @@ public class ContractDao {
      */
     public List<Map<String, Object>> fetchQuotations(String contractCode) {
         List<Map<String, Object>> rows = jdbcTemplate.queryForList(
-                "SELECT contract_code, quotation_order_id, del_status, ctime, utime " +
+                "SELECT contract_code, bill_code, company_code, bind_type, ctime, mtime " +
                 "FROM contract_quotation_relation " +
                 "WHERE contract_code = ? AND del_status = 0",
                 contractCode);
