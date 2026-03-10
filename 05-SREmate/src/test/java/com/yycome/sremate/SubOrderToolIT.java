@@ -17,7 +17,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class SubOrderToolIT {
 
     // ===================== 修改为本地实际存在的测试数据 =====================
-    private static final String HOME_ORDER_NO = "826030611000000795";
+    private static final String HOME_ORDER_NO = "825123110000002753";
     private static final String QUOTATION_ORDER_NO = "GBILL260309110407580001";
     // ======================================================================
 

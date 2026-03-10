@@ -17,7 +17,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class ContractInstanceToolIT {
 
     // ===================== 修改为本地实际存在的测试数据 =====================
-    private static final String CONTRACT_CODE = "C1772854666284956";
+    private static final String CONTRACT_CODE = "C1767173898135504";
     // ======================================================================
 
     @Autowired

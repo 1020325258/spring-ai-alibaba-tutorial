@@ -17,8 +17,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 class ContractConfigToolIT {
 
     // ===================== 修改为本地实际存在的测试数据 =====================
-    private static final String CONTRACT_CODE = "C1772925348216431";
-    private static final String PROJECT_ORDER_ID = "826030619000001899";
+    private static final String CONTRACT_CODE = "C1767173898135504";
+    private static final String PROJECT_ORDER_ID = "825123110000002753";
     // ======================================================================
 
     @Autowired
@@ -44,7 +44,7 @@ class ContractConfigToolIT {
 
     @Test
     void queryContractConfig_byOrderId_withContractType_shouldReturnConfig() {
-        String response = ask(PROJECT_ORDER_ID + "的正签合同配置");
+        String response = ask(PROJECT_ORDER_ID + "的销售合同配置");
 
         assertThat(response).doesNotContain("error");
         assertThat(response).doesNotContain("未找到编号");

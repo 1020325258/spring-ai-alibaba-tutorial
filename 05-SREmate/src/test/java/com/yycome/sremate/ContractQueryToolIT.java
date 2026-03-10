@@ -20,8 +20,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 class ContractQueryToolIT {
 
     // ===================== 修改为本地实际存在的测试数据 =====================
-    private static final String CONTRACT_CODE = "C1772854666284956";
-    private static final String PROJECT_ORDER_ID = "826030911000002645";
+    private static final String CONTRACT_CODE = "C1767173898135504";
+    private static final String PROJECT_ORDER_ID = "825123110000002753";
     // ======================================================================
 
     @Autowired
