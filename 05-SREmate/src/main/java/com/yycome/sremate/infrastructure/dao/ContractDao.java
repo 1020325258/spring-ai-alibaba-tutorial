@@ -26,7 +26,7 @@ public class ContractDao {
     public Map<String, Object> fetchContractBase(String contractCode) {
         List<Map<String, Object>> rows = jdbcTemplate.queryForList(
                 "SELECT contract_code, type, status, platform_instance_id, amount, project_order_id, ctime " +
-                "FROM contract WHERE contract_code = ? AND del_status = 0 LIMIT 1",
+                "FROM contract WHERE contract_code = ? AND del_status = 0 AND status != 9 LIMIT 1",
                 contractCode);
         if (rows.isEmpty()) return null;
         Map<String, Object> row = rows.get(0);
@@ -111,7 +111,7 @@ public class ContractDao {
      */
     public List<Map<String, Object>> fetchQuotations(String contractCode) {
         List<Map<String, Object>> rows = jdbcTemplate.queryForList(
-                "SELECT contract_code, bill_code, company_code, bind_type, ctime, mtime " +
+                "SELECT contract_code, bill_code, company_code, bind_type, status, ctime, mtime " +
                 "FROM contract_quotation_relation " +
                 "WHERE contract_code = ? AND del_status = 0",
                 contractCode);
@@ -143,7 +143,7 @@ public class ContractDao {
     public List<Map<String, Object>> fetchContractsByOrderId(String projectOrderId) {
         List<Map<String, Object>> rows = jdbcTemplate.queryForList(
                 "SELECT contract_code, type, status, platform_instance_id, amount, ctime " +
-                "FROM contract WHERE project_order_id = ? AND del_status = 0",
+                "FROM contract WHERE project_order_id = ? AND status != 9 AND del_status = 0",
                 projectOrderId);
         // 格式化时间字段
         return rows.stream().map(row -> {

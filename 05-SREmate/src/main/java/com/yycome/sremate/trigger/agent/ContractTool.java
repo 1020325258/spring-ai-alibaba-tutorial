@@ -42,14 +42,18 @@ public class ContractTool {
     @Tool(description = """
             根据合同编号（contract_code）查询合同数据。
             contractCode 参数为合同编号字符串，格式为C前缀+数字，如 C1772925352128725。
+            【重要】本工具仅接受以字母C开头的合同编号。若输入为纯数字（如826031018000004758），说明是订单号，必须改用 queryContractsByOrderId 工具，本工具不处理订单号。
             dataType 参数控制查询范围，根据用户意图填写：
             - 用户说"合同数据"、"合同详情"、"合同信息" → 填 ALL（返回 contract + contract_node + contract_user + contract_quotation_relation + contract_field_sharding）
             - 用户说"合同节点"、"节点数据"、"操作日志"、"合同日志" → 填 CONTRACT_NODE（返回 contract + contract_node + contract_log）
             - 用户说"合同字段"、"字段数据" → 填 CONTRACT_FIELD（返回 contract + contract_field_sharding）
-            - 用户说"签约人"、"合同用户"、"参与人" → 填 CONTRACT_USER（返回 contract + contract_user）
-            注意：若用户提供的编号为纯数字（无C前缀），说明是订单号，应使用 queryContractsByOrderId 工具。""")
+            - 用户说"签约人"、"合同用户"、"参与人" → 填 CONTRACT_USER（返回 contract + contract_user）""")
     public String queryContractData(String contractCode, String dataType) {
         log.info("queryContractData - contractCode: {}, dataType: {}", contractCode, dataType);
+        // 防御性校验：纯数字说明是订单号，LLM 调错了工具
+        if (contractCode != null && contractCode.matches("\\d+")) {
+            return toErrorJson("参数错误：" + contractCode + " 是订单号（纯数字），请使用 queryContractsByOrderId 工具查询订单下的合同");
+        }
         try {
             QueryDataType type = QueryDataType.valueOf(dataType.toUpperCase());
             Map<String, Object> result = contractQueryService.queryByCode(contractCode, type);
