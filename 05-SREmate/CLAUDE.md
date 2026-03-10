@@ -2,6 +2,10 @@
 
 注意：
 1. 开发完进行测试，保证功能正常实现。
+2. **每次代码变更后必须运行全部集成测试**，确保已有功能不被破坏：
+   ```bash
+   ./05-SREmate/scripts/run-integration-tests.sh
+   ```
 
 ## 项目结构
 
@@ -197,8 +201,15 @@ class YourFeatureIT {
 2. **数据输出**：验证返回结果包含期望的业务字段
 3. **错误处理**：验证数据不存在时有合理的提示，而非代码异常
 
+运行全部集成测试（每次变更后必须执行）：
+```bash
+./05-SREmate/scripts/run-integration-tests.sh
+```
+
 运行指定集成测试：
 ```bash
 JAVA_HOME=/Library/Java/JavaVirtualMachines/jdk-21.jdk/Contents/Home \
   mvn test -pl 05-SREmate -Dtest=YourFeatureIT
 ```
+
+测试数据常量维护：各 IT 文件顶部的 `CONTRACT_CODE`、`PROJECT_ORDER_ID` 等常量需与本地 DB 实际数据一致，数据变化时及时更新。详见 `docs/integration-tests.md`。
