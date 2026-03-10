@@ -1,39 +1,16 @@
 package com.yycome.sremate;
 
 import org.junit.jupiter.api.Test;
-import org.springframework.ai.chat.client.ChatClient;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.ActiveProfiles;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * ContractTool 集成测试 - 验证按合同号和订单号查询合同数据的完整链路
- *
- * 测试数据说明：
- *   CONTRACT_CODE：替换为本地 DB 中真实存在的合同编号（C 前缀）
- *   PROJECT_ORDER_ID：替换为本地 DB 中真实存在的项目订单号（纯数字）
  */
-@SpringBootTest(properties = "sre.console.enabled=false")
-@ActiveProfiles("local")
-class ContractQueryToolIT {
+class ContractQueryToolIT extends BaseSREIT {
 
-    // ===================== 修改为本地实际存在的测试数据 =====================
     private static final String CONTRACT_CODE = "C1767173898135504";
     private static final String PROJECT_ORDER_ID = "825123110000002753";
-    // ======================================================================
-
-    @Autowired
-    private ChatClient sreAgent;
-
-    private String ask(String question) {
-        String response = sreAgent.prompt().user(question).call().content();
-        System.out.println("=== 问题：" + question + " ===\n" + response + "\n");
-        return response;
-    }
-
-    // --- queryContractData ---
 
     @Test
     void queryContractData_withContractCode_shouldReturnContractData() {
@@ -79,8 +56,6 @@ class ContractQueryToolIT {
         assertThat(response).doesNotContain("error");
         assertThat(response).doesNotContain("未找到编号");
     }
-
-    // --- queryContractsByOrderId ---
 
     @Test
     void queryContractsByOrderId_withOrderId_shouldReturnContractList() {
