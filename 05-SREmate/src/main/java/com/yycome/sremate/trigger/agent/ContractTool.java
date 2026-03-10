@@ -133,7 +133,8 @@ public class ContractTool {
             根据合同编号（contract_code）查询合同对应的版式 form_id。
             该工具自动完成两步操作：1) 从数据库查询合同的 platform_instance_id；
             2) 以 platform_instance_id 作为 instanceId 调用版式查询接口获取 form_id。
-            当用户询问"查询某合同的版式"、"查合同的form_id"、"合同编号XXX的版式是什么"时使用此工具。
+            【严格触发条件】仅当用户明确提到"版式"、"form_id"、"版式数据"、"版式ID"时才使用此工具。
+            用户询问"合同数据"、"合同详情"、"合同信息"时，即使合同数据中包含 platformInstanceId 字段，也绝对不能调用本工具。
             contractCode 参数为合同编号字符串，如 C1772854666284956。""")
     public String queryContractFormId(String contractCode) {
         log.info("queryContractFormId - contractCode: {}", contractCode);
