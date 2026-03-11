@@ -25,9 +25,17 @@ public class SkillQueryTool {
      * @return 相关的排查经验和解决方案
      */
     @Tool(description = """
-            查询SRE运维知识库，获取问题排查经验和解决方案。
-            queryType可选值：diagnosis（问题诊断）、operations（运维咨询）、knowledge（通用知识）。
-            keywords用于匹配相关的文档，多个关键词用空格分隔。""")
+            【运维知识库查询】问题诊断和运维咨询时使用。
+
+            触发条件：用户描述技术问题（超时、报错、异常）或运维咨询
+
+            参数：
+            - queryType：diagnosis（诊断）/operations（运维）/knowledge（知识）
+            - keywords：关键词，空格分隔
+
+            示例：
+            - "数据库连接超时" → queryType=diagnosis, keywords="数据库 连接 超时"
+            - "如何重启服务" → queryType=operations, keywords="重启 服务" """)
     public String querySkills(String queryType, String keywords) {
         log.info("调用SkillQueryTool - 类型: {}, 关键词: {}", queryType, keywords);
         return skillService.querySkills(queryType, keywords);

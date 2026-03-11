@@ -87,7 +87,12 @@ public class EndpointTemplateService {
                 ? getTemplatesByCategory(category)
                 : getAllTemplates();
 
-        if (templates.isEmpty()) return "暂无可用接口";
+        if (templates.isEmpty()) {
+            String msg = category != null
+                    ? String.format("分类【%s】下暂无可用接口。可用分类：system、database、monitoring、contract", category)
+                    : "暂无可用接口，请检查配置文件";
+            return msg;
+        }
 
         StringBuilder sb = new StringBuilder();
         sb.append("可用的接口列表：\n\n");

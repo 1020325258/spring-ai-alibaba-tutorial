@@ -40,14 +40,25 @@ public class ContractTool {
      * @return JSON格式聚合数据
      */
     @Tool(description = """
-            根据合同编号（contract_code）查询合同数据。
-            contractCode 参数为合同编号字符串，格式为C前缀+数字，如 C1772925352128725。
-            【重要】本工具仅接受以字母C开头的合同编号。若输入为纯数字（如826031018000004758），说明是订单号，必须改用 queryContractsByOrderId 工具，本工具不处理订单号。
-            dataType 参数控制查询范围，根据用户意图填写：
-            - 用户说"合同数据"、"合同详情"、"合同信息" → 填 ALL（返回 contract + contract_node + contract_user + contract_quotation_relation + contract_field_sharding）
-            - 用户说"合同节点"、"节点数据"、"操作日志"、"合同日志" → 填 CONTRACT_NODE（返回 contract + contract_node + contract_log）
-            - 用户说"合同字段"、"字段数据" → 填 CONTRACT_FIELD（返回 contract + contract_field_sharding）
-            - 用户说"签约人"、"合同用户"、"参与人" → 填 CONTRACT_USER（返回 contract + contract_user）""")
+            【合同编号查询】用户输入包含C前缀编号时使用。
+
+            触发条件：编号以C开头（如C1767173898135504）
+
+            参数：
+            - contractCode：C前缀+数字（必填）
+            - dataType：查询范围
+              | 用户说 | dataType值 |
+              |--------|-----------|
+              | 合同数据/详情/信息 | ALL |
+              | 节点/日志 | CONTRACT_NODE |
+              | 字段 | CONTRACT_FIELD |
+              | 签约人/参与人 | CONTRACT_USER |
+
+            示例：
+            - "C1767173898135504合同数据" → contractCode=C1767173898135504, dataType=ALL
+            - "C1767173898135504签约人" → dataType=CONTRACT_USER
+
+            ⚠️ 注意：纯数字是订单号，请用queryContractsByOrderId""")
     public String queryContractData(String contractCode, String dataType) {
         log.info("queryContractData - contractCode: {}, dataType: {}", contractCode, dataType);
         // 防御性校验：纯数字说明是订单号，LLM 调错了工具
@@ -76,15 +87,18 @@ public class ContractTool {
      * @return JSON格式聚合合同数据
      */
     @Tool(description = """
-            根据项目订单号（project_order_id）查询该订单下所有合同的完整详情。
-            返回每份合同的节点记录（contract_node）、参与人信息（contract_user）、
-            扩展字段（contract_field_sharding，分库分表，按合同号数字部分取模10确定表后缀）
-            以及报价关联（contract_quotation_relation）。
-            当用户询问"订单的合同详情"、"订单下合同的完整信息"、"合同的扩展字段"时使用此工具。
-            如果用户只是想知道订单有哪些合同，请使用 queryContractListByOrderId 工具（响应更快）。
-            projectOrderId 参数为项目订单号字符串，格式为纯数字，如 826030619000001899。
-            注意：若用户提供的编号以字母C开头（如 C1772925352128725），则该编号是合同编号而非订单号，
-            此时不得调用本工具，应使用 queryContractData 工具。""")
+            【订单号查询】用户输入包含纯数字编号时使用。
+
+            触发条件：编号为纯数字（如825123110000002753）
+
+            参数：
+            - projectOrderId：纯数字订单号（必填）
+
+            示例：
+            - "825123110000002753有哪些合同" → projectOrderId=825123110000002753
+            - "订单825123110000002753的合同详情" → projectOrderId=825123110000002753
+
+            ⚠️ 注意：C前缀是合同号，请用queryContractData""")
     public String queryContractsByOrderId(String projectOrderId) {
         log.info("queryContractsByOrderId - projectOrderId: {}", projectOrderId);
         try {
@@ -106,10 +120,16 @@ public class ContractTool {
      * @return JSON格式结果
      */
     @Tool(description = """
-            根据合同编号（contract_code）查询合同的 platform_instance_id。
-            若只需要 instanceId 而不需要版式数据时使用此工具。
-            如需同时获取 form_id，请直接使用 queryContractFormId。
-            contractCode 参数为合同编号字符串。""")
+            【查询实例ID】仅查询platform_instance_id时使用。
+
+            触发条件：用户明确问"instance_id"或"实例ID"
+
+            参数：
+            - contractCode：C前缀合同号（必填）
+
+            示例："C1767173898135504的instance_id"
+
+            💡 提示：如需版式form_id，直接用queryContractFormId""")
     public String queryContractInstanceId(String contractCode) {
         log.info("queryContractInstanceId - contractCode: {}", contractCode);
         try {
@@ -134,12 +154,16 @@ public class ContractTool {
      * @return 版式接口原始响应
      */
     @Tool(description = """
-            根据合同编号（contract_code）查询合同对应的版式 form_id。
-            该工具自动完成两步操作：1) 从数据库查询合同的 platform_instance_id；
-            2) 以 platform_instance_id 作为 instanceId 调用版式查询接口获取 form_id。
-            【严格触发条件】仅当用户明确提到"版式"、"form_id"、"版式数据"、"版式ID"时才使用此工具。
-            用户询问"合同数据"、"合同详情"、"合同信息"时，即使合同数据中包含 platformInstanceId 字段，也绝对不能调用本工具。
-            contractCode 参数为合同编号字符串，如 C1772854666284956。""")
+            【版式查询】仅当用户提到"版式"或"form_id"时使用。
+
+            触发条件：包含关键词"版式"、"form_id"、"版式ID"
+
+            参数：
+            - contractCode：C前缀合同号（必填）
+
+            示例："C1767173898135504的版式form_id"
+
+            ⚠️ 禁止：用户说"合同数据"时不能用此工具""")
     public String queryContractFormId(String contractCode) {
         log.info("queryContractFormId - contractCode: {}", contractCode);
         try {
@@ -166,34 +190,20 @@ public class ContractTool {
      * @return JSON格式配置数据
      */
     @Tool(description = """
-            查询合同配置表（contract_city_company_info）数据。
-            当用户询问"合同配置表"、"配置表数据"、"合同配置"时使用此工具。
+            【合同配置表查询】用户提到"配置表"或"合同配置"时使用。
 
-            参数说明：
-            - contractOrOrderId：合同编号或订单号，直接填入用户提供的编号即可，系统会自动识别格式
-              - 如果用户说"C1772925348216431的合同配置"，填入 C1772925348216431
-              - 如果用户说"826030619000001899的合同配置"，填入 826030619000001899
+            触发条件：包含关键词"配置表"、"合同配置"
 
-            - contractType：合同类型名称，支持的类型包括：
-              - 认购合同/认购/定金（类型1）
-              - 设计合同/设计（类型2）
-              - 正签合同/正签/正式合同（类型3）
-              - 套餐变更合同/变更合同/套餐变更/变更（类型4）
-              - 首期款合同/首期款协议/首期合同（类型5）
-              - 整装首期款合同/整装首期（类型6）
-              - 图纸（类型7）
-              - 销售合同/销售/个性化（类型8）
-              - 设计变更协议/设计变更（类型11）
-              - 补充协议/补充（类型29）
-              - 和解协议/和解（类型30）
-              - 使用合同编号查询时：可以不填，系统自动从合同表获取
-              - 使用订单号查询时：必须填写用户指定的类型名称
-              - 如果用户没有指定类型，请询问用户需要查询哪种合同类型
+            参数：
+            - contractOrOrderId：合同号或订单号（自动识别格式）
+            - contractType：合同类型（订单号查询时必填）
 
-            示例场景：
-            - "C1772925348216431的合同配置表数据" → contractOrOrderId=C1772925348216431, contractType可空
-            - "826030619000001899的正签合同配置" → contractOrOrderId=826030619000001899, contractType=正签
-            - "826030619000001899的合同配置" → contractOrOrderId=826030619000001899, 但需要询问contractType""")
+            支持的类型：认购(1)、设计(2)、正签(3)、套餐变更(4)、首期款(5)、
+            整装首期(6)、图纸(7)、销售(8)、设计变更(11)、补充协议(29)、和解(30)
+
+            示例：
+            - "C1767173898135504的配置表" → contractOrOrderId=C1767173898135504, contractType可空
+            - "825123110000002753的销售合同配置" → contractOrOrderId=825123110000002753, contractType=销售""")
     public String queryContractConfig(String contractOrOrderId, String contractType) {
         log.info("queryContractConfig - contractOrOrderId: {}, contractType: {}", contractOrOrderId, contractType);
         try {
@@ -238,21 +248,18 @@ public class ContractTool {
      * @return JSON格式子单信息
      */
     @Tool(description = """
-            根据订单号查询对应的子单信息，支持按报价单号和变更单号筛选。
-            当用户询问以下问题时使用此工具：
-            - "查询某订单下某报价单的子单信息"
-            - "某订单下某报价单对应的子单是什么"
-            - "查询订单xxx下报价单xxx的子单"
+            【子单查询】用户提到"子单"或"S单"时使用。
 
-            参数说明：
-            - homeOrderNo：订单号（必填），纯数字格式，如 826030611000000795
-            - quotationOrderNo：报价单号（可选），GBILL前缀+数字，如 GBILL260309110407580001
+            触发条件：包含关键词"子单"、"S单"
+
+            参数：
+            - homeOrderNo：订单号（必填）
+            - quotationOrderNo：报价单号（可选，GBILL前缀）
             - projectChangeNo：变更单号（可选）
 
             示例：
-            - "826030611000000795下GBILL260309110407580001的子单信息" → homeOrderNo=826030611000000795, quotationOrderNo=GBILL260309110407580001
-            - "查询订单826030611000000795的子单" → homeOrderNo=826030611000000795
-            """)
+            - "825123110000002753的子单" → homeOrderNo=825123110000002753
+            - "825123110000002753下GBILL260309110407580001的子单" → 加上quotationOrderNo""")
     public String querySubOrderInfo(String homeOrderNo, String quotationOrderNo, String projectChangeNo) {
         log.info("querySubOrderInfo - homeOrderNo: {}, quotationOrderNo: {}, projectChangeNo: {}",
                 homeOrderNo, quotationOrderNo, projectChangeNo);

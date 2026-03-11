@@ -41,15 +41,21 @@ public class HttpEndpointTool {
      * @return 接口响应
      */
     @Tool(description = """
-            调用预定义的接口，用于获取系统状态、诊断信息或业务数据。
-            endpointId参数是预定义接口的标识，常用接口包括：
-            - sign-order-list: 查询项目订单的子单/S单列表（签约业务相关），参数 projectOrderId
-            - contract-form-data: 根据合同实例ID查询版式 form_id，参数 instanceId（即 platform_instance_id）
-            - health-check: 应用健康检查
-            - metrics: 应用性能指标
-            params参数是从用户输入中提取的参数值。
-            当用户询问"查询某订单的子单"、"子单列表"、"S单"等签约相关问题时，使用sign-order-list接口，参数projectOrderId为订单号。
-            当已有 instanceId 需要查询版式时，使用 contract-form-data 接口，参数 instanceId 为合同实例ID。""")
+            【预定义接口调用】调用系统预配置的HTTP接口。
+
+            触发条件：需要查询系统状态、监控指标或业务数据
+
+            常用接口：
+            - sign-order-list：查询子单列表，参数projectOrderId
+            - contract-form-data：查询版式，参数instanceId
+            - health-check：健康检查
+            - metrics：性能指标
+
+            参数：
+            - endpointId：接口标识
+            - params：参数Map
+
+            示例：{"endpointId":"health-check","params":{}}""")
     public String callPredefinedEndpoint(String endpointId, Map<String, String> params) {
         log.info("[TOOL_CALL] callPredefinedEndpoint - endpointId: {}, params: {}", endpointId, params);
 
@@ -118,8 +124,16 @@ public class HttpEndpointTool {
      * @return 可用接口列表
      */
     @Tool(description = """
-            列出所有可用的预定义接口，帮助选择合适的接口进行调用。
-            category参数是可选的分类名称（system、database、monitoring、contract），不提供则列出所有接口。""")
+            【列出可用接口】查看所有预定义接口。
+
+            触发条件：用户问"有哪些接口"、"可用接口"
+
+            参数：
+            - category：分类（可选）system/database/monitoring/contract
+
+            示例：
+            - 不填category → 列出全部
+            - category=contract → 只列出签约相关接口""")
     public String listAvailableEndpoints(String category) {
         log.info("[TOOL_CALL] listAvailableEndpoints - category: {}", category);
         return endpointTemplateService.getTemplatesDescription(category);
