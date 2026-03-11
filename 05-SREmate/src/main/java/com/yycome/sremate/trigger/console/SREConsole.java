@@ -3,6 +3,7 @@ package com.yycome.sremate.trigger.console;
 import com.yycome.sremate.infrastructure.service.DirectOutputHolder;
 import com.yycome.sremate.infrastructure.service.MetricsCollector;
 import com.yycome.sremate.infrastructure.service.TracingService;
+import com.yycome.sremate.trigger.console.command.*;
 import org.fusesource.jansi.Ansi;
 import org.fusesource.jansi.AnsiConsole;
 import org.jline.reader.*;
@@ -48,6 +49,11 @@ public class SREConsole implements CommandLineRunner {
     @Autowired
     private DirectOutputHolder directOutputHolder;
 
+    @Autowired
+    private CommandRegistry commandRegistry;
+
+    private SlashCommandCompleter slashCompleter;
+
     private final List<Message> conversationHistory = new ArrayList<>();
 
     /** 保留的最大消息条数（user + assistant 各算 1 条，10 条 = 5 轮对话） */
@@ -66,10 +72,17 @@ public class SREConsole implements CommandLineRunner {
                 .system(true)
                 .build();
 
+        // 初始化命令注册
+        initCommands();
+
+        // 创建斜杠命令补全器
+        slashCompleter = new SlashCommandCompleter(commandRegistry);
+
         LineReader reader = LineReaderBuilder.builder()
                 .terminal(terminal)
                 .parser(new org.jline.reader.impl.DefaultParser())
                 .history(new DefaultHistory())
+                .completer(slashCompleter)
                 .build();
 
         terminal.handle(Signal.INT, sig -> {
@@ -88,6 +101,32 @@ public class SREConsole implements CommandLineRunner {
                     Ansi.ansi().fg(Ansi.Color.BLUE).a("\n你: ").reset().toString()
                 );
 
+                // 重置提示标记（每次新输入时）
+                slashCompleter.resetHints();
+
+                // 处理斜杠命令
+                if (input.startsWith("/")) {
+                    String cmdName = input.substring(1).trim();
+                    ConsoleCommand cmd = commandRegistry.getCommand(cmdName);
+                    if (cmd != null) {
+                        cmd.getAction().accept(new ConsoleCommand.CommandContext(
+                                this::showStats,
+                                this::showTrace,
+                                () -> {
+                                    System.out.println(Ansi.ansi().fg(Ansi.Color.CYAN).a("\n" + metricsCollector.getReportSummary()).reset());
+                                    System.out.println(Ansi.ansi().fg(Ansi.Color.CYAN).a("\n再见！感谢使用SRE值班客服Agent。").reset());
+                                }
+                        ));
+                        if ("quit".equals(cmd.getName()) || "exit".equals(cmd.getName()) || "q".equals(cmdName)) {
+                            break;
+                        }
+                    } else {
+                        System.out.println(Ansi.ansi().fg(Ansi.Color.RED).a("\n未知命令: " + input + "，输入 /help 查看可用命令").reset());
+                    }
+                    continue;
+                }
+
+                // 兼容无斜杠的旧命令
                 if ("quit".equalsIgnoreCase(input) || "exit".equalsIgnoreCase(input)) {
                     System.out.println(Ansi.ansi().fg(Ansi.Color.CYAN).a("\n" + metricsCollector.getReportSummary()).reset());
                     System.out.println(Ansi.ansi().fg(Ansi.Color.CYAN).a("\n再见！感谢使用SRE值班客服Agent。").reset());
@@ -198,6 +237,28 @@ public class SREConsole implements CommandLineRunner {
         AnsiConsole.systemUninstall();
     }
 
+    private void initCommands() {
+        commandRegistry.register(new ConsoleCommand("tools", "显示所有数据查询工具", null, c -> {
+            System.out.println(commandRegistry.formatToolsText());
+        }));
+
+        commandRegistry.register(new ConsoleCommand("help", "显示帮助信息", null, c -> {
+            System.out.println(commandRegistry.formatHelpText());
+        }));
+
+        commandRegistry.register(new ConsoleCommand("stats", "查看性能统计", new String[]{"stat"}, c -> {
+            c.getShowStats().run();
+        }));
+
+        commandRegistry.register(new ConsoleCommand("trace", "查看最近工具调用记录", null, c -> {
+            c.getShowTrace().run();
+        }));
+
+        commandRegistry.register(new ConsoleCommand("quit", "退出程序", new String[]{"exit", "q"}, c -> {
+            c.getExit().run();
+        }));
+    }
+
     private void showStats() {
         System.out.println(Ansi.ansi().fg(Ansi.Color.CYAN).a("\n" + metricsCollector.getReportSummary()).reset());
     }
@@ -233,16 +294,18 @@ public class SREConsole implements CommandLineRunner {
 
         System.out.println(Ansi.ansi().fg(Ansi.Color.YELLOW).bold().a("  可用命令").reset()
                 .fg(Ansi.Color.WHITE).a("  ·  ·  ·  ·  ·  ·  ·  ·  ·  ·  ·  ·  ·  ·  ·  ·  ·  ·").reset());
-        System.out.println(Ansi.ansi().fg(Ansi.Color.WHITE).bold().a("  ├─ stats ").reset()
+        System.out.println(Ansi.ansi().fg(Ansi.Color.WHITE).bold().a("  ├─ /tools ").reset()
+                .fg(Ansi.Color.YELLOW).a(" 显示数据查询工具").reset());
+        System.out.println(Ansi.ansi().fg(Ansi.Color.WHITE).bold().a("  ├─ /help  ").reset()
+                .fg(Ansi.Color.YELLOW).a(" 显示帮助信息").reset());
+        System.out.println(Ansi.ansi().fg(Ansi.Color.WHITE).bold().a("  ├─ /stats ").reset()
                 .fg(Ansi.Color.YELLOW).a(" 查看性能统计").reset());
-        System.out.println(Ansi.ansi().fg(Ansi.Color.WHITE).bold().a("  ├─ trace ").reset()
+        System.out.println(Ansi.ansi().fg(Ansi.Color.WHITE).bold().a("  ├─ /trace ").reset()
                 .fg(Ansi.Color.YELLOW).a(" 查看最近工具调用记录").reset());
-        System.out.println(Ansi.ansi().fg(Ansi.Color.WHITE).bold().a("  ├─ quit  ").reset()
+        System.out.println(Ansi.ansi().fg(Ansi.Color.WHITE).bold().a("  └─ /quit  ").reset()
                 .fg(Ansi.Color.YELLOW).a(" 退出程序").reset());
-        System.out.println(Ansi.ansi().fg(Ansi.Color.WHITE).bold().a("  └─ ↑ / ↓ ").reset()
-                .fg(Ansi.Color.YELLOW).a(" 浏览历史命令  ·  Ctrl+C 取消当前输入").reset());
         System.out.println();
-        System.out.println(Ansi.ansi().fg(Ansi.Color.GREEN).a("  请输入问题开始咨询...").reset());
+        System.out.println(Ansi.ansi().fg(Ansi.Color.GREEN).a("  输入 / 查看所有命令  ·  Tab 自动补全").reset());
         System.out.println();
     }
 
