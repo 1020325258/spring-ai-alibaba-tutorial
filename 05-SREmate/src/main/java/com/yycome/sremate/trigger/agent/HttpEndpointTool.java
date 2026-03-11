@@ -85,39 +85,7 @@ public class HttpEndpointTool {
             String url = endpointTemplateService.buildUrl(template, filledParams);
             log.info("[TOOL_CALL] 构建URL: {}", url);
 
-            Mono<String> responseMono;
-            String method = template.getMethod();
-
-            if ("GET".equalsIgnoreCase(method)) {
-                responseMono = webClient.get()
-                        .uri(url)
-                        .headers(headers -> {
-                            if (template.getHeaders() != null) {
-                                template.getHeaders().forEach(headers::add);
-                            }
-                        })
-                        .retrieve()
-                        .bodyToMono(String.class);
-            } else if ("POST".equalsIgnoreCase(method)) {
-                String requestBody = endpointTemplateService.buildRequestBody(template, filledParams);
-                if (requestBody == null) requestBody = "{}";
-                log.info("[TOOL_CALL] 请求体: {}", requestBody);
-                responseMono = webClient.post()
-                        .uri(url)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .headers(headers -> {
-                            if (template.getHeaders() != null) {
-                                template.getHeaders().forEach(headers::add);
-                            }
-                        })
-                        .bodyValue(requestBody)
-                        .retrieve()
-                        .bodyToMono(String.class);
-            } else {
-                return "错误：不支持的HTTP方法: " + method;
-            }
-
-            String response = responseMono
+            String response = executeHttpRequest(template, url, filledParams)
                     .timeout(Duration.ofSeconds(template.getTimeout()))
                     .block();
 
@@ -133,6 +101,54 @@ public class HttpEndpointTool {
             log.error("[TOOL_CALL] 预定义接口调用失败", e);
             return "接口调用失败: " + e.getMessage();
         }
+    }
+
+    /**
+     * 调用预定义接口并返回原始 HTTP 响应体（供 Java 层内部聚合使用，不暴露给 LLM）。
+     * 不做 responseFields 过滤，不加 wrapper 文字，直接返回接口返回的 JSON 字符串。
+     * 若接口不存在或调用失败，返回 null。
+     */
+    public String callPredefinedEndpointRaw(String endpointId, Map<String, String> params) {
+        try {
+            EndpointTemplate template = endpointTemplateService.getTemplate(endpointId);
+            if (template == null) return null;
+
+            Map<String, String> filledParams = endpointTemplateService.fillDefaultValues(
+                    template, params != null ? params : new HashMap<>());
+            String url = endpointTemplateService.buildUrl(template, filledParams);
+
+            return executeHttpRequest(template, url, filledParams)
+                    .timeout(Duration.ofSeconds(template.getTimeout()))
+                    .block();
+        } catch (Exception e) {
+            log.error("[TOOL_CALL] callPredefinedEndpointRaw 失败 endpointId={}", endpointId, e);
+            return null;
+        }
+    }
+
+    /**
+     * 构建 HTTP 请求 Mono（GET / POST），提取自 callPredefinedEndpoint 避免重复
+     */
+    private Mono<String> executeHttpRequest(EndpointTemplate template, String url, Map<String, String> filledParams) {
+        String method = template.getMethod();
+        if ("GET".equalsIgnoreCase(method)) {
+            return webClient.get()
+                    .uri(url)
+                    .headers(h -> { if (template.getHeaders() != null) template.getHeaders().forEach(h::add); })
+                    .retrieve()
+                    .bodyToMono(String.class);
+        } else if ("POST".equalsIgnoreCase(method)) {
+            String requestBody = endpointTemplateService.buildRequestBody(template, filledParams);
+            if (requestBody == null) requestBody = "{}";
+            return webClient.post()
+                    .uri(url)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .headers(h -> { if (template.getHeaders() != null) template.getHeaders().forEach(h::add); })
+                    .bodyValue(requestBody)
+                    .retrieve()
+                    .bodyToMono(String.class);
+        }
+        return Mono.error(new IllegalArgumentException("不支持的HTTP方法: " + method));
     }
 
     /**

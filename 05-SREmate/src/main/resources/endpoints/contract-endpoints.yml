@@ -125,7 +125,7 @@ endpoints:
       - quotationOrderNo：报价单号（可选），GBILL前缀+数字
       - projectChangeNo：变更单号（可选）
     category: contract
-    urlTemplate: "http://nrs-order-service.offline-beta.ttb.test.ke.com/api/subOrder/queryBaseInfoByHomeOrderNo?homeOrderNo=${homeOrderNo}&quotationOrderNo=${quotationOrderNo}&projectChangeNo=${projectChangeNo}"
+    urlTemplate: "http://nrs-order-service.nrs-escrow.ttb.test.ke.com/api/subOrder/queryBaseInfoByHomeOrderNo?homeOrderNo=${homeOrderNo}&quotationOrderNo=${quotationOrderNo}&projectChangeNo=${projectChangeNo}"
     method: GET
     parameters:
       - name: homeOrderNo
