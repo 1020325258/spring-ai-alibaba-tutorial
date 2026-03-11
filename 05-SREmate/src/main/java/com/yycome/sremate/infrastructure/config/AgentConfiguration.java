@@ -1,9 +1,11 @@
 package com.yycome.sremate.infrastructure.config;
 
-import com.yycome.sremate.trigger.agent.ContractTool;
+import com.yycome.sremate.trigger.agent.BudgetBillTool;
+import com.yycome.sremate.trigger.agent.ContractQueryTool;
 import com.yycome.sremate.trigger.agent.HttpEndpointTool;
 import com.yycome.sremate.trigger.agent.KnowledgeQueryTool;
 import com.yycome.sremate.trigger.agent.SkillQueryTool;
+import com.yycome.sremate.trigger.agent.SubOrderTool;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.tool.ToolCallbackProvider;
 import org.springframework.ai.tool.method.MethodToolCallbackProvider;
@@ -43,12 +45,16 @@ public class AgentConfiguration {
     @Bean
     public ToolCallbackProvider sreTools(
             SkillQueryTool skillQueryTool,
-            ContractTool contractTool,
+            ContractQueryTool contractQueryTool,
+            BudgetBillTool budgetBillTool,
+            SubOrderTool subOrderTool,
             HttpEndpointTool httpEndpointTool,
             @Autowired(required = false) KnowledgeQueryTool knowledgeQueryTool) {
         List<Object> tools = new ArrayList<>();
         tools.add(skillQueryTool);
-        tools.add(contractTool);
+        tools.add(contractQueryTool);
+        tools.add(budgetBillTool);
+        tools.add(subOrderTool);
         tools.add(httpEndpointTool);
         if (knowledgeQueryTool != null) {
             tools.add(knowledgeQueryTool);
