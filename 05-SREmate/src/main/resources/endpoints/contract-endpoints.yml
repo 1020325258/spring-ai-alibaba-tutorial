@@ -10,14 +10,9 @@ endpoints:
       - "查询826022518000001562的子单"
       注意：子单、S单、签约单是同义词，都指代可签约的子订单。
     category: contract
-    urlTemplate: "http://utopia-nrs-sales-project.nrs-escrow.ttb.test.ke.com/home/contract/getSignOrderList/V3?projectOrderId=${projectOrderId}"
+    urlTemplate: "http://utopia-nrs-sales-project.${env}.ttb.test.ke.com/home/contract/getSignOrderList/V3?projectOrderId=${projectOrderId}"
     method: GET
     parameters:
-      - name: host
-        type: string
-        description: 服务地址，如 utopia-nrs-sales-project.nrs-escrow.ttb.test.ke.com
-        required: true
-        defaultValue: "utopia-nrs-sales-project.nrs-escrow.ttb.test.ke.com"
       - name: projectOrderId
         type: string
         description: 项目订单ID，用户提供的订单号
@@ -45,7 +40,7 @@ endpoints:
       - "合同版式查询"
       注意：instanceId 是合同实例ID，form_id 是版式标识符。
     category: contract
-    urlTemplate: "http://utopia-nrs-sales-project.nrs-escrow.ttb.test.ke.com/api/contract/command/getFormData?instanceId=${instanceId}"
+    urlTemplate: "http://utopia-nrs-sales-project.${env}.ttb.test.ke.com/api/contract/command/getFormData?instanceId=${instanceId}"
     method: GET
     parameters:
       - name: instanceId
@@ -74,7 +69,7 @@ endpoints:
       - "查看订单的报价"
       返回字段：billType（账单类型）、billTypeDesc（账单类型描述）、statusDesc（状态描述）、billCode（账单编号）、originalBillCode（原始账单编号）
     category: contract
-    urlTemplate: "http://utopia-atom.nrs-escrow.ttb.test.ke.com/api/budget-bill/list"
+    urlTemplate: "http://utopia-atom.${env}.ttb.test.ke.com/api/budget-bill/list"
     method: POST
     requestBodyTemplate: '{"projectOrderId":"${projectOrderId}"}'
     responseFields:
@@ -125,7 +120,7 @@ endpoints:
       - quotationOrderNo：报价单号（可选），GBILL前缀+数字
       - projectChangeNo：变更单号（可选）
     category: contract
-    urlTemplate: "http://nrs-order-service.nrs-escrow.ttb.test.ke.com/api/subOrder/queryBaseInfoByHomeOrderNo?homeOrderNo=${homeOrderNo}&quotationOrderNo=${quotationOrderNo}&projectChangeNo=${projectChangeNo}"
+    urlTemplate: "http://nrs-order-service.${env}.ttb.test.ke.com/api/subOrder/queryBaseInfoByHomeOrderNo?homeOrderNo=${homeOrderNo}&quotationOrderNo=${quotationOrderNo}&projectChangeNo=${projectChangeNo}"
     method: GET
     parameters:
       - name: homeOrderNo

@@ -1,7 +1,9 @@
 package com.yycome.sremate.infrastructure.gateway;
 
+import com.yycome.sremate.infrastructure.config.EnvironmentConfig;
 import com.yycome.sremate.infrastructure.gateway.model.EndpointParameter;
 import com.yycome.sremate.infrastructure.gateway.model.EndpointTemplate;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
@@ -24,7 +26,10 @@ import java.util.stream.Collectors;
  */
 @Slf4j
 @Service
+@RequiredArgsConstructor
 public class EndpointTemplateService {
+
+    private final EnvironmentConfig environmentConfig;
 
     private final PathMatchingResourcePatternResolver resourceResolver = new PathMatchingResourcePatternResolver();
     private static final String ENDPOINTS_PATH = "classpath:endpoints/**/*.yml";
@@ -146,6 +151,11 @@ public class EndpointTemplateService {
 
     public String buildUrl(EndpointTemplate template, Map<String, String> params) {
         String url = template.getUrlTemplate();
+
+        // 首先替换环境占位符 ${env}
+        url = url.replace("${env}", environmentConfig.getCurrentEnv());
+
+        // 然后替换参数占位符
         Matcher matcher = PLACEHOLDER_PATTERN.matcher(url);
         StringBuffer sb = new StringBuffer();
 

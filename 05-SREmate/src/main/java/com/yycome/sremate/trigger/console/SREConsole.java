@@ -1,5 +1,6 @@
 package com.yycome.sremate.trigger.console;
 
+import com.yycome.sremate.infrastructure.config.EnvironmentConfig;
 import com.yycome.sremate.infrastructure.service.DirectOutputHolder;
 import com.yycome.sremate.infrastructure.service.MetricsCollector;
 import com.yycome.sremate.infrastructure.service.TracingService;
@@ -43,6 +44,9 @@ public class SREConsole implements CommandLineRunner {
 
     @Autowired
     private DirectOutputHolder directOutputHolder;
+
+    @Autowired
+    private EnvironmentConfig environmentConfig;
 
     @Autowired
     private CommandRegistry commandRegistry;
@@ -92,7 +96,7 @@ public class SREConsole implements CommandLineRunner {
         while (true) {
             try {
                 String input = reader.readLine(
-                    Ansi.ansi().fg(Ansi.Color.BLUE).a("\n你: ").reset().toString()
+                    Ansi.ansi().fg(Ansi.Color.BLUE).a("\n[" + environmentConfig.getCurrentEnv() + "] 你: ").reset().toString()
                 );
 
                 // 重置提示标记（每次新输入时）
@@ -242,6 +246,10 @@ public class SREConsole implements CommandLineRunner {
         commandRegistry.register(new ConsoleCommand("quit", "退出程序", new String[]{"exit", "q"}, c -> {
             c.getExit().run();
         }));
+
+        commandRegistry.register(new ConsoleCommand("env", "查看或切换环境", null, c -> {
+            showEnvInfo();
+        }));
     }
 
     private void showStats() {
@@ -251,6 +259,57 @@ public class SREConsole implements CommandLineRunner {
     private void showTrace() {
         String traceOutput = tracingService.visualizeRecentTraces(20);
         System.out.println(Ansi.ansi().fg(Ansi.Color.CYAN).a("\n" + traceOutput).reset());
+    }
+
+    /**
+     * 显示环境信息，并支持交互式切换环境
+     */
+    private void showEnvInfo() {
+        System.out.println();
+        System.out.println(Ansi.ansi().fg(Ansi.Color.CYAN).bold().a("  当前环境: ").reset()
+                .fg(Ansi.Color.GREEN).a(environmentConfig.getCurrentEnvDescription()).reset());
+        System.out.println(Ansi.ansi().fg(Ansi.Color.CYAN).a("  ──────────────────────────────").reset());
+
+        var envs = environmentConfig.getAvailableEnvironments();
+        int i = 1;
+        for (var entry : envs.entrySet()) {
+            String marker = entry.getKey().equals(environmentConfig.getCurrentEnv()) ? " ✓" : "";
+            System.out.println(Ansi.ansi().fg(Ansi.Color.WHITE)
+                    .a(String.format("  %d. %s%s", i++, entry.getValue(), marker)).reset());
+        }
+
+        System.out.println();
+        System.out.println(Ansi.ansi().fg(Ansi.Color.YELLOW).a("  输入序号切换环境，或按 Enter 返回: ").reset());
+
+        try {
+            Terminal terminal = TerminalBuilder.builder().system(true).build();
+            LineReader envReader = LineReaderBuilder.builder().terminal(terminal).build();
+            String input = envReader.readLine("");
+
+            if (input.trim().isEmpty()) {
+                return;
+            }
+
+            try {
+                int choice = Integer.parseInt(input.trim());
+                var envList = new java.util.ArrayList<>(envs.keySet());
+                if (choice >= 1 && choice <= envList.size()) {
+                    String newEnv = envList.get(choice - 1);
+                    if (environmentConfig.switchEnv(newEnv)) {
+                        System.out.println(Ansi.ansi().fg(Ansi.Color.GREEN)
+                                .a("\n  ✓ 已切换到: " + environmentConfig.getCurrentEnvDescription()).reset());
+                    }
+                } else {
+                    System.out.println(Ansi.ansi().fg(Ansi.Color.RED).a("\n  无效的序号").reset());
+                }
+            } catch (NumberFormatException e) {
+                System.out.println(Ansi.ansi().fg(Ansi.Color.RED).a("\n  请输入数字序号").reset());
+            }
+
+            terminal.close();
+        } catch (Exception e) {
+            System.out.println(Ansi.ansi().fg(Ansi.Color.RED).a("\n  切换失败: " + e.getMessage()).reset());
+        }
     }
 
     private void printBanner() {
@@ -273,6 +332,8 @@ public class SREConsole implements CommandLineRunner {
                 .a("  ──────────────────────────────────────────────────────────────").reset());
         System.out.println(Ansi.ansi().fg(Ansi.Color.GREEN).bold()
                 .a("      智能 SRE 值班助手  ·  v2.0  ·  Powered by Qwen-Turbo      ").reset());
+        System.out.println(Ansi.ansi().fg(Ansi.Color.MAGENTA)
+                .a("      当前环境: " + environmentConfig.getCurrentEnvDescription() + "      ").reset());
         System.out.println(Ansi.ansi().fg(Ansi.Color.CYAN)
                 .a("  ──────────────────────────────────────────────────────────────").reset());
         System.out.println();
@@ -287,6 +348,8 @@ public class SREConsole implements CommandLineRunner {
                 .fg(Ansi.Color.YELLOW).a(" 查看性能统计").reset());
         System.out.println(Ansi.ansi().fg(Ansi.Color.WHITE).bold().a("  ├─ /trace ").reset()
                 .fg(Ansi.Color.YELLOW).a(" 查看最近工具调用记录").reset());
+        System.out.println(Ansi.ansi().fg(Ansi.Color.WHITE).bold().a("  ├─ /env   ").reset()
+                .fg(Ansi.Color.YELLOW).a(" 查看或切换环境").reset());
         System.out.println(Ansi.ansi().fg(Ansi.Color.WHITE).bold().a("  └─ /quit  ").reset()
                 .fg(Ansi.Color.YELLOW).a(" 退出程序").reset());
         System.out.println();
