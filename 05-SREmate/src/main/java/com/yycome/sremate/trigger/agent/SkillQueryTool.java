@@ -37,8 +37,15 @@ public class SkillQueryTool {
             - "数据库连接超时" → queryType=diagnosis, keywords="数据库 连接 超时"
             - "如何重启服务" → queryType=operations, keywords="重启 服务" """)
     public String querySkills(String queryType, String keywords) {
-        log.info("调用SkillQueryTool - 类型: {}, 关键词: {}", queryType, keywords);
-        return skillService.querySkills(queryType, keywords);
+        long start = System.currentTimeMillis();
+        try {
+            String result = skillService.querySkills(queryType, keywords);
+            log.info("[TOOL] querySkills → {}ms, ok", System.currentTimeMillis() - start);
+            return result;
+        } catch (Exception e) {
+            log.error("[TOOL] querySkills → {}ms, error: {}", System.currentTimeMillis() - start, e.getMessage());
+            throw e;
+        }
     }
 
     /**
@@ -48,7 +55,9 @@ public class SkillQueryTool {
      */
     @Tool(description = "列出SRE运维知识库的所有分类")
     public String listSkillCategories() {
-        log.info("调用listSkillCategories");
-        return "可用的Skills分类：" + String.join(", ", skillService.listSkillCategories());
+        long start = System.currentTimeMillis();
+        String result = "可用的Skills分类：" + String.join(", ", skillService.listSkillCategories());
+        log.info("[TOOL] listSkillCategories → {}ms, ok", System.currentTimeMillis() - start);
+        return result;
     }
 }

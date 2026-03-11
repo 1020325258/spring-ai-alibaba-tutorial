@@ -63,7 +63,7 @@ public class ContractTool {
 
             ⚠️ 注意：纯数字是订单号，请用queryContractsByOrderId""")
     public String queryContractData(String contractCode, String dataType) {
-        log.info("queryContractData - contractCode: {}, dataType: {}", contractCode, dataType);
+        long start = System.currentTimeMillis();
         // 防御性校验：纯数字说明是订单号，LLM 调错了工具
         if (contractCode != null && contractCode.matches("\\d+")) {
             return toErrorJson("参数错误：" + contractCode + " 是订单号（纯数字），请使用 queryContractsByOrderId 工具查询订单下的合同");
@@ -72,13 +72,18 @@ public class ContractTool {
             QueryDataType type = QueryDataType.valueOf(dataType.toUpperCase());
             Map<String, Object> result = contractQueryService.queryByCode(contractCode, type);
             if (result == null) {
+                log.info("[TOOL] queryContractData → {}ms, 0 rows (not found)", System.currentTimeMillis() - start);
                 return toErrorJson("未找到合同编号为 " + contractCode + " 的合同记录");
             }
-            return contractQueryService.toJson(result);
+            String json = contractQueryService.toJson(result);
+            int rows = countDataRows(result);
+            log.info("[TOOL] queryContractData → {}ms, {} rows", System.currentTimeMillis() - start, rows);
+            return json;
         } catch (IllegalArgumentException e) {
+            log.error("[TOOL] queryContractData → {}ms, error: {}", System.currentTimeMillis() - start, e.getMessage());
             return toErrorJson("无效的 dataType 参数: " + dataType + "，可选值: ALL / CONTRACT_NODE / CONTRACT_FIELD / CONTRACT_USER");
         } catch (Exception e) {
-            log.error("queryContractData 失败", e);
+            log.error("[TOOL] queryContractData → {}ms, error: {}", System.currentTimeMillis() - start, e.getMessage());
             return toErrorJson(e.getMessage());
         }
     }
@@ -103,15 +108,18 @@ public class ContractTool {
 
             ⚠️ 注意：C前缀是合同号，请用queryContractData""")
     public String queryContractsByOrderId(String projectOrderId) {
-        log.info("queryContractsByOrderId - projectOrderId: {}", projectOrderId);
+        long start = System.currentTimeMillis();
         try {
             List<Map<String, Object>> result = contractQueryService.queryByOrderId(projectOrderId);
             if (result == null) {
+                log.info("[TOOL] queryContractsByOrderId → {}ms, 0 rows (not found)", System.currentTimeMillis() - start);
                 return toErrorJson("订单 " + projectOrderId + " 下未找到合同记录");
             }
-            return contractQueryService.toJson(result);
+            String json = contractQueryService.toJson(result);
+            log.info("[TOOL] queryContractsByOrderId → {}ms, {} rows", System.currentTimeMillis() - start, result.size());
+            return json;
         } catch (Exception e) {
-            log.error("queryContractsByOrderId 失败", e);
+            log.error("[TOOL] queryContractsByOrderId → {}ms, error: {}", System.currentTimeMillis() - start, e.getMessage());
             return toErrorJson(e.getMessage());
         }
     }
@@ -134,18 +142,21 @@ public class ContractTool {
 
             💡 提示：如需版式form_id，直接用queryContractFormId""")
     public String queryContractInstanceId(String contractCode) {
-        log.info("queryContractInstanceId - contractCode: {}", contractCode);
+        long start = System.currentTimeMillis();
         try {
             Long instanceId = contractQueryService.queryInstanceId(contractCode);
             if (instanceId == null) {
+                log.info("[TOOL] queryContractInstanceId → {}ms, not found", System.currentTimeMillis() - start);
                 return toErrorJson("未找到合同编号为 " + contractCode + " 的合同记录");
             }
             Map<String, Object> result = new LinkedHashMap<>();
             result.put("contractCode", contractCode);
             result.put("platformInstanceId", instanceId);
-            return contractQueryService.toJson(result);
+            String json = contractQueryService.toJson(result);
+            log.info("[TOOL] queryContractInstanceId → {}ms, 1 row", System.currentTimeMillis() - start);
+            return json;
         } catch (Exception e) {
-            log.error("查询 platform_instance_id 失败", e);
+            log.error("[TOOL] queryContractInstanceId → {}ms, error: {}", System.currentTimeMillis() - start, e.getMessage());
             return toErrorJson(e.getMessage());
         }
     }
@@ -168,15 +179,17 @@ public class ContractTool {
 
             ⚠️ 禁止：用户说"合同数据"时不能用此工具""")
     public String queryContractFormId(String contractCode) {
-        log.info("queryContractFormId - contractCode: {}", contractCode);
+        long start = System.currentTimeMillis();
         try {
             String result = contractQueryService.queryFormId(contractCode);
             if (result == null) {
+                log.info("[TOOL] queryContractFormId → {}ms, not found", System.currentTimeMillis() - start);
                 return toErrorJson("未找到合同编号为 " + contractCode + " 的合同记录，无法查询版式");
             }
+            log.info("[TOOL] queryContractFormId → {}ms, ok", System.currentTimeMillis() - start);
             return result;
         } catch (Exception e) {
-            log.error("查询合同版式失败", e);
+            log.error("[TOOL] queryContractFormId → {}ms, error: {}", System.currentTimeMillis() - start, e.getMessage());
             return toErrorJson(e.getMessage());
         }
     }
@@ -208,7 +221,7 @@ public class ContractTool {
             - "C1767173898135504的配置表" → contractOrOrderId=C1767173898135504, contractType可空
             - "825123110000002753的销售合同配置" → contractOrOrderId=825123110000002753, contractType=销售""")
     public String queryContractConfig(String contractOrOrderId, String contractType) {
-        log.info("queryContractConfig - contractOrOrderId: {}, contractType: {}", contractOrOrderId, contractType);
+        long start = System.currentTimeMillis();
         try {
             // 自动识别编号类型
             String contractCode = null;
@@ -224,11 +237,14 @@ public class ContractTool {
 
             Map<String, Object> result = contractQueryService.queryContractConfig(contractCode, projectOrderId, contractType);
             if (result == null) {
+                log.info("[TOOL] queryContractConfig → {}ms, not found", System.currentTimeMillis() - start);
                 return toErrorJson("未找到编号 " + contractOrOrderId + " 对应的合同记录");
             }
-            return contractQueryService.toJson(result);
+            String json = contractQueryService.toJson(result);
+            log.info("[TOOL] queryContractConfig → {}ms, 1 row", System.currentTimeMillis() - start);
+            return json;
         } catch (Exception e) {
-            log.error("queryContractConfig 失败", e);
+            log.error("[TOOL] queryContractConfig → {}ms, error: {}", System.currentTimeMillis() - start, e.getMessage());
             return toErrorJson(e.getMessage());
         }
     }
@@ -262,7 +278,7 @@ public class ContractTool {
 
             ⚠️ 注意：报价单 ≠ 子单，不要用子单工具查报价单""")
     public String queryBudgetBillList(String projectOrderId) {
-        log.info("queryBudgetBillList - projectOrderId: {}", projectOrderId);
+        long start = System.currentTimeMillis();
         try {
             // 1. 获取报价单列表（已过滤字段）
             String billListJson = httpEndpointTool.callPredefinedEndpoint("budget-bill-list",
@@ -288,9 +304,12 @@ public class ContractTool {
                 result.set(listKey, enrichedList);
             }
 
-            return objectMapper.writeValueAsString(result);
+            String json = objectMapper.writeValueAsString(result);
+            int billCount = countTotalBills(result);
+            log.info("[TOOL] queryBudgetBillList → {}ms, {} bills", System.currentTimeMillis() - start, billCount);
+            return json;
         } catch (Exception e) {
-            log.error("queryBudgetBillList 失败", e);
+            log.error("[TOOL] queryBudgetBillList → {}ms, error: {}", System.currentTimeMillis() - start, e.getMessage());
             return toErrorJson(e.getMessage());
         }
     }
@@ -348,18 +367,49 @@ public class ContractTool {
             - "825123110000002753的子单" → homeOrderNo=825123110000002753
             - "825123110000002753下GBILL260309110407580001的子单" → 加上quotationOrderNo""")
     public String querySubOrderInfo(String homeOrderNo, String quotationOrderNo, String projectChangeNo) {
-        log.info("querySubOrderInfo - homeOrderNo: {}, quotationOrderNo: {}, projectChangeNo: {}",
-                homeOrderNo, quotationOrderNo, projectChangeNo);
+        long start = System.currentTimeMillis();
         try {
             Map<String, String> params = new HashMap<>();
             params.put("homeOrderNo", homeOrderNo);
             params.put("quotationOrderNo", quotationOrderNo != null ? quotationOrderNo : "");
             params.put("projectChangeNo", projectChangeNo != null ? projectChangeNo : "");
 
-            return httpEndpointTool.callPredefinedEndpoint("sub-order-info", params);
+            String result = httpEndpointTool.callPredefinedEndpoint("sub-order-info", params);
+            log.info("[TOOL] querySubOrderInfo → {}ms, ok", System.currentTimeMillis() - start);
+            return result;
         } catch (Exception e) {
-            log.error("querySubOrderInfo 失败", e);
+            log.error("[TOOL] querySubOrderInfo → {}ms, error: {}", System.currentTimeMillis() - start, e.getMessage());
             return toErrorJson(e.getMessage());
         }
+    }
+
+    /**
+     * 统计结果中的数据行数
+     */
+    private int countDataRows(Map<String, Object> result) {
+        if (result == null) return 0;
+        int count = 0;
+        for (Object value : result.values()) {
+            if (value instanceof List) {
+                count += ((List<?>) value).size();
+            } else if (value instanceof Map) {
+                count++; // 单个对象算1行
+            }
+        }
+        return count > 0 ? count : 1;
+    }
+
+    /**
+     * 统计报价单总数
+     */
+    private int countTotalBills(ObjectNode result) {
+        int count = 0;
+        for (String listKey : List.of("decorateBudgetList", "personalBudgetList")) {
+            JsonNode list = result.path(listKey);
+            if (list.isArray()) {
+                count += list.size();
+            }
+        }
+        return count;
     }
 }

@@ -36,15 +36,16 @@ public class KnowledgeQueryTool {
             """)
     public String searchKnowledge(String query,
                                    @ToolParam(required = false, description = "返回结果数量，默认3") Integer topK) {
-        log.info("searchKnowledge - query: {}, topK: {}", query, topK);
-
+        long start = System.currentTimeMillis();
         int k = (topK != null && topK > 0) ? topK : 3;
         List<KnowledgeResult> results = knowledgeService.searchHybrid(query, k);
 
         if (results.isEmpty()) {
+            log.info("[TOOL] searchKnowledge → {}ms, 0 docs", System.currentTimeMillis() - start);
             return "未找到相关知识条目";
         }
 
+        log.info("[TOOL] searchKnowledge → {}ms, {} docs", System.currentTimeMillis() - start, results.size());
         return formatResults(results);
     }
 
@@ -57,13 +58,14 @@ public class KnowledgeQueryTool {
             - feedback: 反馈类型 (HELPFUL/UNHELPFUL)
             """)
     public String recordFeedback(String query, String docId, String feedback) {
-        log.info("recordFeedback - query: {}, docId: {}, feedback: {}", query, docId, feedback);
-
+        long start = System.currentTimeMillis();
         try {
             FeedbackType type = FeedbackType.valueOf(feedback.toUpperCase());
             knowledgeService.recordFeedback(query, docId, type);
+            log.info("[TOOL] recordFeedback → {}ms, ok", System.currentTimeMillis() - start);
             return "反馈已记录";
         } catch (IllegalArgumentException e) {
+            log.error("[TOOL] recordFeedback → {}ms, error: invalid feedback type", System.currentTimeMillis() - start);
             return "无效的反馈类型，请使用 HELPFUL 或 UNHELPFUL";
         }
     }
@@ -80,9 +82,9 @@ public class KnowledgeQueryTool {
             返回：对应类型的统计数据
             """)
     public String viewKnowledgeStats(String type) {
-        log.info("viewKnowledgeStats - type: {}", type);
-
+        long start = System.currentTimeMillis();
         KnowledgeStatistics stats = knowledgeService.getStatistics();
+        log.info("[TOOL] viewKnowledgeStats → {}ms, ok", System.currentTimeMillis() - start);
 
         return switch (type.toLowerCase()) {
             case "hot" -> formatHotQueries(stats);

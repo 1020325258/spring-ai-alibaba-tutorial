@@ -10,6 +10,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
 import org.aspectj.lang.annotation.Aspect;
+import org.aspectj.lang.reflect.MethodSignature;
 import org.springframework.stereotype.Component;
 
 import java.util.HashMap;
@@ -43,12 +44,14 @@ public class ObservabilityAspect {
 
     @Around("@annotation(org.springframework.ai.tool.annotation.Tool)")
     public Object logToolCall(ProceedingJoinPoint joinPoint) throws Throwable {
-        String toolName = joinPoint.getSignature().getName();
+        MethodSignature signature = (MethodSignature) joinPoint.getSignature();
+        String toolName = signature.getName();
+        String[] paramNames = signature.getParameterNames();
         Object[] args = joinPoint.getArgs();
         long startTime = System.currentTimeMillis();
 
-        // 构建参数Map（脱敏处理）
-        Map<String, Object> params = buildParamsMap(args);
+        // 构建参数Map（使用实际参数名）
+        Map<String, Object> params = buildParamsMap(paramNames, args);
 
         // 判断是否为数据查询类工具
         boolean isDataQuery = DATA_QUERY_TOOLS.contains(toolName);
@@ -60,9 +63,8 @@ public class ObservabilityAspect {
         // 开始追踪（保留原有 TracingService 兼容性）
         TracingContext tracing = tracingService.startToolCall(toolName, params);
 
-        // 结构化日志：开始
-        log.info("[TOOL] {} | params={} | type={}",
-                toolName, params, isDataQuery ? "DATA_QUERY" : "KNOWLEDGE");
+        // 入口日志：工具名 + 参数
+        log.info("[TOOL] {}({})", toolName, buildParamsString(paramNames, args));
 
         try {
             Object result = joinPoint.proceed();
@@ -83,10 +85,6 @@ public class ObservabilityAspect {
                 directOutputHolder.setIfAbsent((String) result);
             }
 
-            // 结构化日志：成功
-            log.info("[TOOL] {} | duration={}ms | success=true | preview={}",
-                    toolName, duration, truncatePreview(result));
-
             return result;
         } catch (Exception e) {
             long duration = System.currentTimeMillis() - startTime;
@@ -100,9 +98,8 @@ public class ObservabilityAspect {
             // 记录性能指标
             metricsCollector.recordToolCall(toolName, duration, false);
 
-            // 结构化日志：失败
-            log.error("[TOOL] {} | duration={}ms | success=false | error={}",
-                    toolName, duration, e.getMessage());
+            // 错误日志
+            log.error("[TOOL] {} → {}ms, error: {}", toolName, duration, e.getMessage());
 
             throw e;
         } finally {
@@ -112,26 +109,41 @@ public class ObservabilityAspect {
     }
 
     /**
-     * 构建参数Map
+     * 构建参数Map（使用实际参数名）
      */
-    private Map<String, Object> buildParamsMap(Object[] args) {
+    private Map<String, Object> buildParamsMap(String[] paramNames, Object[] args) {
         Map<String, Object> params = new HashMap<>();
-        if (args != null) {
-            for (int i = 0; i < args.length; i++) {
-                params.put("arg" + i, args[i]);
+        if (paramNames != null && args != null) {
+            for (int i = 0; i < paramNames.length && i < args.length; i++) {
+                params.put(paramNames[i], args[i]);
             }
         }
         return params;
     }
 
     /**
-     * 截断预览字符串
+     * 构建参数字符串（参数名=值格式）
      */
-    private String truncatePreview(Object result) {
-        if (result == null) return "null";
-        String str = result.toString();
-        if (str.length() > 100) {
-            return str.substring(0, 100) + "...(" + str.length() + "chars)";
+    private String buildParamsString(String[] paramNames, Object[] args) {
+        if (paramNames == null || args == null || paramNames.length == 0) {
+            return "";
+        }
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < paramNames.length && i < args.length; i++) {
+            if (i > 0) sb.append(", ");
+            sb.append(paramNames[i]).append("=").append(formatArg(args[i]));
+        }
+        return sb.toString();
+    }
+
+    /**
+     * 格式化参数值（截断过长的值）
+     */
+    private String formatArg(Object arg) {
+        if (arg == null) return "null";
+        String str = arg.toString();
+        if (str.length() > 50) {
+            return str.substring(0, 50) + "...";
         }
         return str;
     }

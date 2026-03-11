@@ -189,12 +189,14 @@ endpointId: null, params: null
         示例：
         - "826031111000001859的xxx" → projectOrderId=826031111000001859""")
 public String queryXxxList(String projectOrderId) {
-    log.info("queryXxxList - projectOrderId: {}", projectOrderId);
+    long start = System.currentTimeMillis();
     try {
-        return httpEndpointTool.callPredefinedEndpoint("your-endpoint-id",
+        String result = httpEndpointTool.callPredefinedEndpoint("your-endpoint-id",
                 Map.of("projectOrderId", projectOrderId));
+        log.info("[TOOL] queryXxxList → {}ms, ok", System.currentTimeMillis() - start);
+        return result;
     } catch (Exception e) {
-        log.error("queryXxxList 失败", e);
+        log.error("[TOOL] queryXxxList → {}ms, error: {}", System.currentTimeMillis() - start, e.getMessage());
         return toErrorJson(e.getMessage());
     }
 }
@@ -217,6 +219,62 @@ private static final Set<String> DATA_QUERY_TOOLS = Set.of(
 ```
 
 > **每次在 `ContractTool` 中新增 `@Tool` 方法后，必须同步将方法名加入 `DATA_QUERY_TOOLS`，否则该工具结果仍会经过 LLM 二次归纳，既慢又可能被改写。**
+
+---
+
+## 工具日志规范（分层精炼）
+
+### 职责划分
+
+| 层级 | 日志内容 | 示例 |
+|------|---------|------|
+| **AOP 层** (`ObservabilityAspect`) | 入口日志：工具名 + 参数 | `[TOOL] queryContractData(contractCode=C..., dataType=ALL)` |
+| **工具层** (各 Tool 类) | 结果日志：耗时 + 结果摘要 | `[TOOL] queryContractData → 50ms, 5 rows` |
+
+### 日志格式
+
+**入口日志（AOP 层自动输出）**：
+```
+[TOOL] 工具名(参数名=值, 参数名=值)
+```
+
+**结果日志（工具层手动输出）**：
+```
+[TOOL] 工具名 → 耗时ms, 结果摘要
+```
+
+### 结果摘要规则
+
+| 工具类型 | 结果摘要格式 |
+|---------|-------------|
+| SQL 数据查询 | `N rows` 或 `0 rows (not found)` |
+| HTTP 请求 | `status=200` 或 `error: xxx` |
+| 知识库查询 | `N docs` |
+
+### 新增工具时的日志写法
+
+```java
+@Tool(description = "...")
+public String querySomething(String param) {
+    long start = System.currentTimeMillis();
+    try {
+        // 业务逻辑
+        String result = doQuery(param);
+        log.info("[TOOL] querySomething → {}ms, {} rows",
+                System.currentTimeMillis() - start, rowCount);
+        return result;
+    } catch (Exception e) {
+        log.error("[TOOL] querySomething → {}ms, error: {}",
+                System.currentTimeMillis() - start, e.getMessage());
+        return toErrorJson(e.getMessage());
+    }
+}
+```
+
+**注意事项**：
+- ❌ 不要在工具方法开头写入口日志（AOP 层已自动输出）
+- ✅ 只在方法结尾写结果日志，包含耗时和结果摘要
+- ✅ 错误情况也要输出日志，便于排查问题
 
 ---
 

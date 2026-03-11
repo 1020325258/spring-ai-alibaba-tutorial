@@ -9,6 +9,7 @@ import com.yycome.sremate.infrastructure.gateway.model.EndpointTemplate;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
@@ -65,11 +66,12 @@ public class HttpEndpointTool {
 
             示例：{"endpointId":"health-check","params":{}}""")
     public String callPredefinedEndpoint(String endpointId, Map<String, String> params) {
-        log.info("[TOOL_CALL] callPredefinedEndpoint - endpointId: {}, params: {}", endpointId, params);
-
+        long start = System.currentTimeMillis();
         try {
             EndpointTemplate template = endpointTemplateService.getTemplate(endpointId);
             if (template == null) {
+                log.error("[TOOL] callPredefinedEndpoint → {}ms, template not found: {}",
+                        System.currentTimeMillis() - start, endpointId);
                 return "错误：未找到接口模板: " + endpointId + "\n使用 listAvailableEndpoints 查看可用接口";
             }
 
@@ -78,16 +80,23 @@ public class HttpEndpointTool {
             try {
                 endpointTemplateService.validateParameters(template, safeParams);
             } catch (IllegalArgumentException e) {
+                log.error("[TOOL] callPredefinedEndpoint → {}ms, validation error: {}",
+                        System.currentTimeMillis() - start, e.getMessage());
                 return "参数验证失败: " + e.getMessage();
             }
 
             Map<String, String> filledParams = endpointTemplateService.fillDefaultValues(template, safeParams);
             String url = endpointTemplateService.buildUrl(template, filledParams);
-            log.info("[TOOL_CALL] 构建URL: {}", url);
 
-            String response = executeHttpRequest(template, url, filledParams)
+            ResponseEntity<String> responseEntity = executeHttpRequest(template, url, filledParams)
                     .timeout(Duration.ofSeconds(template.getTimeout()))
                     .block();
+
+            int status = responseEntity.getStatusCode().value();
+            String response = responseEntity.getBody();
+
+            log.info("[TOOL] callPredefinedEndpoint → {}ms, status={}",
+                    System.currentTimeMillis() - start, status);
 
             // 字段过滤：配置了 responseFields 时，直接返回过滤后的纯 JSON
             if (template.getResponseFields() != null && !template.getResponseFields().isEmpty()) {
@@ -98,7 +107,8 @@ public class HttpEndpointTool {
                     endpointId, template.getName(), url, response);
 
         } catch (Exception e) {
-            log.error("[TOOL_CALL] 预定义接口调用失败", e);
+            log.error("[TOOL] callPredefinedEndpoint → {}ms, error: {}",
+                    System.currentTimeMillis() - start, e.getMessage());
             return "接口调用失败: " + e.getMessage();
         }
     }
@@ -117,26 +127,27 @@ public class HttpEndpointTool {
                     template, params != null ? params : new HashMap<>());
             String url = endpointTemplateService.buildUrl(template, filledParams);
 
-            return executeHttpRequest(template, url, filledParams)
+            ResponseEntity<String> responseEntity = executeHttpRequest(template, url, filledParams)
                     .timeout(Duration.ofSeconds(template.getTimeout()))
                     .block();
+            return responseEntity != null ? responseEntity.getBody() : null;
         } catch (Exception e) {
-            log.error("[TOOL_CALL] callPredefinedEndpointRaw 失败 endpointId={}", endpointId, e);
+            log.error("[TOOL] callPredefinedEndpointRaw error endpointId={}", endpointId, e);
             return null;
         }
     }
 
     /**
-     * 构建 HTTP 请求 Mono（GET / POST），提取自 callPredefinedEndpoint 避免重复
+     * 构建 HTTP 请求 Mono（GET / POST），返回 ResponseEntity 包含状态码
      */
-    private Mono<String> executeHttpRequest(EndpointTemplate template, String url, Map<String, String> filledParams) {
+    private Mono<ResponseEntity<String>> executeHttpRequest(EndpointTemplate template, String url, Map<String, String> filledParams) {
         String method = template.getMethod();
         if ("GET".equalsIgnoreCase(method)) {
             return webClient.get()
                     .uri(url)
                     .headers(h -> { if (template.getHeaders() != null) template.getHeaders().forEach(h::add); })
                     .retrieve()
-                    .bodyToMono(String.class);
+                    .toEntity(String.class);
         } else if ("POST".equalsIgnoreCase(method)) {
             String requestBody = endpointTemplateService.buildRequestBody(template, filledParams);
             if (requestBody == null) requestBody = "{}";
@@ -146,7 +157,7 @@ public class HttpEndpointTool {
                     .headers(h -> { if (template.getHeaders() != null) template.getHeaders().forEach(h::add); })
                     .bodyValue(requestBody)
                     .retrieve()
-                    .bodyToMono(String.class);
+                    .toEntity(String.class);
         }
         return Mono.error(new IllegalArgumentException("不支持的HTTP方法: " + method));
     }
@@ -169,8 +180,10 @@ public class HttpEndpointTool {
             - 不填category → 列出全部
             - category=contract → 只列出签约相关接口""")
     public String listAvailableEndpoints(String category) {
-        log.info("[TOOL_CALL] listAvailableEndpoints - category: {}", category);
-        return endpointTemplateService.getTemplatesDescription(category);
+        long start = System.currentTimeMillis();
+        String result = endpointTemplateService.getTemplatesDescription(category);
+        log.info("[TOOL] listAvailableEndpoints → {}ms, ok", System.currentTimeMillis() - start);
+        return result;
     }
 
     /**
@@ -206,7 +219,7 @@ public class HttpEndpointTool {
             }
             return objectMapper.writeValueAsString(result);
         } catch (Exception e) {
-            log.warn("[TOOL_CALL] 响应字段过滤失败，返回原始响应: {}", e.getMessage());
+            log.warn("[TOOL] filterResponseFields error: {}", e.getMessage());
             return responseJson;
         }
     }
@@ -225,34 +238,39 @@ public class HttpEndpointTool {
             params参数是请求参数（仅POST请求需要，JSON格式）。
             推荐使用callPredefinedEndpoint调用预定义接口，更简单安全。""")
     public String callHttpEndpoint(String url, String method, Map<String, Object> params) {
-        log.info("[TOOL_CALL] callHttpEndpoint - URL: {}, 方法: {}", url, method);
-
+        long start = System.currentTimeMillis();
         try {
-            Mono<String> responseMono;
+            Mono<ResponseEntity<String>> responseMono;
 
             if ("GET".equalsIgnoreCase(method)) {
                 responseMono = webClient.get()
                         .uri(url)
                         .retrieve()
-                        .bodyToMono(String.class);
+                        .toEntity(String.class);
             } else if ("POST".equalsIgnoreCase(method)) {
                 responseMono = webClient.post()
                         .uri(url)
                         .bodyValue(params != null ? params : "{}")
                         .retrieve()
-                        .bodyToMono(String.class);
+                        .toEntity(String.class);
             } else {
+                log.error("[TOOL] callHttpEndpoint → {}ms, unsupported method: {}",
+                        System.currentTimeMillis() - start, method);
                 return "错误：不支持的HTTP方法: " + method;
             }
 
-            String response = responseMono
+            ResponseEntity<String> responseEntity = responseMono
                     .timeout(Duration.ofSeconds(30))
                     .block();
 
+            int status = responseEntity.getStatusCode().value();
+            String response = responseEntity.getBody();
+
+            log.info("[TOOL] callHttpEndpoint → {}ms, status={}", System.currentTimeMillis() - start, status);
             return String.format("接口: %s\n方法: %s\n响应:\n%s", url, method, response);
 
         } catch (Exception e) {
-            log.error("[TOOL_CALL] HTTP接口调用失败", e);
+            log.error("[TOOL] callHttpEndpoint → {}ms, error: {}", System.currentTimeMillis() - start, e.getMessage());
             return "接口调用失败: " + e.getMessage();
         }
     }
