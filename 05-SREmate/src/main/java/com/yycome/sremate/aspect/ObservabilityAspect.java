@@ -1,5 +1,6 @@
 package com.yycome.sremate.aspect;
 
+import com.yycome.sremate.infrastructure.annotation.DataQueryTool;
 import com.yycome.sremate.infrastructure.service.DirectOutputHolder;
 import com.yycome.sremate.infrastructure.service.MetricsCollector;
 import com.yycome.sremate.infrastructure.service.TracingService;
@@ -13,9 +14,9 @@ import org.aspectj.lang.annotation.Aspect;
 import org.aspectj.lang.reflect.MethodSignature;
 import org.springframework.stereotype.Component;
 
+import java.lang.reflect.Method;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Set;
 
 /**
  * 可观测性切面
@@ -31,17 +32,6 @@ public class ObservabilityAspect {
     private final MetricsCollector metricsCollector;
     private final DirectOutputHolder directOutputHolder;
 
-    /** 数据查询类工具名称集合 */
-    private static final Set<String> DATA_QUERY_TOOLS = Set.of(
-            "queryContractData",
-            "queryContractsByOrderId",
-            "queryContractInstanceId",
-            "queryContractFormId",
-            "queryContractConfig",
-            "querySubOrderInfo",
-            "queryBudgetBillList"
-    );
-
     @Around("@annotation(org.springframework.ai.tool.annotation.Tool)")
     public Object logToolCall(ProceedingJoinPoint joinPoint) throws Throwable {
         MethodSignature signature = (MethodSignature) joinPoint.getSignature();
@@ -53,8 +43,9 @@ public class ObservabilityAspect {
         // 构建参数Map（使用实际参数名）
         Map<String, Object> params = buildParamsMap(paramNames, args);
 
-        // 判断是否为数据查询类工具
-        boolean isDataQuery = DATA_QUERY_TOOLS.contains(toolName);
+        // 通过反射检查方法是否有 @DataQueryTool 注解
+        Method method = signature.getMethod();
+        boolean isDataQuery = method.isAnnotationPresent(DataQueryTool.class);
 
         // 创建并绑定上下文
         ToolCallContext callContext = ToolCallContext.start(toolName, params);
