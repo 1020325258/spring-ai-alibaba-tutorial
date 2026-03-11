@@ -11,16 +11,11 @@ import org.jline.reader.impl.history.DefaultHistory;
 import org.jline.terminal.Terminal;
 import org.jline.terminal.TerminalBuilder;
 import org.springframework.ai.chat.client.ChatClient;
-import org.springframework.ai.chat.messages.AssistantMessage;
-import org.springframework.ai.chat.messages.Message;
-import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.stereotype.Component;
 import reactor.core.Disposable;
 
-import java.util.ArrayList;
-import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import org.jline.terminal.Terminal.Signal;
@@ -54,10 +49,9 @@ public class SREConsole implements CommandLineRunner {
 
     private SlashCommandCompleter slashCompleter;
 
-    private final List<Message> conversationHistory = new ArrayList<>();
-
-    /** 保留的最大消息条数（user + assistant 各算 1 条，10 条 = 5 轮对话） */
-    private static final int MAX_HISTORY = 10;
+    // 注：关闭对话历史功能，每次请求独立处理，防止 LLM 模仿历史模式跳过工具调用
+    // private final List<Message> conversationHistory = new ArrayList<>();
+    // private static final int MAX_HISTORY = 10;
 
     /** 当前正在进行的流式订阅，用于 Ctrl+C 中断 */
     private final AtomicReference<Disposable> currentSubscription = new AtomicReference<>();
@@ -147,8 +141,6 @@ public class SREConsole implements CommandLineRunner {
                     continue;
                 }
 
-                conversationHistory.add(new UserMessage(input));
-
                 System.out.println(Ansi.ansi().fg(Ansi.Color.GREEN).a("\nSRE助手: ").reset());
 
                 long startMs = System.currentTimeMillis();
@@ -161,8 +153,9 @@ public class SREConsole implements CommandLineRunner {
                 // 标记是否已触发直接输出旁路
                 java.util.concurrent.atomic.AtomicBoolean directOutputUsed = new java.util.concurrent.atomic.AtomicBoolean(false);
 
+                // 每次请求独立处理，不传入对话历史，防止 LLM 模仿历史模式跳过工具调用
                 Disposable sub = sreAgent.prompt()
-                        .messages(conversationHistory)
+                        .user(input)
                         .stream()
                         .content()
                         .doOnNext(chunk -> {
@@ -200,7 +193,6 @@ public class SREConsole implements CommandLineRunner {
 
                 if (interrupted.get()) {
                     System.out.println(Ansi.ansi().fg(Ansi.Color.YELLOW).a("\n[已中断]").reset());
-                    conversationHistory.remove(conversationHistory.size() - 1);
                     continue;
                 }
 
@@ -213,14 +205,7 @@ public class SREConsole implements CommandLineRunner {
 
                 copyToClipboardIfJson(response);
 
-                // 数据查询结果不写入对话历史，防止 LLM 下次直接复读历史数据而跳过实时工具调用
-                String historyContent = directOutputUsed.get()
-                        ? "[已调用工具查询并直接输出数据，结果不保留在上下文中]"
-                        : response;
-                conversationHistory.add(new AssistantMessage(historyContent));
-                if (conversationHistory.size() > MAX_HISTORY) {
-                    conversationHistory.subList(0, conversationHistory.size() - MAX_HISTORY).clear();
-                }
+                // 注：不再维护对话历史，每次请求独立处理
 
             } catch (UserInterruptException e) {
                 System.out.println(Ansi.ansi().fg(Ansi.Color.YELLOW).a("\n输入 'quit' 或 'exit' 退出").reset());
