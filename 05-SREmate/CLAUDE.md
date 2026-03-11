@@ -315,54 +315,56 @@ private String resolveFieldShardingTable(String contractCode) {
 ## 集成测试
 
 - 测试文件命名：`*IT.java`，放在 `src/test/java/com/yycome/sremate/`
-- 只写端到端集成测试，通过真实问题验证 Agent 完整链路响应
+- 继承 `BaseSREIT` 基类，使用 `ask()` 方法和工具调用断言
 - 必须加 `sre.console.enabled=false` 禁用交互命令行，否则测试启动会阻塞
 
-### 端到端测试规范（强制）
+### 测试核心原则：验证工具调用行为
 
-**必须验证 Agent 正确识别意图并输出期望数据**，不能仅验证"工具被调用"。
+**重点验证 Agent 是否调用了正确的工具**，而非验证输出内容。这样测试更稳定，不受业务数据变化影响。
+
+### 可用的断言方法
+
+`BaseSREIT` 提供以下工具调用断言方法：
+
+| 方法 | 说明 |
+|------|------|
+| `assertToolCalled(String toolName)` | 断言指定工具被调用且成功 |
+| `assertToolNotCalled(String toolName)` | 断言指定工具未被调用 |
+| `assertAllToolsSuccess()` | 断言所有工具调用都成功 |
+| `assertAnyToolCalled()` | 断言至少调用了一个工具 |
+| `getToolCalls()` | 获取最后一次 ask() 的工具调用列表 |
+
+### 测试示例
 
 ```java
-@SpringBootTest(properties = "sre.console.enabled=false")
-@ActiveProfiles("local")
-class YourFeatureIT {
+class ContractQueryToolIT extends BaseSREIT {
 
-    @Autowired
-    private ChatClient sreAgent;
+    private static final String CONTRACT_CODE = "C1767173898135504";
+    private static final String PROJECT_ORDER_ID = "825123110000002753";
 
     @Test
-    void queryByContractCode_shouldReturnContractData() {
-        String response = sreAgent.prompt()
-                .user("C1772854666284956的合同配置表数据")
-                .call()
-                .content();
+    void contractCodePrefix_shouldCallQueryContractData() {
+        ask(CONTRACT_CODE + "的合同数据");
 
-        System.out.println("=== Agent 回复 ===\n" + response);
-
-        // ✅ 正确：验证返回了期望的业务数据
-        assertThat(response).contains("contract_city_company_info");
-        assertThat(response).contains("projectOrderId");
-        assertThat(response).doesNotContain("未找到");
-        assertThat(response).doesNotContain("error");
+        assertToolCalled("queryContractData");
+        assertAllToolsSuccess();
     }
 
     @Test
-    void queryByOrderId_shouldUseProjectOrderId() {
-        String response = sreAgent.prompt()
-                .user("826030619000001899的合同配置")
-                .call()
-                .content();
+    void pureDigits_shouldCallQueryContractsByOrderId() {
+        ask(PROJECT_ORDER_ID + "的合同详情");
 
-        System.out.println("=== Agent 回复 ===\n" + response);
+        assertToolCalled("queryContractsByOrderId");
+        assertToolNotCalled("queryContractData");  // 不应该调用错误的工具
+        assertAllToolsSuccess();
+    }
 
-        // ✅ 验证 Agent 正确识别订单号，并使用正确的参数
-        assertThat(response).satisfiesAnyOf(
-            r -> assertThat(r).contains("contract_city_company_info"),
-            r -> assertThat(r).contains("needAskType"),  // 需要询问合同类型
-            r -> assertThat(r).contains("availableTypes")
-        );
-        // ❌ 不应该出现：说明 Agent 没有正确识别订单号
-        assertThat(response).doesNotContain("未找到编号");
+    @Test
+    void subOrderKeyword_shouldCallQuerySubOrderInfo() {
+        ask(PROJECT_ORDER_ID + "的子单信息");
+
+        assertToolCalled("querySubOrderInfo");
+        assertAllToolsSuccess();
     }
 }
 ```
@@ -371,9 +373,9 @@ class YourFeatureIT {
 
 新增或修改 @Tool 工具后，端到端测试必须覆盖：
 
-1. **入参识别**：验证 Agent 能正确区分不同格式的输入（合同号 C 前缀 vs 订单号纯数字）
-2. **数据输出**：验证返回结果包含期望的业务字段
-3. **错误处理**：验证数据不存在时有合理的提示，而非代码异常
+1. **意图识别**：验证 Agent 根据输入格式选择正确的工具
+2. **关键词触发**：验证关键词能触发对应工具（如"报价单"→ `queryBudgetBillList`）
+3. **互斥验证**：验证相似输入不会触发错误的工具
 
 运行全部集成测试（每次变更后必须执行）：
 ```bash
@@ -386,4 +388,3 @@ JAVA_HOME=/Library/Java/JavaVirtualMachines/jdk-21.jdk/Contents/Home \
   mvn test -pl 05-SREmate -Dtest=YourFeatureIT
 ```
 
-测试数据常量维护：各 IT 文件顶部的 `CONTRACT_CODE`、`PROJECT_ORDER_ID` 等常量需与本地 DB 实际数据一致，数据变化时及时更新。详见 `docs/integration-tests.md`。

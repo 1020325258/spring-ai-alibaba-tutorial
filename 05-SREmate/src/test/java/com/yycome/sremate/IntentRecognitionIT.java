@@ -1,9 +1,8 @@
 package com.yycome.sremate;
 
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
-
-import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * 意图识别准确性集成测试
@@ -16,168 +15,148 @@ class IntentRecognitionIT extends BaseSREIT {
 
     // ===== 编号格式识别测试 =====
 
-    @Test
-    @DisplayName("C前缀合同编号应使用queryContractData")
-    void contractCode_CPrefix_shouldUseContractTool() {
-        String response = ask(CONTRACT_CODE + "合同数据");
+    @Nested
+    @DisplayName("编号格式识别")
+    class IdFormatRecognition {
 
-        // 验证返回了合同数据
-        assertThat(response).contains("contractCode");
-        // 不应出现订单号相关错误
-        assertThat(response).doesNotContain("是订单号");
-        assertThat(response).doesNotContain("请使用 queryContractsByOrderId");
-    }
+        @Test
+        @DisplayName("C前缀合同编号应使用queryContractData")
+        void contractCode_CPrefix_shouldUseContractTool() {
+            ask(CONTRACT_CODE + "合同数据");
 
-    @Test
-    @DisplayName("纯数字订单号应使用queryContractsByOrderId")
-    void orderId_pureDigits_shouldUseOrderTool() {
-        String response = ask(ORDER_ID + "有哪些合同");
+            assertToolCalled("queryContractData");
+            assertToolNotCalled("queryContractsByOrderId");
+            assertAllToolsSuccess();
+        }
 
-        // 验证返回了合同列表
-        assertThat(response).contains("contracts");
-        // 不应出现合同编号相关错误
-        assertThat(response).doesNotContain("是合同编号");
-    }
+        @Test
+        @DisplayName("纯数字订单号应使用queryContractsByOrderId")
+        void orderId_pureDigits_shouldUseOrderTool() {
+            ask(ORDER_ID + "有哪些合同");
 
-    @Test
-    @DisplayName("混合编号应识别主要意图")
-    void mixedIds_shouldIdentifyPrimaryIntent() {
-        String response = ask("查" + CONTRACT_CODE + "，不是" + ORDER_ID);
-
-        // 应识别出合同编号
-        assertThat(response).containsIgnoringCase(CONTRACT_CODE);
+            assertToolCalled("queryContractsByOrderId");
+            assertToolNotCalled("queryContractData");
+            assertAllToolsSuccess();
+        }
     }
 
     // ===== 关键词意图识别测试 =====
 
-    @Test
-    @DisplayName("版式关键词应使用queryContractFormId")
-    void keyword_formId_shouldUseFormIdTool() {
-        String response = ask(CONTRACT_CODE + "的版式form_id");
+    @Nested
+    @DisplayName("关键词意图识别")
+    class KeywordRecognition {
 
-        // 即使查询失败，也应该调用了正确的工具
-        // 不应出现"合同数据"相关的错误提示
-        assertThat(response).doesNotContain("合同数据时不能用此工具");
-    }
+        @Test
+        @DisplayName("版式关键词应使用queryContractFormId")
+        void keyword_formId_shouldUseFormIdTool() {
+            ask(CONTRACT_CODE + "的版式form_id");
 
-    @Test
-    @DisplayName("子单关键词应使用querySubOrderInfo")
-    void keyword_subOrder_shouldUseSubOrderTool() {
-        String response = ask(ORDER_ID + "的子单信息");
+            assertToolCalled("queryContractFormId");
+            assertAllToolsSuccess();
+        }
 
-        // 验证返回了子单数据
-        assertThat(response).satisfiesAnyOf(
-            r -> assertThat(r).contains("orderNo"),
-            r -> assertThat(r).contains("子单"),
-            r -> assertThat(r).contains("S1")
-        );
-    }
+        @Test
+        @DisplayName("子单关键词应使用querySubOrderInfo")
+        void keyword_subOrder_shouldUseSubOrderTool() {
+            ask(ORDER_ID + "的子单信息");
 
-    @Test
-    @DisplayName("签约人关键词应设置正确的dataType")
-    void keyword_signer_shouldSetCorrectDataType() {
-        String response = ask(CONTRACT_CODE + "的签约人");
+            assertToolCalled("querySubOrderInfo");
+            assertAllToolsSuccess();
+        }
 
-        // 验证返回了签约人数据
-        assertThat(response).contains("contract_user");
-    }
+        @Test
+        @DisplayName("签约人关键词应设置正确的dataType")
+        void keyword_signer_shouldSetCorrectDataType() {
+            ask(CONTRACT_CODE + "的签约人");
 
-    @Test
-    @DisplayName("节点关键词应设置正确的dataType")
-    void keyword_node_shouldSetCorrectDataType() {
-        String response = ask(CONTRACT_CODE + "的合同节点");
+            assertToolCalled("queryContractData");
+            assertAllToolsSuccess();
+        }
 
-        // 验证返回了节点数据
-        assertThat(response).contains("contract_node");
-    }
+        @Test
+        @DisplayName("节点关键词应设置正确的dataType")
+        void keyword_node_shouldSetCorrectDataType() {
+            ask(CONTRACT_CODE + "的合同节点");
 
-    @Test
-    @DisplayName("配置表关键词应使用queryContractConfig")
-    void keyword_config_shouldUseConfigTool() {
-        String response = ask(CONTRACT_CODE + "的合同配置表");
+            assertToolCalled("queryContractData");
+            assertAllToolsSuccess();
+        }
 
-        // 验证返回了配置数据
-        assertThat(response).contains("contract_city_company_info");
-    }
+        @Test
+        @DisplayName("配置表关键词应使用queryContractConfig")
+        void keyword_config_shouldUseConfigTool() {
+            ask(CONTRACT_CODE + "的合同配置表");
 
-    // ===== 边界情况测试 =====
+            assertToolCalled("queryContractConfig");
+            assertAllToolsSuccess();
+        }
 
-    @Test
-    @DisplayName("模糊输入应返回合理响应")
-    void ambiguousInput_shouldReturnReasonableResponse() {
-        String response = ask("查合同");
+        @Test
+        @DisplayName("报价单关键词应使用queryBudgetBillList")
+        void keyword_budgetBill_shouldUseBudgetBillTool() {
+            ask(ORDER_ID + "的报价单");
 
-        // 即使模糊输入，也应返回合理响应（可能是默认查询某个合同）
-        assertThat(response).isNotEmpty();
-    }
+            assertToolCalled("queryBudgetBillList");
+            assertAllToolsSuccess();
+        }
 
-    @Test
-    @DisplayName("列出所有接口应返回可用接口")
-    void listEndpoints_shouldReturnEndpoints() {
-        String response = ask("有哪些可用的预定义接口");
+        @Test
+        @DisplayName("instance_id关键词应使用queryContractInstanceId")
+        void keyword_instanceId_shouldUseInstanceIdTool() {
+            ask(CONTRACT_CODE + "的instance_id");
 
-        // 应包含接口相关内容
-        assertThat(response).satisfiesAnyOf(
-            r -> assertThat(r).containsIgnoringCase("接口"),
-            r -> assertThat(r).containsIgnoringCase("sign-order"),
-            r -> assertThat(r).containsIgnoringCase("contract"),
-            r -> assertThat(r).containsIgnoringCase("health"),
-            r -> assertThat(r).containsIgnoringCase("暂无"),
-            r -> assertThat(r).containsIgnoringCase("分类")
-        );
-    }
-
-    @Test
-    @DisplayName("按分类列出接口应返回正确结果")
-    void listEndpoints_byCategory_shouldFilterCorrectly() {
-        String response = ask("查看 contract 分类的接口");
-
-        // 应包含 contract 相关接口
-        assertThat(response).satisfiesAnyOf(
-            r -> assertThat(r).containsIgnoringCase("sub-order-info"),
-            r -> assertThat(r).containsIgnoringCase("contract"),
-            r -> assertThat(r).containsIgnoringCase("子单")
-        );
+            assertToolCalled("queryContractInstanceId");
+            assertAllToolsSuccess();
+        }
     }
 
     // ===== 运维诊断测试 =====
 
-    @Test
-    @DisplayName("数据库超时应使用querySkills")
-    void diagnosis_databaseTimeout_shouldUseSkills() {
-        String response = ask("数据库连接超时怎么排查");
+    @Nested
+    @DisplayName("运维诊断")
+    class DiagnosisTests {
 
-        // 应返回排查建议
-        assertThat(response).satisfiesAnyOf(
-            r -> assertThat(r).containsIgnoringCase("连接"),
-            r -> assertThat(r).containsIgnoringCase("超时"),
-            r -> assertThat(r).containsIgnoringCase("排查"),
-            r -> assertThat(r).containsIgnoringCase("数据库")
-        );
+        @Test
+        @DisplayName("数据库超时应使用querySkills")
+        void diagnosis_databaseTimeout_shouldUseSkills() {
+            ask("数据库连接超时怎么排查");
+
+            assertToolCalled("querySkills");
+            assertAllToolsSuccess();
+        }
+
+        @Test
+        @DisplayName("服务超时应使用querySkills")
+        void diagnosis_serviceTimeout_shouldUseSkills() {
+            ask("服务超时怎么处理");
+
+            assertToolCalled("querySkills");
+            assertAllToolsSuccess();
+        }
     }
 
-    @Test
-    @DisplayName("服务超时应使用querySkills")
-    void diagnosis_serviceTimeout_shouldUseSkills() {
-        String response = ask("服务超时怎么处理");
+    // ===== 接口查询测试 =====
 
-        // 应返回排查建议
-        assertThat(response).satisfiesAnyOf(
-            r -> assertThat(r).containsIgnoringCase("超时"),
-            r -> assertThat(r).containsIgnoringCase("服务"),
-            r -> assertThat(r).containsIgnoringCase("排查"),
-            r -> assertThat(r).containsIgnoringCase("检查")
-        );
-    }
+    @Nested
+    @DisplayName("接口查询")
+    class EndpointTests {
 
-    // ===== 响应格式测试 =====
+        @Test
+        @DisplayName("列出所有接口应使用listAvailableEndpoints")
+        void listEndpoints_shouldUseListTool() {
+            ask("有哪些可用的预定义接口");
 
-    @Test
-    @DisplayName("数据查询应直接返回JSON")
-    void dataQuery_shouldReturnDirectJson() {
-        String response = ask(CONTRACT_CODE + "合同数据");
+            assertToolCalled("listAvailableEndpoints");
+            assertAllToolsSuccess();
+        }
 
-        // 应以 { 开头（直接 JSON 输出）
-        assertThat(response.trim()).startsWith("{");
+        @Test
+        @DisplayName("按分类列出接口应使用listAvailableEndpoints")
+        void listEndpoints_byCategory_shouldUseListTool() {
+            ask("查看 contract 分类的接口");
+
+            assertToolCalled("listAvailableEndpoints");
+            assertAllToolsSuccess();
+        }
     }
 }

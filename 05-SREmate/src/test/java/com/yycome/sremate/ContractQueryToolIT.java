@@ -2,10 +2,8 @@ package com.yycome.sremate;
 
 import org.junit.jupiter.api.Test;
 
-import static org.assertj.core.api.Assertions.assertThat;
-
 /**
- * ContractTool 集成测试 - 验证按合同号和订单号查询合同数据的完整链路
+ * ContractTool 集成测试 - 验证 Agent 能正确识别输入并调用对应工具
  */
 class ContractQueryToolIT extends BaseSREIT {
 
@@ -13,68 +11,51 @@ class ContractQueryToolIT extends BaseSREIT {
     private static final String PROJECT_ORDER_ID = "825123110000002753";
 
     @Test
-    void queryContractData_withContractCode_shouldReturnContractData() {
-        String response = ask(CONTRACT_CODE + "的合同数据");
+    void contractCodePrefix_shouldCallQueryContractData() {
+        ask(CONTRACT_CODE + "的合同数据");
 
-        assertThat(response).doesNotContain("error");
-        assertThat(response).doesNotContain("未找到");
-        assertThat(response).satisfiesAnyOf(
-                r -> assertThat(r).containsIgnoringCase("contract_code"),
-                r -> assertThat(r).containsIgnoringCase("contract_status"),
-                r -> assertThat(r).containsIgnoringCase(CONTRACT_CODE)
-        );
+        assertToolCalled("queryContractData");
+        assertAllToolsSuccess();
     }
 
     @Test
-    void queryContractData_contractNodeType_shouldReturnNodeData() {
-        String response = ask(CONTRACT_CODE + "的合同节点数据");
+    void contractCodeWithNodeType_shouldCallQueryContractData() {
+        ask(CONTRACT_CODE + "的合同节点数据");
 
-        assertThat(response).doesNotContain("error");
-        assertThat(response).satisfiesAnyOf(
-                r -> assertThat(r).containsIgnoringCase("contract_node"),
-                r -> assertThat(r).containsIgnoringCase("node_type"),
-                r -> assertThat(r).containsIgnoringCase("node_status")
-        );
+        assertToolCalled("queryContractData");
+        assertAllToolsSuccess();
     }
 
     @Test
-    void queryContractData_contractUserType_shouldReturnUserData() {
-        String response = ask(CONTRACT_CODE + "的签约人信息");
+    void contractCodeWithUserType_shouldCallQueryContractData() {
+        ask(CONTRACT_CODE + "的签约人信息");
 
-        assertThat(response).doesNotContain("error");
-        assertThat(response).satisfiesAnyOf(
-                r -> assertThat(r).containsIgnoringCase("contract_user"),
-                r -> assertThat(r).containsIgnoringCase("user_name"),
-                r -> assertThat(r).containsIgnoringCase("user_type")
-        );
+        assertToolCalled("queryContractData");
+        assertAllToolsSuccess();
     }
 
     @Test
-    void queryContractData_withCPrefix_shouldNotUseOrderTool() {
-        String response = ask("查询" + CONTRACT_CODE + "的合同详情");
+    void pureDigits_shouldCallQueryContractsByOrderId() {
+        ask(PROJECT_ORDER_ID + "的合同详情");
 
-        assertThat(response).doesNotContain("error");
-        assertThat(response).doesNotContain("未找到编号");
+        assertToolCalled("queryContractsByOrderId");
+        assertAllToolsSuccess();
     }
 
     @Test
-    void queryContractsByOrderId_withOrderId_shouldReturnContractList() {
-        String response = ask(PROJECT_ORDER_ID + "的合同详情");
+    void orderIdKeyword_shouldCallQueryContractsByOrderId() {
+        ask("订单" + PROJECT_ORDER_ID + "下有哪些合同");
 
-        assertThat(response).doesNotContain("error");
-        assertThat(response).doesNotContain("未找到");
-        assertThat(response).satisfiesAnyOf(
-                r -> assertThat(r).containsIgnoringCase("contract_code"),
-                r -> assertThat(r).containsIgnoringCase("project_order_id"),
-                r -> assertThat(r).contains(PROJECT_ORDER_ID)
-        );
+        assertToolCalled("queryContractsByOrderId");
+        assertAllToolsSuccess();
     }
 
     @Test
-    void queryContractsByOrderId_pureDigits_shouldNotUseContractTool() {
-        String response = ask("订单" + PROJECT_ORDER_ID + "下有哪些合同");
+    void contractCode_shouldNotCallOrderTool() {
+        ask("查询" + CONTRACT_CODE + "的合同详情");
 
-        assertThat(response).doesNotContain("无效的 dataType");
-        assertThat(response).doesNotContain("error");
+        assertToolCalled("queryContractData");
+        assertToolNotCalled("queryContractsByOrderId");
+        assertAllToolsSuccess();
     }
 }

@@ -171,6 +171,72 @@ abstract class BaseSREIT {
         return response;
     }
 
+    /**
+     * 获取最后一次 ask() 调用捕获的工具调用列表
+     */
+    protected List<ToolCall> getToolCalls() {
+        return currentRecord != null ? currentRecord.toolCalls : List.of();
+    }
+
+    /**
+     * 断言指定工具被调用（且成功）
+     */
+    protected void assertToolCalled(String toolName) {
+        List<ToolCall> calls = getToolCalls();
+        boolean found = calls.stream()
+                .anyMatch(t -> t.name.equals(toolName) && t.success);
+        if (!found) {
+            String actualTools = calls.stream()
+                    .map(t -> t.name + (t.success ? "" : "(FAILED)"))
+                    .collect(Collectors.joining(", "));
+            throw new AssertionError(
+                    "期望调用工具: " + toolName + ", 实际调用: " + (actualTools.isEmpty() ? "无" : actualTools));
+        }
+    }
+
+    /**
+     * 断言指定工具被调用（包含参数校验）
+     */
+    protected void assertToolCalled(String toolName, String... expectedParams) {
+        // 目前只验证工具名，后续可扩展参数验证
+        assertToolCalled(toolName);
+    }
+
+    /**
+     * 断言指定工具未被调用
+     */
+    protected void assertToolNotCalled(String toolName) {
+        List<ToolCall> calls = getToolCalls();
+        boolean found = calls.stream().anyMatch(t -> t.name.equals(toolName));
+        if (found) {
+            throw new AssertionError("不期望调用工具: " + toolName + ", 但实际被调用了");
+        }
+    }
+
+    /**
+     * 断言工具调用成功（无失败的工具调用）
+     */
+    protected void assertAllToolsSuccess() {
+        List<ToolCall> failed = getToolCalls().stream()
+                .filter(t -> !t.success)
+                .toList();
+        if (!failed.isEmpty()) {
+            String failedNames = failed.stream()
+                    .map(t -> t.name)
+                    .collect(Collectors.joining(", "));
+            throw new AssertionError("工具调用失败: " + failedNames);
+        }
+    }
+
+    /**
+     * 断言至少调用了一个工具
+     */
+    protected void assertAnyToolCalled() {
+        if (getToolCalls().isEmpty()) {
+            throw new AssertionError("期望至少调用一个工具，但未调用任何工具");
+        }
+    }
+
     private List<ToolCall> captureNewToolCalls(int count) {
         List<ToolCall> result = new ArrayList<>();
         int i = 0;
