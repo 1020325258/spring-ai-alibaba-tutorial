@@ -4,8 +4,11 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.yycome.sremate.infrastructure.annotation.DataQueryTool;
 import com.yycome.sremate.infrastructure.gateway.EndpointTemplateService;
 import com.yycome.sremate.infrastructure.gateway.model.EndpointTemplate;
+import com.yycome.sremate.infrastructure.service.ToolExecutionTemplate;
+import com.yycome.sremate.infrastructure.service.ToolResult;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.http.MediaType;
@@ -32,13 +35,16 @@ public class HttpEndpointTool {
 
     private final WebClient webClient;
     private final EndpointTemplateService endpointTemplateService;
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final ObjectMapper objectMapper;
 
-    public HttpEndpointTool(WebClient.Builder webClientBuilder, EndpointTemplateService endpointTemplateService) {
+    public HttpEndpointTool(WebClient.Builder webClientBuilder,
+                            EndpointTemplateService endpointTemplateService,
+                            ObjectMapper objectMapper) {
         this.webClient = webClientBuilder
                 .codecs(configurer -> configurer.defaultCodecs().maxInMemorySize(10 * 1024 * 1024))
                 .build();
         this.endpointTemplateService = endpointTemplateService;
+        this.objectMapper = objectMapper;
     }
 
     /**
@@ -65,25 +71,16 @@ public class HttpEndpointTool {
             - params：参数Map
 
             示例：{"endpointId":"health-check","params":{}}""")
+    @DataQueryTool
     public String callPredefinedEndpoint(String endpointId, Map<String, String> params) {
-        long start = System.currentTimeMillis();
-        try {
+        return ToolExecutionTemplate.execute("callPredefinedEndpoint", () -> {
             EndpointTemplate template = endpointTemplateService.getTemplate(endpointId);
             if (template == null) {
-                log.error("[TOOL] callPredefinedEndpoint → {}ms, template not found: {}",
-                        System.currentTimeMillis() - start, endpointId);
-                return "错误：未找到接口模板: " + endpointId + "\n使用 listAvailableEndpoints 查看可用接口";
+                return ToolResult.error("未找到接口模板: " + endpointId + "\n使用 listAvailableEndpoints 查看可用接口");
             }
 
             Map<String, String> safeParams = params != null ? params : new HashMap<>();
-
-            try {
-                endpointTemplateService.validateParameters(template, safeParams);
-            } catch (IllegalArgumentException e) {
-                log.error("[TOOL] callPredefinedEndpoint → {}ms, validation error: {}",
-                        System.currentTimeMillis() - start, e.getMessage());
-                return "参数验证失败: " + e.getMessage();
-            }
+            endpointTemplateService.validateParameters(template, safeParams);
 
             Map<String, String> filledParams = endpointTemplateService.fillDefaultValues(template, safeParams);
             String url = endpointTemplateService.buildUrl(template, filledParams);
@@ -92,11 +89,7 @@ public class HttpEndpointTool {
                     .timeout(Duration.ofSeconds(template.getTimeout()))
                     .block();
 
-            int status = responseEntity.getStatusCode().value();
             String response = responseEntity.getBody();
-
-            log.info("[TOOL] callPredefinedEndpoint → {}ms, status={}",
-                    System.currentTimeMillis() - start, status);
 
             // 字段过滤：配置了 responseFields 时，直接返回过滤后的纯 JSON
             if (template.getResponseFields() != null && !template.getResponseFields().isEmpty()) {
@@ -105,12 +98,7 @@ public class HttpEndpointTool {
 
             return String.format("接口: %s (%s)\n名称: %s\n响应:\n%s",
                     endpointId, template.getName(), url, response);
-
-        } catch (Exception e) {
-            log.error("[TOOL] callPredefinedEndpoint → {}ms, error: {}",
-                    System.currentTimeMillis() - start, e.getMessage());
-            return "接口调用失败: " + e.getMessage();
-        }
+        });
     }
 
     /**
