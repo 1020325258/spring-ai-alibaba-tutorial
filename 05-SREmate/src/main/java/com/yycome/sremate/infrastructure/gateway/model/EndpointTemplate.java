@@ -35,6 +35,16 @@ public class EndpointTemplate {
     /** 请求头 */
     private Map<String, String> headers;
 
+    /** POST 请求体模板（支持 ${paramName} 占位符） */
+    private String requestBodyTemplate;
+
+    /**
+     * 响应字段过滤：仅保留指定的顶层数组字段中的特定 key。
+     * 格式：{ "arrayField": ["key1", "key2", ...] }
+     * 例如：{ "decorateBudgetList": ["billType","billCode"], "personalBudgetList": ["billType","billCode"] }
+     */
+    private Map<String, List<String>> responseFields;
+
     /** 超时时间（秒） */
     private int timeout;
 

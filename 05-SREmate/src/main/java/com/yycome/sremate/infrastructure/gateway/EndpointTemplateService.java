@@ -65,6 +65,7 @@ public class EndpointTemplateService {
     }
 
     public EndpointTemplate getTemplate(String id) {
+        if (id == null) return null;
         return templateMap.get(id);
     }
 
@@ -121,6 +122,25 @@ public class EndpointTemplateService {
             sb.append("\n");
         }
 
+        return sb.toString();
+    }
+
+    /**
+     * 构建 POST 请求体，将模板中的 ${paramName} 替换为实际参数值
+     */
+    public String buildRequestBody(EndpointTemplate template, Map<String, String> params) {
+        if (template.getRequestBodyTemplate() == null) {
+            return null;
+        }
+        String body = template.getRequestBodyTemplate();
+        Matcher matcher = PLACEHOLDER_PATTERN.matcher(body);
+        StringBuffer sb = new StringBuffer();
+        while (matcher.find()) {
+            String paramName = matcher.group(1);
+            String value = params.getOrDefault(paramName, "");
+            matcher.appendReplacement(sb, value.replace("\\", "\\\\").replace("$", "\\$"));
+        }
+        matcher.appendTail(sb);
         return sb.toString();
     }
 
@@ -207,6 +227,17 @@ public class EndpointTemplateService {
                 parameters.add(param);
             }
             template.setParameters(parameters);
+        }
+
+        template.setRequestBodyTemplate((String) data.get("requestBodyTemplate"));
+
+        Map<String, Object> responseFieldsRaw = (Map<String, Object>) data.get("responseFields");
+        if (responseFieldsRaw != null) {
+            Map<String, List<String>> responseFields = new java.util.LinkedHashMap<>();
+            for (Map.Entry<String, Object> entry : responseFieldsRaw.entrySet()) {
+                responseFields.put(entry.getKey(), (List<String>) entry.getValue());
+            }
+            template.setResponseFields(responseFields);
         }
 
         Map<String, String> headers = (Map<String, String>) data.get("headers");

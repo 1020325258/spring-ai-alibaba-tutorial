@@ -63,6 +63,54 @@ endpoints:
       - "合同116894442的版式是什么"
       - "获取合同实例116894442的表单数据"
 
+  - id: budget-bill-list
+    name: 查询报价单列表
+    description: |
+      根据项目订单ID查询该订单下的报价单列表，包含装修报价（decorateBudgetList）和个性化报价（personalBudgetList）。
+      当用户询问以下问题时使用此接口：
+      - "查询某订单的报价单"
+      - "某订单的报价单列表"
+      - "826031111000001859的报价单"
+      - "查看订单的报价"
+      返回字段：billType（账单类型）、billTypeDesc（账单类型描述）、statusDesc（状态描述）、billCode（账单编号）、originalBillCode（原始账单编号）
+    category: contract
+    urlTemplate: "http://utopia-atom.nrs-escrow.ttb.test.ke.com/api/budget-bill/list"
+    method: POST
+    requestBodyTemplate: '{"projectOrderId":"${projectOrderId}"}'
+    responseFields:
+      decorateBudgetList:
+        - billType
+        - billTypeDesc
+        - statusDesc
+        - billCode
+        - originalBillCode
+        - billTotalAmount
+        - ctime
+      personalBudgetList:
+        - billType
+        - billTypeDesc
+        - statusDesc
+        - billCode
+        - originalBillCode
+        - billTotalAmount
+        - ctime
+    parameters:
+      - name: projectOrderId
+        type: string
+        description: 项目订单ID，纯数字格式
+        required: true
+        example: "826031111000001859"
+    headers:
+      ucid: "1000000030598946"
+      displayName: "huyuyang005"
+      X-NRS-User-Id: "1000000000000000"
+      Content-Type: "application/json"
+    timeout: 15
+    examples:
+      - "826031111000001859的报价单"
+      - "查询826031111000001859的报价单列表"
+      - "查看订单826031111000001859的报价"
+
   - id: sub-order-info
     name: 查询子单基本信息
     description: |

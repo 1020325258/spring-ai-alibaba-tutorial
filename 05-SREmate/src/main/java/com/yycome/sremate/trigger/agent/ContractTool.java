@@ -240,6 +240,36 @@ public class ContractTool {
     }
 
     /**
+     * 根据项目订单号查询报价单列表
+     *
+     * @param projectOrderId 项目订单号，纯数字格式
+     * @return 过滤后的报价单列表 JSON（仅含 billType/billTypeDesc/statusDesc/billCode/originalBillCode）
+     */
+    @Tool(description = """
+            【报价单查询】用户提到"报价单"或"报价"时使用。
+
+            触发条件：包含关键词"报价单"、"报价"、"报价列表"
+
+            参数：
+            - projectOrderId：纯数字订单号（必填）
+
+            示例：
+            - "826031111000001859的报价单" → projectOrderId=826031111000001859
+            - "查询826031111000001859报价单列表" → projectOrderId=826031111000001859
+
+            ⚠️ 注意：报价单 ≠ 子单，不要用子单工具查报价单""")
+    public String queryBudgetBillList(String projectOrderId) {
+        log.info("queryBudgetBillList - projectOrderId: {}", projectOrderId);
+        try {
+            return httpEndpointTool.callPredefinedEndpoint("budget-bill-list",
+                    Map.of("projectOrderId", projectOrderId));
+        } catch (Exception e) {
+            log.error("queryBudgetBillList 失败", e);
+            return toErrorJson(e.getMessage());
+        }
+    }
+
+    /**
      * 根据订单号查询子单信息
      *
      * @param homeOrderNo       订单号（必填）

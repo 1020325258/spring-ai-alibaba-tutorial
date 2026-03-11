@@ -21,7 +21,40 @@ src/main/java/.../
 
 ---
 
-## 新增 HTTP 接口
+## POST 接口接入规范
+
+### 场景：接口需要带 Request Body 的 POST 请求
+
+仅在 YAML 中追加配置即可，**无需修改 Java 代码**。需要用到 `requestBodyTemplate` 和 `responseFields` 两个扩展字段：
+
+```yaml
+- id: your-endpoint-id
+  name: 接口名称
+  method: POST
+  urlTemplate: "http://host/path"
+  requestBodyTemplate: '{"paramName":"${paramName}"}'   # POST body 模板，支持 ${} 占位符
+  responseFields:                                        # 响应字段过滤（可选）
+    arrayField1:                                         # data 下的数组字段名
+      - fieldA
+      - fieldB
+    arrayField2:
+      - fieldA
+      - fieldB
+  parameters:
+    - name: paramName
+      type: string
+      required: true
+  headers:
+    Content-Type: "application/json"
+```
+
+**行为说明：**
+- `requestBodyTemplate`：`${paramName}` 会被 `params` 中对应值替换，构建为 JSON body 发送
+- `responseFields`：配置后，直接返回过滤后的**纯 JSON**（不带 wrapper 文字），只保留 `data` 下指定数组字段的指定列；不配置则返回完整响应
+
+---
+
+## 新增 HTTP 接口（GET）
 
 在 `src/main/resources/endpoints/` 对应分类的 YAML 文件中追加，无需修改 Java 代码。
 
@@ -102,6 +135,49 @@ public String queryXxxFull(String key) {
 ```
 
 > 原则：当用户意图需要跨数据库和 HTTP 接口时，**必须**用复合工具，禁止依赖 LLM 自动串联多步工具调用。
+
+---
+
+## 新增 HTTP 专用工具（⚠️ 强制规范）
+
+### 禁止直接让 LLM 调用 `callPredefinedEndpoint` 处理业务查询
+
+`callPredefinedEndpoint` 是泛型工具，需要 LLM 同时推断 `endpointId`（字符串）和 `params`（Map）两个参数。**实测 LLM 高概率推断失败，传入 null**，导致报错：
+
+```
+params={arg1=null, arg0=null}
+endpointId: null, params: null
+错误：未找到接口模板: null
+```
+
+### 正确做法：在 `ContractTool` 中新增专用方法
+
+每个业务查询接口必须在 `ContractTool`（或其他领域 Tool 类）中封装一个专用 `@Tool` 方法，内部调用 `callPredefinedEndpoint`：
+
+```java
+@Tool(description = """
+        【xxx查询】用户提到"xxx"时使用。
+
+        触发条件：包含关键词"xxx"
+
+        参数：
+        - projectOrderId：纯数字订单号（必填）
+
+        示例：
+        - "826031111000001859的xxx" → projectOrderId=826031111000001859""")
+public String queryXxxList(String projectOrderId) {
+    log.info("queryXxxList - projectOrderId: {}", projectOrderId);
+    try {
+        return httpEndpointTool.callPredefinedEndpoint("your-endpoint-id",
+                Map.of("projectOrderId", projectOrderId));
+    } catch (Exception e) {
+        log.error("queryXxxList 失败", e);
+        return toErrorJson(e.getMessage());
+    }
+}
+```
+
+**原则：`callPredefinedEndpoint` 只能在 Java 层内部调用，不暴露给 LLM 直接使用业务接口。**
 
 ---
 

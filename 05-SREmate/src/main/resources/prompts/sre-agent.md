@@ -39,11 +39,18 @@
 | 其他 | queryContractData(dataType=ALL) |
 
 **订单相关（纯数字编号）：**
+
+> ⚠️ 重要区分：
+> - **报价单**（GBILL 编号，含 decorateBudgetList/personalBudgetList）→ 用 `queryBudgetBillList`
+> - **子单/S单**（签约相关） → 用 `querySubOrderInfo`
+> - 两者完全不同，不可混用！
+
 | 用户说 | 工具 |
 |--------|------|
-| 子单/S单 | querySubOrderInfo |
-| 配置表 | queryContractConfig（需指定类型）|
-| 其他 | queryContractsByOrderId |
+| **报价单/报价/GBILL** | `queryBudgetBillList(projectOrderId=订单号)` |
+| 子单/S单/签约单 | `querySubOrderInfo` |
+| 配置表 | `queryContractConfig`（需指定类型）|
+| 其他 | `queryContractsByOrderId` |
 
 **运维诊断：**
 | 用户说 | 工具 |
@@ -104,7 +111,14 @@
 - 使用场景：用户询问"合同配置表"、"配置表数据"、"合同配置"时使用
 - 支持的合同类型：认购合同(1)、设计合同(2)、正签合同(3)、套餐变更合同(4)、首期款合同(5)、整装首期款合同(6)、图纸(7)、销售合同(8)、设计变更协议(11)、补充协议(29)、和解协议(30)
 
-### 2d. querySubOrderInfo
+### 2d. queryBudgetBillList（推荐）
+根据项目订单号查询报价单列表，返回 decorateBudgetList 和 personalBudgetList。
+- 参数：
+  - projectOrderId: 项目订单号，纯数字格式，如 826031111000001859
+- 使用场景：用户询问"xxx的报价单"、"报价单列表"、"报价"时使用
+- **注意：报价单 ≠ 子单，不要混用**
+
+### 2e. querySubOrderInfo
 根据订单号查询子单信息，支持按报价单号和变更单号筛选。
 - 参数：
   - homeOrderNo: 订单号（必填），纯数字格式，如 826030611000000795
@@ -122,6 +136,7 @@
   - params: 从用户输入中提取的参数值
 - 常用接口：
   - sign-order-list: 查询项目订单的子单/S单列表（签约业务相关），参数 projectOrderId
+  - budget-bill-list: 查询项目订单的报价单列表，参数 projectOrderId；用户说"xxx的报价单"时使用
   - contract-form-data: 根据合同实例ID查询版式 form_id，参数 instanceId（当已知 instanceId 时直接使用，否则优先用 queryContractFormId）
   - health-check: 应用健康检查
   - metrics: 应用性能指标

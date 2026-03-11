@@ -1,15 +1,21 @@
 package com.yycome.sremate.trigger.agent;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.yycome.sremate.infrastructure.gateway.EndpointTemplateService;
 import com.yycome.sremate.infrastructure.gateway.model.EndpointTemplate;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.tool.annotation.Tool;
+import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 
 import java.time.Duration;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -25,6 +31,7 @@ public class HttpEndpointTool {
 
     private final WebClient webClient;
     private final EndpointTemplateService endpointTemplateService;
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     public HttpEndpointTool(WebClient.Builder webClientBuilder, EndpointTemplateService endpointTemplateService) {
         this.webClient = webClientBuilder
@@ -47,6 +54,7 @@ public class HttpEndpointTool {
 
             常用接口：
             - sign-order-list：查询子单列表，参数projectOrderId
+            - budget-bill-list：查询报价单列表（decorateBudgetList/personalBudgetList），参数projectOrderId；用户说"xxx的报价单"时使用
             - contract-form-data：查询版式，参数instanceId
             - health-check：健康检查
             - metrics：性能指标
@@ -91,13 +99,18 @@ public class HttpEndpointTool {
                         .retrieve()
                         .bodyToMono(String.class);
             } else if ("POST".equalsIgnoreCase(method)) {
+                String requestBody = endpointTemplateService.buildRequestBody(template, filledParams);
+                if (requestBody == null) requestBody = "{}";
+                log.info("[TOOL_CALL] 请求体: {}", requestBody);
                 responseMono = webClient.post()
                         .uri(url)
+                        .contentType(MediaType.APPLICATION_JSON)
                         .headers(headers -> {
                             if (template.getHeaders() != null) {
                                 template.getHeaders().forEach(headers::add);
                             }
                         })
+                        .bodyValue(requestBody)
                         .retrieve()
                         .bodyToMono(String.class);
             } else {
@@ -107,6 +120,11 @@ public class HttpEndpointTool {
             String response = responseMono
                     .timeout(Duration.ofSeconds(template.getTimeout()))
                     .block();
+
+            // 字段过滤：配置了 responseFields 时，直接返回过滤后的纯 JSON
+            if (template.getResponseFields() != null && !template.getResponseFields().isEmpty()) {
+                return filterResponseFields(response, template.getResponseFields());
+            }
 
             return String.format("接口: %s (%s)\n名称: %s\n响应:\n%s",
                     endpointId, template.getName(), url, response);
@@ -137,6 +155,44 @@ public class HttpEndpointTool {
     public String listAvailableEndpoints(String category) {
         log.info("[TOOL_CALL] listAvailableEndpoints - category: {}", category);
         return endpointTemplateService.getTemplatesDescription(category);
+    }
+
+    /**
+     * 从响应 JSON 中过滤出指定数组字段的指定列
+     * responseFields: { "decorateBudgetList": ["billType","billCode"], ... }
+     */
+    private String filterResponseFields(String responseJson, Map<String, List<String>> responseFields) {
+        try {
+            JsonNode root = objectMapper.readTree(responseJson);
+            JsonNode data = root.path("data");
+            if (data.isMissingNode()) {
+                return responseJson;
+            }
+
+            ObjectNode result = objectMapper.createObjectNode();
+            for (Map.Entry<String, List<String>> entry : responseFields.entrySet()) {
+                String arrayKey = entry.getKey();
+                List<String> keepFields = entry.getValue();
+                JsonNode arrayNode = data.path(arrayKey);
+                if (!arrayNode.isArray()) continue;
+
+                ArrayNode filtered = objectMapper.createArrayNode();
+                for (JsonNode item : arrayNode) {
+                    ObjectNode filteredItem = objectMapper.createObjectNode();
+                    for (String field : keepFields) {
+                        if (item.has(field)) {
+                            filteredItem.set(field, item.get(field));
+                        }
+                    }
+                    filtered.add(filteredItem);
+                }
+                result.set(arrayKey, filtered);
+            }
+            return objectMapper.writeValueAsString(result);
+        } catch (Exception e) {
+            log.warn("[TOOL_CALL] 响应字段过滤失败，返回原始响应: {}", e.getMessage());
+            return responseJson;
+        }
     }
 
     /**
