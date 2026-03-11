@@ -7,6 +7,29 @@
    ./05-SREmate/scripts/run-integration-tests.sh
    ```
 
+## Bug 修复记录
+
+### [已修复] 多次查询同一订单时 Agent 不调用工具，直接复读历史数据
+
+**现象：** 用户连续多次询问同一订单（如 `826031111000001859报价单`），第二次起 Agent 不再调用工具，直接流式输出上一次的查询结果，数据不实时。
+
+**根因：** `SREConsole` 维护了 `conversationHistory` 并在每轮请求时通过 `.messages(conversationHistory)` 传给 LLM。当历史中已有相同查询的 JSON 结果时，LLM 识别到重复意图，倾向于直接复读历史，绕过工具调用。尽管系统提示词中写明"必须实时查询"，LLM 并不能保证每次遵守。
+
+**修复方案（`SREConsole.java` 第 177 行）：**
+数据查询走 `DirectOutputHolder` 直接输出路径时（`directOutputUsed = true`），不将实际数据写入对话历史，改为写入占位文本：
+
+```java
+// 数据查询结果不写入对话历史，防止 LLM 下次直接复读历史数据而跳过实时工具调用
+String historyContent = directOutputUsed.get()
+        ? "[已调用工具查询并直接输出数据，结果不保留在上下文中]"
+        : response;
+conversationHistory.add(new AssistantMessage(historyContent));
+```
+
+**原则：数据查询结果只输出给用户，不进对话历史。对话历史只存 LLM 的文字回复，不存工具返回的原始数据。**
+
+---
+
 ## 项目结构
 
 ```

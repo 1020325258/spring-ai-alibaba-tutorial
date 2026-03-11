@@ -174,7 +174,11 @@ public class SREConsole implements CommandLineRunner {
 
                 copyToClipboardIfJson(response);
 
-                conversationHistory.add(new AssistantMessage(response));
+                // 数据查询结果不写入对话历史，防止 LLM 下次直接复读历史数据而跳过实时工具调用
+                String historyContent = directOutputUsed.get()
+                        ? "[已调用工具查询并直接输出数据，结果不保留在上下文中]"
+                        : response;
+                conversationHistory.add(new AssistantMessage(historyContent));
                 if (conversationHistory.size() > MAX_HISTORY) {
                     conversationHistory.subList(0, conversationHistory.size() - MAX_HISTORY).clear();
                 }
