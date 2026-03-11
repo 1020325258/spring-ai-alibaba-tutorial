@@ -37,7 +37,8 @@ public class ObservabilityAspect {
             "queryContractInstanceId",
             "queryContractFormId",
             "queryContractConfig",
-            "querySubOrderInfo"
+            "querySubOrderInfo",
+            "queryBudgetBillList"
     );
 
     @Around("@annotation(org.springframework.ai.tool.annotation.Tool)")

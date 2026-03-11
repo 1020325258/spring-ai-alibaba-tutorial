@@ -179,6 +179,22 @@ public String queryXxxList(String projectOrderId) {
 
 **原则：`callPredefinedEndpoint` 只能在 Java 层内部调用，不暴露给 LLM 直接使用业务接口。**
 
+### 新增专用工具后必须同步 DATA_QUERY_TOOLS
+
+`ObservabilityAspect.java` 中维护了一个 `DATA_QUERY_TOOLS` 集合，只有在此集合中的工具，其返回结果才会写入 `DirectOutputHolder`，从而绕过 LLM 归纳、直接输出原始数据（提升性能、保证准确性）。
+
+```java
+// ObservabilityAspect.java
+private static final Set<String> DATA_QUERY_TOOLS = Set.of(
+        "queryContractData",
+        "queryContractsByOrderId",
+        // ...
+        "queryBudgetBillList"   // ← 每新增一个专用工具都要加进来
+);
+```
+
+> **每次在 `ContractTool` 中新增 `@Tool` 方法后，必须同步将方法名加入 `DATA_QUERY_TOOLS`，否则该工具结果仍会经过 LLM 二次归纳，既慢又可能被改写。**
+
 ---
 
 ## 分库分表处理规范
@@ -208,9 +224,10 @@ private String resolveFieldShardingTable(String contractCode) {
 
 新增工具或接口后，同步更新 `src/main/resources/prompts/sre-agent.md`：
 
-1. 在"可用工具"章节补充工具说明（含触发场景和参数）
-2. 复合工具标注"推荐/优先"，原子工具说明何时退化使用
-3. `callPredefinedEndpoint` 的常用接口列表同步补充新 endpointId
+1. 在"可用工具"章节补充**专用工具**说明（含触发场景和参数），不要写 `callPredefinedEndpoint`
+2. 在决策表中明确：关键词 → 专用工具名，防止 LLM 选错工具
+3. 同类工具之间写清楚区分规则（如"报价单 ≠ 子单，不要混用"）
+4. 不需要在提示词中暴露 `endpointId`，那是 Java 层内部细节
 
 ---
 
