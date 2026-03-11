@@ -78,8 +78,9 @@ public class ObservabilityAspect {
             metricsCollector.recordToolCall(toolName, duration, true);
 
             // 如果是数据查询类工具，将结果写入 DirectOutputHolder
+            // 使用 setIfAbsent() 保证第一个写入的结果被使用，防止多工具调用时后者覆盖前者
             if (isDataQuery && result instanceof String) {
-                directOutputHolder.set((String) result);
+                directOutputHolder.setIfAbsent((String) result);
             }
 
             // 结构化日志：成功

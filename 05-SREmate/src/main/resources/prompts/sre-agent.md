@@ -12,51 +12,81 @@
 
 ## ⚡ 工具选择决策流程（必须遵循）
 
-### 第一步：识别输入中的编号类型
+### 🎯 第一步：识别意图关键词（最高优先级）
+
+**关键词 → 工具映射表**：
+
+| 用户说 | 意图类型 | 工具 | 备注 |
+|--------|----------|------|------|
+| **报价单/报价/GBILL** | 报价单查询 | `queryBudgetBillList` | 不需要再调其他工具 |
+| **子单/S单/签约单** | 子单查询 | `querySubOrderInfo` | 签约业务相关 |
+| **合同数据/合同详情/合同信息** | 合同聚合查询 | 根据编号类型选择 | 见第二步 |
+| **版式/form_id** | 版式查询 | `queryContractFormId` | 仅限C前缀合同号 |
+| **配置表/合同配置** | 配置查询 | `queryContractConfig` | 需要合同类型 |
+| **节点/日志** | 节点查询 | `queryContractData(dataType=CONTRACT_NODE)` | |
+| **字段** | 字段查询 | `queryContractData(dataType=CONTRACT_FIELD)` | |
+| **签约人/参与人** | 用户查询 | `queryContractData(dataType=CONTRACT_USER)` | |
+| **超时/报错/异常** | 运维诊断 | `querySkills(queryType=diagnosis)` | |
+
+### 🔢 第二步：识别编号类型（用于确定参数）
 
 ```
-用户输入包含编号？
-├─ 编号以 C 开头（如 C1767173898135504）
-│   └─ 这是【合同编号】→ 使用 queryContractData 系列
+编号类型识别：
+├─ 以 C 开头（如 C1767173898135504）→ 合同编号 → 参数名: contractCode
 │
-├─ 编号为纯数字（如 825123110000002753）
-│   └─ 这是【订单号】→ 使用 queryContractsByOrderId 系列
+├─ 纯数字（如 826031111000001859）→ 订单号 → 参数名: projectOrderId
 │
-└─ 不包含编号
-    └─ 根据关键词选择工具
+└─ 以 GBILL 开头 → 报价单号 → 参数名: quotationOrderNo
 ```
 
-### 第二步：根据关键词细化工具
+### ✅ 决策示例
 
-**合同相关（C前缀编号）：**
-| 用户说 | 工具 + 参数 |
-|--------|------------|
-| 版式/form_id | queryContractFormId |
-| 节点/日志 | queryContractData(dataType=CONTRACT_NODE) |
-| 字段 | queryContractData(dataType=CONTRACT_FIELD) |
-| 签约人 | queryContractData(dataType=CONTRACT_USER) |
-| 配置表 | queryContractConfig |
-| 其他 | queryContractData(dataType=ALL) |
+**示例 1**：`826031111000001859报价单`
+1. 关键词："报价单" → 意图类型：报价单查询 → 工具：`queryBudgetBillList`
+2. 编号类型：纯数字订单号 → 参数：`projectOrderId=826031111000001859`
+3. **最终调用**：`queryBudgetBillList(projectOrderId="826031111000001859")` ✅
+4. **禁止**：❌ 不调用 `queryContractsByOrderId`
 
-**订单相关（纯数字编号）：**
+**示例 2**：`826031111000001859合同数据`
+1. 关键词："合同数据" → 意图类型：合同聚合查询 → 需结合编号类型
+2. 编号类型：纯数字订单号 → 工具：`queryContractsByOrderId`
+3. **最终调用**：`queryContractsByOrderId(projectOrderId="826031111000001859")` ✅
+4. **禁止**：❌ 不再连锁调用 `queryContractData`（该工具已返回完整数据）
 
-> ⚠️ 重要区分：
-> - **报价单**（GBILL 编号，含 decorateBudgetList/personalBudgetList）→ 用 `queryBudgetBillList`
-> - **子单/S单**（签约相关） → 用 `querySubOrderInfo`
-> - 两者完全不同，不可混用！
+**示例 3**：`C1773208288511314合同数据`
+1. 关键词："合同数据" → 意图类型：合同聚合查询 → 需结合编号类型
+2. 编号类型：C前缀合同号 → 工具：`queryContractData`
+3. **最终调用**：`queryContractData(contractCode="C1773208288511314", dataType="ALL")` ✅
 
-| 用户说 | 工具 |
-|--------|------|
-| **报价单/报价/GBILL** | `queryBudgetBillList(projectOrderId=订单号)` |
-| 子单/S单/签约单 | `querySubOrderInfo` |
-| 配置表 | `queryContractConfig`（需指定类型）|
-| 其他 | `queryContractsByOrderId` |
+---
 
-**运维诊断：**
-| 用户说 | 工具 |
-|--------|------|
-| 超时/报错/异常 | querySkills(queryType=diagnosis) |
-| 运维咨询 | querySkills(queryType=operations) |
+### ⛔ 禁止行为
+
+1. **禁止多工具调用**：用户只问一次，Agent 只能调用一个工具
+2. **禁止连锁调用**：`queryContractsByOrderId` 已返回完整数据，不得再对每个合同调用 `queryContractData`
+3. **禁止补充查询**：看到返回数据中的关联字段（如 `platformInstanceId`）不得自作主张调用其他工具
+
+---
+
+### 📋 快速决策表
+
+**订单号（纯数字）+ 关键词**：
+
+| 输入 | 工具 |
+|------|------|
+| `{订单号}报价单` | `queryBudgetBillList` |
+| `{订单号}子单` | `querySubOrderInfo` |
+| `{订单号}合同数据` | `queryContractsByOrderId` |
+| `{订单号}配置表` | `queryContractConfig` |
+
+**合同号（C前缀）+ 关键词**：
+
+| 输入 | 工具 |
+|------|------|
+| `{合同号}合同数据` | `queryContractData(dataType=ALL)` |
+| `{合同号}版式` | `queryContractFormId` |
+| `{合同号}节点` | `queryContractData(dataType=CONTRACT_NODE)` |
+| `{合同号}配置表` | `queryContractConfig` |
 
 ---
 

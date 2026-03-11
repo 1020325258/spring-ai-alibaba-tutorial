@@ -15,10 +15,20 @@ public class DirectOutputHolder {
     private static final AtomicReference<String> OUTPUT = new AtomicReference<>();
 
     /**
-     * 设置直接输出内容
+     * 设置直接输出内容（覆盖）
      */
     public void set(String output) {
         OUTPUT.set(output);
+    }
+
+    /**
+     * 仅当当前无内容时才写入（first-write-wins）。
+     * 防止同一请求中多个 DATA_QUERY 工具相互覆盖，保证第一个写入的结果被使用。
+     *
+     * @return true 表示写入成功；false 表示已有内容，本次忽略
+     */
+    public boolean setIfAbsent(String output) {
+        return OUTPUT.compareAndSet(null, output);
     }
 
     /**
