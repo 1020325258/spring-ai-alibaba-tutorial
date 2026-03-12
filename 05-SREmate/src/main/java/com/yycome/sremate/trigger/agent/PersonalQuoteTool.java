@@ -21,6 +21,15 @@ public class PersonalQuoteTool {
 
     private final HttpEndpointTool httpEndpointTool;
 
+    /**
+     * 根据订单号和单据号查询个性化报价数据
+     *
+     * @param projectOrderId  订单号（必填）
+     * @param subOrderNoList  S单号列表，逗号分隔（可选）
+     * @param changeOrderId   变更单号（可选）
+     * @param billCodeList    报价单号列表，逗号分隔（可选）
+     * @return JSON 格式个性化报价数据
+     */
     @Tool(description = """
             【个性化报价查询】用户提到"个性化报价"时使用。
 
