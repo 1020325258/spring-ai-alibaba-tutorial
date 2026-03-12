@@ -15,7 +15,7 @@ JAVA_HOME=/Library/Java/JavaVirtualMachines/jdk-21.jdk/Contents/Home \
   mvn test \
   -f "$PROJECT_ROOT/pom.xml" \
   -pl 05-SREmate \
-  -Dtest="StartupIT,ContractQueryToolIT,ContractInstanceToolIT,ContractConfigToolIT,SubOrderToolIT,SkillQueryToolIT,HttpEndpointToolIT" \
+  -Dtest="StartupIT,ContractQueryToolIT,ContractInstanceToolIT,ContractConfigToolIT,SubOrderToolIT,SkillQueryToolIT,HttpEndpointToolIT,PersonalQuoteToolIT" \
   -Dsurefire.failIfNoSpecifiedTests=false
 
 echo ""
