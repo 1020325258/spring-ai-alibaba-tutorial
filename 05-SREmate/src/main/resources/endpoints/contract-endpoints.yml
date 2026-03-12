@@ -161,6 +161,7 @@ endpoints:
       - subOrderNoList：S单号列表（可选），逗号分隔，如 S15260312120004471
       - billCodeList：报价单号列表（可选），逗号分隔，如 GBILL260312104241050001
       - changeOrderId：变更单号（可选），与订单号格式类似
+      注意：subOrderNoList、billCodeList、changeOrderId 三个参数至少传一个。
     category: contract
     urlTemplate: "http://utopia-nrs-sales-project.${env}.ttb.test.ke.com/api/contract/tool/getContractPersonalData?projectOrderId=${projectOrderId}&subOrderNoList=${subOrderNoList}&billCodeList=${billCodeList}&changeOrderId=${changeOrderId}"
     method: GET
@@ -182,9 +183,9 @@ endpoints:
         example: "GBILL260312104241050001"
       - name: changeOrderId
         type: string
-        description: 变更单号，可为空
+        description: 变更单号，格式与订单号类似（纯数字），可为空
         required: false
-        example: ""
+        example: "826031210000003581"
     headers:
       X-NRS-User-Id: "1000000000000000"
       Content-Type: "application/json"
@@ -193,4 +194,5 @@ endpoints:
       - "826031210000003581的个性化报价数据"
       - "826031210000003581下S15260312120004471的个性化报价"
       - "826031210000003581下GBILL260312104241050001的个性化报价"
+      - "826031210000003581下变更单826031210000003581的个性化报价"
 
