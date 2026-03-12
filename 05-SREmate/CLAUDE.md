@@ -292,4 +292,24 @@ ToolResult.notFound("合同", "C123")  // 资源未找到
 | `ContractQueryTool` | 合同数据查询 | queryContractData, queryContractsByOrderId, queryContractInstanceId, queryContractFormId, queryContractConfig |
 | `BudgetBillTool` | 报价单查询 | queryBudgetBillList |
 | `SubOrderTool` | 子单查询 | querySubOrderInfo |
+| `PersonalQuoteTool` | 个性化报价查询 | queryContractPersonalData |
 | `HttpEndpointTool` | HTTP 接口调用 | callPredefinedEndpoint, callPredefinedEndpointRaw |
+
+---
+
+## HikariCP 连接池配置
+
+**告警识别：** `Failed to validate connection ... (No operations allowed after connection closed.)` → `max-lifetime` 大于 MySQL `wait_timeout`，需调小。
+
+**参数约束（必须满足）：**
+- `idle-timeout` < `max-lifetime`
+- `max-lifetime` < MySQL `wait_timeout` - 30s
+
+**查询 MySQL wait_timeout：** `SHOW VARIABLES LIKE 'wait_timeout';`
+
+**当前配置（application.yml）：**
+- `idle-timeout: 180000`（3 分钟）
+- `max-lifetime: 300000`（5 分钟）
+- `keepalive-time: 60000`（1 分钟心跳，防止 MySQL 提前关闭空闲连接）
+
+**修复记录：** `docs/bug-fix-records/2026-03-12-hikaricp-connection-validation-warning.md`
