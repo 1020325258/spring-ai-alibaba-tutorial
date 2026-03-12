@@ -17,8 +17,19 @@ src/main/resources/
   prompts/            # LLM 系统提示词
   skills/             # SRE 知识库（Markdown）
 src/main/java/.../
-  tools/              # @Tool 工具类（HttpEndpointTool、MySQLQueryTool、ContractTool）
-  config/             # Spring 配置（AgentConfiguration、DataSourceConfiguration）
+  trigger/agent/      # @Tool 工具类（按业务领域拆分）
+    ├── ContractQueryTool.java   # 合同查询
+    ├── BudgetBillTool.java      # 报价单查询
+    ├── SubOrderTool.java        # 子单查询
+    └── HttpEndpointTool.java    # HTTP 接口调用
+  infrastructure/
+    ├── annotation/    # 注解（@DataQueryTool）
+    └── service/       # 基础设施服务（ToolExecutionTemplate、ToolResult）
+  domain/contract/     # 合同领域（DDD）
+    ├── gateway/       # 网关接口（ContractFormGateway）
+    └── service/       # 领域服务（ContractQueryService）
+  config/              # Spring 配置（AgentConfiguration、DataSourceConfiguration）
+  aspect/              # AOP 切面（ObservabilityAspect）
 ```
 
 ---
@@ -114,38 +125,41 @@ urlTemplate: "http://utopia-nrs-sales-project.${env}.ttb.test.ke.com/api/..."
 
 ### 正确做法：封装专用 `@Tool` 方法
 
-在 `ContractTool` 中封装专用方法：
+根据业务领域，在对应的工具类中封装专用方法：
 
 ```java
-@Tool(description = """
-        【xxx查询】用户提到"xxx"时使用。
-        触发条件：包含关键词"xxx"
-        参数：projectOrderId（纯数字订单号，必填）
-        示例："826031111000001859的xxx" → projectOrderId=826031111000001859""")
-public String queryXxxList(String projectOrderId) {
-    long start = System.currentTimeMillis();
-    try {
-        String result = httpEndpointTool.callPredefinedEndpoint("your-endpoint-id",
-                Map.of("projectOrderId", projectOrderId));
-        log.info("[TOOL] queryXxxList → {}ms, ok", System.currentTimeMillis() - start);
-        return result;
-    } catch (Exception e) {
-        log.error("[TOOL] queryXxxList → {}ms, error: {}", System.currentTimeMillis() - start, e.getMessage());
-        return toErrorJson(e.getMessage());
+@Slf4j
+@Component
+@RequiredArgsConstructor
+public class XxxTool {
+
+    private final HttpEndpointTool httpEndpointTool;
+
+    @Tool(description = """
+            【xxx查询】用户提到"xxx"时使用。
+            触发条件：包含关键词"xxx"
+            参数：projectOrderId（纯数字订单号，必填）
+            示例："826031111000001859的xxx" → projectOrderId=826031111000001859""")
+    @DataQueryTool  // 标记为数据查询工具，结果直接输出
+    public String queryXxxList(String projectOrderId) {
+        return ToolExecutionTemplate.execute("queryXxxList", () ->
+            httpEndpointTool.callPredefinedEndpoint("your-endpoint-id",
+                Map.of("projectOrderId", projectOrderId))
+        );
     }
 }
 ```
 
-### 必须同步 DATA_QUERY_TOOLS
+### 必须添加 @DataQueryTool 注解
 
-新增工具后，在 `ObservabilityAspect.DATA_QUERY_TOOLS` 中添加方法名：
+新增数据查询工具方法时，**必须**添加 `@DataQueryTool` 注解：
 
 ```java
-private static final Set<String> DATA_QUERY_TOOLS = Set.of(
-        "queryContractData",
-        "queryBudgetBillList"   // ← 新增工具要加进来
-);
+@DataQueryTool  // 标记后，工具结果直接输出，绕过 LLM 归纳
+public String queryXxxList(...) { ... }
 ```
+
+**注意：** 旧版 `DATA_QUERY_TOOLS` 白名单已废弃，改为注解方式。
 
 ---
 
@@ -238,3 +252,44 @@ void contractCodePrefix_shouldCallQueryContractData() {
 ```bash
 ./05-SREmate/scripts/run-integration-tests.sh
 ```
+
+---
+
+## 基础设施组件
+
+### ToolExecutionTemplate（工具执行模板）
+
+统一处理计时、日志、异常，消除重复的 try-catch-log 模式：
+
+```java
+public static String execute(String toolName, ToolAction action)
+```
+
+### ToolResult（统一结果类）
+
+统一的 JSON 结果格式：
+
+```java
+ToolResult.success(data)     // 成功结果
+ToolResult.error(message)    // 错误结果 {"error":"xxx"}
+ToolResult.notFound("合同", "C123")  // 资源未找到
+```
+
+### @DataQueryTool（数据查询工具注解）
+
+标记工具为数据查询工具，结果直接输出，绕过 LLM 归纳。
+
+### ContractFormGateway（合同版式网关）
+
+领域层网关接口，根据 `platform_instance_id` 查询版式表单数据。实现类委托 `HttpEndpointTool` 调用预定义接口。
+
+---
+
+## 工具类职责划分
+
+| 工具类 | 职责 | 方法 |
+|--------|------|------|
+| `ContractQueryTool` | 合同数据查询 | queryContractData, queryContractsByOrderId, queryContractInstanceId, queryContractFormId, queryContractConfig |
+| `BudgetBillTool` | 报价单查询 | queryBudgetBillList |
+| `SubOrderTool` | 子单查询 | querySubOrderInfo |
+| `HttpEndpointTool` | HTTP 接口调用 | callPredefinedEndpoint, callPredefinedEndpointRaw |

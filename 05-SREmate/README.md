@@ -99,6 +99,24 @@ void contractCodePrefix_shouldCallQueryContractData() {
 
 支持环境：`nrs-escrow`（测试）、`offline-beta`（基准）
 
+### 8. DDD 架构与代码质量
+
+**按业务领域拆分工具类：**
+
+| 工具类 | 职责 |
+|--------|------|
+| `ContractQueryTool` | 合同数据查询 |
+| `BudgetBillTool` | 报价单查询 |
+| `SubOrderTool` | 子单查询 |
+
+**基础设施组件：**
+
+| 组件 | 作用 |
+|------|------|
+| `ToolExecutionTemplate` | 统一工具执行模式，消除重复的 try-catch-log |
+| `ToolResult` | 统一 JSON 结果格式 |
+| `@DataQueryTool` | 注解标记数据查询工具，替代白名单维护 |
+
 ---
 
 ## 技术栈
@@ -146,10 +164,11 @@ cd 05-SREmate && mvn spring-boot:run
 05-SREmate/
 ├── src/main/
 │   ├── java/com/yycome/sremate/
-│   │   ├── tools/           # @Tool 工具类
+│   │   ├── trigger/agent/   # @Tool 工具类（按业务领域拆分）
+│   │   ├── domain/contract/ # 合同领域（DDD）
+│   │   ├── infrastructure/  # 基础设施（注解、模板）
 │   │   ├── config/          # Spring 配置
-│   │   ├── aspect/          # AOP 切面
-│   │   └── trigger/         # 触发层（Console、Agent）
+│   │   └── aspect/          # AOP 切面
 │   └── resources/
 │       ├── endpoints/       # HTTP 接口模板（YAML）
 │       ├── prompts/         # LLM 系统提示词
