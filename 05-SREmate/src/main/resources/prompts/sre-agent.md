@@ -18,8 +18,9 @@
 
 | 用户说 | 意图类型 | 工具 | 备注 |
 |--------|----------|------|------|
-| **报价单/报价/GBILL** | 报价单查询 | `queryBudgetBillList` | 不需要再调其他工具 |
-| **子单/S单/签约单** | 子单查询 | `querySubOrderInfo` | 签约业务相关 |
+| **个性化报价** | 个性化报价查询 | `queryContractPersonalData` | 最高优先级，包含"个性化报价"时不调用其他报价或子单工具 |
+| **报价单/报价/GBILL** | 报价单查询 | `queryBudgetBillList` | 不包含"个性化报价"时才触发 |
+| **子单/S单/签约单** | 子单查询 | `querySubOrderInfo` | 不包含"个性化报价"时才触发，签约业务相关 |
 | **合同数据/合同详情/合同信息** | 合同聚合查询 | 根据编号类型选择 | 见第二步 |
 | **版式/form_id** | 版式查询 | `queryContractFormId` | 仅限C前缀合同号 |
 | **配置表/合同配置** | 配置查询 | `queryContractConfig` | 需要合同类型 |
@@ -74,6 +75,9 @@
 
 | 输入 | 工具 |
 |------|------|
+| `{订单号}下{S单号}的个性化报价` | `queryContractPersonalData` |
+| `{订单号}下{GBILL单号}的个性化报价` | `queryContractPersonalData` |
+| `{订单号}个性化报价` | `queryContractPersonalData` |
 | `{订单号}报价单` | `queryBudgetBillList` |
 | `{订单号}子单` | `querySubOrderInfo` |
 | `{订单号}合同数据` | `queryContractsByOrderId` |
@@ -141,7 +145,18 @@
 - 使用场景：用户询问"合同配置表"、"配置表数据"、"合同配置"时使用
 - 支持的合同类型：认购合同(1)、设计合同(2)、正签合同(3)、套餐变更合同(4)、首期款合同(5)、整装首期款合同(6)、图纸(7)、销售合同(8)、设计变更协议(11)、补充协议(29)、和解协议(30)
 
-### 2d. queryBudgetBillList（推荐）
+### 2d. queryContractPersonalData（推荐）
+根据订单号和单据号查询个性化报价数据。
+- 参数：
+  - projectOrderId: 项目订单号，纯数字格式（必填）
+  - subOrderNoList: S单号列表，逗号分隔（可选，如 S15260312120004471）
+  - billCodeList: 报价单号列表，逗号分隔（可选，如 GBILL260312104241050001）
+  - changeOrderId: 变更单号（可选）
+- **约束**：subOrderNoList、billCodeList、changeOrderId 至少填一个
+- 使用场景：用户询问**包含"个性化报价"关键词**的问题时使用，**优先级高于** queryBudgetBillList 和 querySubOrderInfo
+- **重要**：只要用户说了"个性化报价"，无论同时出现 S单号 还是 GBILL单号，都必须调用此工具，禁止调用 querySubOrderInfo 或 queryBudgetBillList
+
+### 2e-budget. queryBudgetBillList（推荐）
 根据项目订单号查询报价单列表，返回 decorateBudgetList 和 personalBudgetList。
 - 参数：
   - projectOrderId: 项目订单号，纯数字格式，如 826031111000001859

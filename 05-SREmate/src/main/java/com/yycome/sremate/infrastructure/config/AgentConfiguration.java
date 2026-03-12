@@ -4,6 +4,7 @@ import com.yycome.sremate.trigger.agent.BudgetBillTool;
 import com.yycome.sremate.trigger.agent.ContractQueryTool;
 import com.yycome.sremate.trigger.agent.HttpEndpointTool;
 import com.yycome.sremate.trigger.agent.KnowledgeQueryTool;
+import com.yycome.sremate.trigger.agent.PersonalQuoteTool;
 import com.yycome.sremate.trigger.agent.SkillQueryTool;
 import com.yycome.sremate.trigger.agent.SubOrderTool;
 import org.springframework.ai.chat.client.ChatClient;
@@ -48,6 +49,7 @@ public class AgentConfiguration {
             ContractQueryTool contractQueryTool,
             BudgetBillTool budgetBillTool,
             SubOrderTool subOrderTool,
+            PersonalQuoteTool personalQuoteTool,
             HttpEndpointTool httpEndpointTool,
             @Autowired(required = false) KnowledgeQueryTool knowledgeQueryTool) {
         List<Object> tools = new ArrayList<>();
@@ -55,6 +57,7 @@ public class AgentConfiguration {
         tools.add(contractQueryTool);
         tools.add(budgetBillTool);
         tools.add(subOrderTool);
+        tools.add(personalQuoteTool);
         tools.add(httpEndpointTool);
         if (knowledgeQueryTool != null) {
             tools.add(knowledgeQueryTool);
