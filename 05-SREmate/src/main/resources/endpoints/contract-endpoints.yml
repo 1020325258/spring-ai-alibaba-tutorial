@@ -147,3 +147,50 @@ endpoints:
       - "查询订单826030611000000795的子单"
       - "826030611000000795订单下报价单GBILL260309110407580001对应的子单"
 
+  - id: contract-personal-data
+    name: 查询订单个性化报价数据
+    description: |
+      根据项目订单号及单据号查询该订单下对应单据的个性化报价数据。
+      当用户询问以下问题时使用此接口：
+      - "查询某订单的个性化报价"
+      - "某S单的个性化报价数据"
+      - "某报价单的个性化报价"
+      - "某变更单的个性化报价"
+      参数说明：
+      - projectOrderId：订单号（必填），纯数字
+      - subOrderNoList：S单号列表（可选），逗号分隔，如 S15260312120004471
+      - billCodeList：报价单号列表（可选），逗号分隔，如 GBILL260312104241050001
+      - changeOrderId：变更单号（可选），与订单号格式类似
+    category: contract
+    urlTemplate: "http://utopia-nrs-sales-project.${env}.ttb.test.ke.com/api/contract/tool/getContractPersonalData?projectOrderId=${projectOrderId}&subOrderNoList=${subOrderNoList}&billCodeList=${billCodeList}&changeOrderId=${changeOrderId}"
+    method: GET
+    parameters:
+      - name: projectOrderId
+        type: string
+        description: 项目订单号，纯数字格式
+        required: true
+        example: "826031210000003581"
+      - name: subOrderNoList
+        type: string
+        description: S单号列表，逗号分隔，可为空
+        required: false
+        example: "S15260312120004471,S15260312120000427"
+      - name: billCodeList
+        type: string
+        description: 报价单号列表，逗号分隔，可为空
+        required: false
+        example: "GBILL260312104241050001"
+      - name: changeOrderId
+        type: string
+        description: 变更单号，可为空
+        required: false
+        example: ""
+    headers:
+      X-NRS-User-Id: "1000000000000000"
+      Content-Type: "application/json"
+    timeout: 15
+    examples:
+      - "826031210000003581的个性化报价数据"
+      - "826031210000003581下S15260312120004471的个性化报价"
+      - "826031210000003581下GBILL260312104241050001的个性化报价"
+
