@@ -1,7 +1,7 @@
 package com.yycome.sremate.domain.contract.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.yycome.sremate.domain.contract.gateway.FormDataGateway;
+import com.yycome.sremate.domain.contract.gateway.ContractFormGateway;
 import com.yycome.sremate.infrastructure.dao.ContractDao;
 import com.yycome.sremate.types.enums.ContractTypeEnum;
 import com.yycome.sremate.types.enums.QueryDataType;
@@ -29,16 +29,16 @@ import java.util.stream.Stream;
 public class ContractQueryService {
 
     private final ContractDao contractDao;
-    private final FormDataGateway formDataGateway;
+    private final ContractFormGateway contractFormGateway;
     private final ObjectMapper objectMapper;
 
     /** 用于并行 DB 子查询的线程池，大小与连接池对齐 */
     private final ExecutorService dbQueryExecutor = Executors.newFixedThreadPool(5);
 
     @Autowired
-    public ContractQueryService(ContractDao contractDao, FormDataGateway formDataGateway, ObjectMapper objectMapper) {
+    public ContractQueryService(ContractDao contractDao, ContractFormGateway contractFormGateway, ObjectMapper objectMapper) {
         this.contractDao = contractDao;
-        this.formDataGateway = formDataGateway;
+        this.contractFormGateway = contractFormGateway;
         this.objectMapper = objectMapper;
     }
 
@@ -150,7 +150,7 @@ public class ContractQueryService {
     public String queryFormId(String contractCode) {
         Long instanceId = contractDao.findPlatformInstanceId(contractCode);
         if (instanceId == null) return null;
-        return formDataGateway.queryFormData(instanceId.toString());
+        return contractFormGateway.queryFormData(instanceId.toString());
     }
 
     /**
