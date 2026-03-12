@@ -32,5 +32,7 @@ class PersonalQuoteToolIT extends BaseSREIT {
         ask(ORDER_ID + "下" + SUB_ORDER_NO + "的个性化报价");
 
         assertToolNotCalled("queryBudgetBillList");
+        assertToolCalled("queryContractPersonalData");
+        assertAllToolsSuccess();
     }
 }
