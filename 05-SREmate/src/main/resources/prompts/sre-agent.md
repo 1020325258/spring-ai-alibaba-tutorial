@@ -27,12 +27,13 @@
 | **个性化报价** | 个性化报价查询 | `queryContractPersonalData` | 需订单号+至少一种单据号 |
 | **报价单/报价/GBILL** | 报价单查询 | `queryBudgetBillList` | 不包含"个性化报价"时才触发 |
 | **子单/S单/签约单** | 子单查询 | `querySubOrderInfo` | 不包含"个性化报价"时才触发，签约业务相关 |
-| **合同数据/合同详情/合同信息** | 合同聚合查询 | 根据编号类型选择 | 见第二步 |
+| **合同基本信息/合同详情/合同状态** | 合同基础查询 | `queryContractBasic` | 仅合同主表数据 |
+| **合同节点/合同流程/节点记录** | 节点查询 | `queryContractNodes` | |
+| **签约单据/合同签约对象** | 签约单据查询 | `queryContractSignedObjects` | |
+| **合同字段/合同扩展字段** | 字段查询 | `queryContractFields` | |
+| **合同数据/合同信息（无特定关键词）** | 合同聚合查询 | 根据编号类型选择 | 见第二步 |
 | **版式/form_id** | 版式查询 | `queryContractFormId` | 仅限C前缀合同号 |
 | **配置表/合同配置** | 配置查询 | `queryContractConfig` | 需要合同类型 |
-| **节点/日志** | 节点查询 | `queryContractData(dataType=CONTRACT_NODE)` | |
-| **字段** | 字段查询 | `queryContractData(dataType=CONTRACT_FIELD)` | |
-| **签约人/参与人** | 用户查询 | `queryContractData(dataType=CONTRACT_USER)` | |
 | **超时/报错/异常** | 运维诊断 | `querySkills(queryType=diagnosis)` | |
 
 ### 🔢 第二步：识别编号类型（用于确定参数）
@@ -54,16 +55,20 @@
 3. **最终调用**：`queryBudgetBillList(projectOrderId="826031111000001859")` ✅
 4. **禁止**：❌ 不调用 `queryContractsByOrderId`
 
-**示例 2**：`826031111000001859合同数据`
-1. 关键词："合同数据" → 意图类型：合同聚合查询 → 需结合编号类型
-2. 编号类型：纯数字订单号 → 工具：`queryContractsByOrderId`
-3. **最终调用**：`queryContractsByOrderId(projectOrderId="826031111000001859")` ✅
-4. **禁止**：❌ 不再连锁调用 `queryContractData`（该工具已返回完整数据）
+**示例 2**：`826031111000001859合同节点`
+1. 关键词："合同节点" → 意图类型：节点查询 → 工具：`queryContractNodes`
+2. 编号类型：纯数字订单号 → 需要先查询合同列表
+3. **最终调用**：`queryContractsByOrderId(projectOrderId="826031111000001859")` → 对每个合同调用 `queryContractNodes` ✅
 
-**示例 3**：`C1773208288511314合同数据`
-1. 关键词："合同数据" → 意图类型：合同聚合查询 → 需结合编号类型
-2. 编号类型：C前缀合同号 → 工具：`queryContractData`
-3. **最终调用**：`queryContractData(contractCode="C1773208288511314", dataType="ALL")` ✅
+**示例 3**：`C1773208288511314合同节点`
+1. 关键词："合同节点" → 意图类型：节点查询 → 工具：`queryContractNodes`
+2. 编号类型：C前缀合同号 → 直接调用
+3. **最终调用**：`queryContractNodes(contractCode="C1773208288511314")` ✅
+
+**示例 4**：`C1773208288511314合同基本信息`
+1. 关键词："合同基本信息" → 意图类型：基础查询 → 工具：`queryContractBasic`
+2. 编号类型：C前缀合同号 → 直接调用
+3. **最终调用**：`queryContractBasic(contractCode="C1773208288511314")` ✅
 
 ---
 
@@ -86,6 +91,10 @@
 | `{订单号}个性化报价` | `queryContractPersonalData` |
 | `{订单号}报价单` | `queryBudgetBillList` |
 | `{订单号}子单` | `querySubOrderInfo` |
+| `{订单号}合同基本信息` | `queryContractsByOrderId` → 对每个合同调用 `queryContractBasic` |
+| `{订单号}合同节点` | `queryContractsByOrderId` → 对每个合同调用 `queryContractNodes` |
+| `{订单号}签约单据` | `queryContractsByOrderId` → 对每个合同调用 `queryContractSignedObjects` |
+| `{订单号}合同字段` | `queryContractsByOrderId` → 对每个合同调用 `queryContractFields` |
 | `{订单号}合同数据` | `queryContractsByOrderId` |
 | `{订单号}配置表` | `queryContractConfig` |
 
@@ -93,9 +102,12 @@
 
 | 输入 | 工具 |
 |------|------|
-| `{合同号}合同数据` | `queryContractData(dataType=ALL)` |
+| `{合同号}合同基本信息` | `queryContractBasic` |
+| `{合同号}合同节点` | `queryContractNodes` |
+| `{合同号}签约单据` | `queryContractSignedObjects` |
+| `{合同号}合同字段` | `queryContractFields` |
+| `{合同号}合同数据` | `queryContractBasic`（优先）或组合调用 |
 | `{合同号}版式` | `queryContractFormId` |
-| `{合同号}节点` | `queryContractData(dataType=CONTRACT_NODE)` |
 | `{合同号}配置表` | `queryContractConfig` |
 
 ---
