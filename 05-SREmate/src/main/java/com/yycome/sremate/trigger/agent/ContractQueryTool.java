@@ -29,27 +29,19 @@ public class ContractQueryTool {
 
     /**
      * 根据合同编号查询合同数据（支持4种查询类型）
+     * @deprecated 推荐使用更精确的单表查询工具：queryContractBasic、queryContractNodes、queryContractSignedObjects、queryContractFields
      */
+    @Deprecated
     @Tool(description = """
-            【合同编号查询】用户输入包含C前缀编号时使用。
+            【已废弃】请优先使用专用工具：
+            - 合同基本信息 → queryContractBasic
+            - 合同节点 → queryContractNodes
+            - 签约单据 → queryContractSignedObjects
+            - 合同字段 → queryContractFields
+            - 签约人/参与人 → queryContractData(dataType=CONTRACT_USER)
 
-            触发条件：编号以C开头（如C1767173898135504）
-
-            参数：
-            - contractCode：C前缀+数字（必填）
-            - dataType：查询范围
-              | 用户说 | dataType值 |
-              |--------|-----------|
-              | 合同数据/详情/信息 | ALL |
-              | 节点/日志 | CONTRACT_NODE |
-              | 字段 | CONTRACT_FIELD |
-              | 签约人/参与人 | CONTRACT_USER |
-
-            示例：
-            - "C1767173898135504合同数据" → contractCode=C1767173898135504, dataType=ALL
-            - "C1767173898135504签约人" → dataType=CONTRACT_USER
-
-            注意：纯数字是订单号，请用queryContractsByOrderId""")
+            仅在需要查询签约人信息时使用本工具。
+            参数：contractCode（C前缀）、dataType（仅CONTRACT_USER有效）""")
     @DataQueryTool
     public String queryContractData(String contractCode, String dataType) {
         return ToolExecutionTemplate.execute("queryContractData", () -> {
