@@ -186,4 +186,43 @@ public class ContractQueryTool {
             return contractQueryService.toJson(result);
         });
     }
+
+    // ── 本体论驱动的单表查询工具方法 ─────────────────────────────
+
+    @Tool(description = "查询合同主表基础数据。触发词：合同基本信息、合同详情、合同状态。参数：contractCode（C前缀合同号，必填）")
+    @DataQueryTool
+    public String queryContractBasic(String contractCode) {
+        return ToolExecutionTemplate.execute("queryContractBasic", () -> {
+            Map<String, Object> result = contractQueryService.queryContractBasic(contractCode);
+            if (result == null) return ToolResult.notFound("合同", contractCode);
+            return contractQueryService.toJson(result);
+        });
+    }
+
+    @Tool(description = "查询合同节点/流程节点数据。触发词：合同节点、合同流程、节点记录。参数：contractCode（C前缀合同号，必填）")
+    @DataQueryTool
+    public String queryContractNodes(String contractCode) {
+        return ToolExecutionTemplate.execute("queryContractNodes", () -> {
+            List<Map<String, Object>> result = contractQueryService.queryContractNodes(contractCode);
+            return contractQueryService.toJson(result);
+        });
+    }
+
+    @Tool(description = "查询合同签约的单据对象（contract_quotation_relation），包含报价单和S单的bill_code。触发词：签约单据、合同关联单据、合同签约对象。参数：contractCode（C前缀合同号，必填）")
+    @DataQueryTool
+    public String queryContractSignedObjects(String contractCode) {
+        return ToolExecutionTemplate.execute("queryContractSignedObjects", () -> {
+            List<Map<String, Object>> result = contractQueryService.queryContractSignedObjects(contractCode);
+            return contractQueryService.toJson(result);
+        });
+    }
+
+    @Tool(description = "查询合同扩展字段数据（contract_field_sharding分表）。触发词：合同字段、合同扩展字段。参数：contractCode（C前缀合同号，必填）")
+    @DataQueryTool
+    public String queryContractFields(String contractCode) {
+        return ToolExecutionTemplate.execute("queryContractFields", () -> {
+            Map<String, Object> result = contractQueryService.queryContractFields(contractCode);
+            return contractQueryService.toJson(result);
+        });
+    }
 }

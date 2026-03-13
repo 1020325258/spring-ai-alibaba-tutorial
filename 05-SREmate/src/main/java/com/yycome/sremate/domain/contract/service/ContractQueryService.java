@@ -282,4 +282,26 @@ public class ContractQueryService {
 
         return result;
     }
+
+    // ── 本体论驱动的单表查询方法 ─────────────────────────────
+
+    /** 查询合同主表基础数据 */
+    public Map<String, Object> queryContractBasic(String contractCode) {
+        return contractDao.fetchContractBase(contractCode);
+    }
+
+    /** 查询合同节点数据 */
+    public List<Map<String, Object>> queryContractNodes(String contractCode) {
+        return contractDao.fetchNodes(contractCode);
+    }
+
+    /** 查询合同签约单据关联（contract_quotation_relation） */
+    public List<Map<String, Object>> queryContractSignedObjects(String contractCode) {
+        return contractDao.fetchQuotations(contractCode);
+    }
+
+    /** 查询合同字段数据（自动路由分表） */
+    public Map<String, Object> queryContractFields(String contractCode) {
+        return contractDao.fetchFields(contractCode);
+    }
 }
