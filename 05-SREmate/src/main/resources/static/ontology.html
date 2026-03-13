@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SREmate 本体可视化</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            margin: 0;
+            padding: 0;
+            background: #f5f5f5;
+        }
+        .container {
+            display: flex;
+            height: 100vh;
+        }
+        #network {
+            flex: 1;
+            background: white;
+        }
+        #sidebar {
+            width: 320px;
+            padding: 20px;
+            background: #fff;
+            border-left: 1px solid #e0e0e0;
+            overflow-y: auto;
+        }
+        h1 {
+            font-size: 18px;
+            margin: 0 0 15px 0;
+            color: #333;
+        }
+        .entity-name {
+            font-size: 16px;
+            font-weight: 600;
+            color: #1a73e8;
+            margin-bottom: 10px;
+        }
+        .entity-table {
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 10px;
+        }
+        .attribute-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        .attribute-item {
+            padding: 8px 0;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        .attribute-name {
+            font-weight: 500;
+            color: #333;
+        }
+        .attribute-type {
+            color: #999;
+            font-size: 11px;
+            margin-left: 5px;
+        }
+        .attribute-desc {
+            color: #666;
+            font-size: 11px;
+            display: block;
+            margin-top: 3px;
+        }
+        .legend {
+            margin-top: 20px;
+            padding-top: 15px;
+            border-top: 1px solid #e0e0e0;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 8px;
+            font-size: 12px;
+        }
+        .legend-color {
+            width: 16px;
+            height: 16px;
+            border-radius: 3px;
+            margin-right: 8px;
+        }
+        .hint {
+            color: #999;
+            font-size: 12px;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div id="network"></div>
+        <div id="sidebar">
+            <h1>SREmate 本体关系图</h1>
+            <div id="entity-info">
+                <p class="hint">点击节点查看实体详情</p>
+            </div>
+            <div class="legend">
+                <h1>领域图例</h1>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #4A90D9;"></div>
+                    <span>签约领域 (contract)</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #F5A623;"></div>
+                    <span>报价领域 (quote)</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #7ED321;"></div>
+                    <span>通用实体</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+    <script>
+        fetch('/api/ontology')
+            .then(r => r.json())
+            .then(data => {
+                const domainColor = { contract: '#4A90D9', quote: '#F5A623' };
+
+                // 从 relations 推断每个实体的 domain
+                const entityDomain = {};
+                data.relations.forEach(r => {
+                    if (r.domain) {
+                        entityDomain[r.from] = r.domain;
+                    }
+                });
+
+                // 构建节点
+                const nodes = data.entities.map(e => ({
+                    id: e.name,
+                    label: e.name + (e.table ? '\n[' + e.table + ']' : ''),
+                    color: { background: domainColor[entityDomain[e.name]] || '#7ED321' },
+                    title: (e.attributes || []).map(a => a.name + ': ' + a.type).join('\n'),
+                    font: { size: 14, face: '-apple-system, BlinkMacSystemFont, sans-serif' },
+                    margin: 10,
+                    shadow: true
+                }));
+
+                // 构建边
+                const edges = data.relations.map((r, i) => ({
+                    id: i,
+                    from: r.from,
+                    to: r.to,
+                    label: r.label + '\nvia: ' + (r.via ? r.via.source_field + '→' + r.via.target_field : ''),
+                    arrows: 'to',
+                    color: { color: domainColor[r.domain] || '#999' },
+                    font: { size: 10, align: 'middle' },
+                    smooth: { type: 'curvedCW', roundness: 0.2 }
+                }));
+
+                // 创建网络图
+                const network = new vis.Network(
+                    document.getElementById('network'),
+                    { nodes: new vis.DataSet(nodes), edges: new vis.DataSet(edges) },
+                    {
+                        layout: {
+                            hierarchical: {
+                                direction: 'UD',
+                                sortMethod: 'directed',
+                                levelSeparation: 150,
+                                nodeSpacing: 200
+                            }
+                        },
+                        physics: {
+                            enabled: false
+                        },
+                        interaction: {
+                            hover: true,
+                            tooltipDelay: 100
+                        }
+                    }
+                );
+
+                // 点击节点显示详情
+                network.on('click', function(params) {
+                    if (params.nodes.length > 0) {
+                        const entityName = params.nodes[0];
+                        const entity = data.entities.find(e => e.name === entityName);
+                        showEntityInfo(entity);
+                    }
+                });
+
+                function showEntityInfo(entity) {
+                    const infoDiv = document.getElementById('entity-info');
+                    let html = '<div class="entity-name">' + entity.name + '</div>';
+                    if (entity.table) {
+                        html += '<div class="entity-table">表: ' + entity.table + '</div>';
+                    }
+                    if (entity.description) {
+                        html += '<div class="entity-desc" style="color:#666;font-size:12px;margin-bottom:10px;">' + entity.description + '</div>';
+                    }
+                    html += '<ul class="attribute-list">';
+                    (entity.attributes || []).forEach(attr => {
+                        html += '<li class="attribute-item">';
+                        html += '<span class="attribute-name">' + attr.name + '</span>';
+                        html += '<span class="attribute-type">' + attr.type + '</span>';
+                        if (attr.description) {
+                            html += '<span class="attribute-desc">' + attr.description + '</span>';
+                        }
+                        html += '</li>';
+                    });
+                    html += '</ul>';
+                    infoDiv.innerHTML = html;
+                }
+            })
+            .catch(err => {
+                document.getElementById('entity-info').innerHTML =
+                    '<p style="color:red;">加载本体数据失败: ' + err.message + '</p>';
+            });
+    </script>
+</body>
+</html>

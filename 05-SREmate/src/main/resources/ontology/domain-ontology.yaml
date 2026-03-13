@@ -1,0 +1,100 @@
+entities:
+  - name: Order
+    description: "项目订单，纯数字编号"
+    attributes:
+      - { name: projectOrderId, type: string, description: "订单号，纯数字" }
+
+  - name: Contract
+    description: "合同实体，C前缀编号"
+    table: contract
+    attributes:
+      - { name: contractCode,  type: string, description: "合同编号，C前缀+数字" }
+      - { name: contractType,  type: enum,   description: "合同类型：认购/正签/销售等" }
+      - { name: status,        type: string, description: "合同状态" }
+
+  - name: ContractNode
+    description: "合同节点/流程节点"
+    table: contract_node
+    attributes:
+      - { name: contractCode, type: string }
+      - { name: nodeType,     type: string }
+      - { name: fireTime,     type: string }
+
+  - name: ContractQuotationRelation
+    description: "合同签约的单据对象，存储合同关联的报价单和S单"
+    table: contract_quotation_relation
+    attributes:
+      - { name: contractCode, type: string }
+      - { name: bill_code,    type: string, description: "签约单据编号，可为报价单或S单" }
+      - { name: bind_type,    type: string }
+      - { name: status,       type: string }
+
+  - name: ContractField
+    description: "合同字段数据，按contractCode取模分10张表"
+    table: contract_field_sharding
+    attributes:
+      - { name: contractCode, type: string }
+      - { name: field_key,    type: string }
+      - { name: field_value,  type: string }
+
+  - name: BudgetBill
+    description: "报价单，挂在订单下"
+    attributes:
+      - { name: billCode,       type: string, description: "报价单编号" }
+      - { name: projectOrderId, type: string, description: "所属订单号" }
+
+  - name: SubOrder
+    description: "S单，可从报价单或合同两个维度关联"
+    attributes:
+      - { name: orderNo,          type: string }
+      - { name: quotationOrderNo, type: string, description: "关联报价单的字段" }
+      - { name: contractCode,     type: string, description: "关联合同的字段" }
+      - { name: projectChangeNo,  type: string }
+      - { name: mdmCode,          type: string }
+      - { name: dueAmount,        type: number }
+
+relations:
+  - from: Order
+    to: Contract
+    label: has_contracts
+    domain: contract
+    via: { source_field: projectOrderId, target_field: projectOrderId }
+
+  - from: Order
+    to: BudgetBill
+    label: has_budget_bills
+    domain: quote
+    via: { source_field: projectOrderId, target_field: projectOrderId }
+
+  - from: Contract
+    to: ContractNode
+    label: has_nodes
+    domain: contract
+    via: { source_field: contractCode, target_field: contractCode }
+
+  - from: Contract
+    to: ContractQuotationRelation
+    label: has_signed_objects
+    domain: contract
+    description: "合同签约的单据对象，bill_code可指向报价单或S单"
+    via: { source_field: contractCode, target_field: contractCode }
+
+  - from: Contract
+    to: ContractField
+    label: has_fields
+    domain: contract
+    via: { source_field: contractCode, target_field: contractCode }
+
+  - from: BudgetBill
+    to: SubOrder
+    label: splits_into
+    domain: quote
+    description: "全量数据，报价单拆分形成S单"
+    via: { source_field: billCode, target_field: quotationOrderNo }
+
+  - from: ContractQuotationRelation
+    to: SubOrder
+    label: references_sub_order
+    domain: contract
+    description: "签约领域关联数据"
+    via: { source_field: bill_code, target_field: orderNo }

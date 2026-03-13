@@ -1,6 +1,6 @@
 # SREmate 集成测试执行报告
 
-> 最后更新: 2026-03-12 09:34:16
+> 最后更新: 2026-03-14 00:23:37
 
 > 运行命令: `./05-SREmate/scripts/run-integration-tests.sh`
 
@@ -11,8 +11,8 @@
 ### ✅ sreAgent_shouldRespondToSimpleQuestion
 
 - **输入:** 你好，你是谁？
-- **输出:** 你好，我是SRE值班客服Agent，专门帮助研发人员快速排查和解决运维问题。你可以向我咨询任何与运维相关的问题，比如系统故障、配置查询、合同数据、报价单信息等。请告诉我你需要什么帮助？
-- **耗时:** 2064ms
+- **输出:** 你好！我是SRE值班客服Agent，专注于帮助研发人员快速排查和解决运维问题。你可以向我咨询关于合同、订单、报价单、子单等相关问题，或者描述你遇到的技术问题，我会尽力提供帮助。有什么可以帮你的吗？
+- **耗时:** 1710ms
 - **工具调用:** 无
 
 ### ✅ applicationContext_shouldLoad
@@ -22,31 +22,62 @@
 
 ---
 
+## PersonalQuoteToolIT
+
+### ✅ personalQuoteKeyword_withSubOrder_shouldCallQueryContractPersonalData
+
+- **输入:** 826031210000003581下S15260312120004471的个性化报价
+- **输出:** {"code":2000,"message":"操作成功","data":{"planAllDTO":null,"homeOrderNo":null,"previousHomeOrderNo":null,"nextHomeOrderNo":null,"personalContractDataList":[{"billCode":null,"changeOrderId":null,"subOrderNoList":["S15260312120004471"],"personalContractPrice":8.00,"comboCode":"2412","comboName":"新团装定软电默认...（截断）
+- **耗时:** 11995ms
+- **工具调用:**
+  - `queryContractPersonalData` ✓ 774ms
+  - `callPredefinedEndpoint` ✓ 772ms
+
+### ✅ personalQuoteKeyword_shouldNotCallBudgetBillTool
+
+- **输入:** 826031210000003581下S15260312120004471的个性化报价
+- **输出:** {"code":2000,"message":"操作成功","data":{"planAllDTO":null,"homeOrderNo":null,"previousHomeOrderNo":null,"nextHomeOrderNo":null,"personalContractDataList":[{"billCode":null,"changeOrderId":null,"subOrderNoList":["S15260312120004471"],"personalContractPrice":8.00,"comboCode":"2412","comboName":"新团装定软电默认...（截断）
+- **耗时:** 11739ms
+- **工具调用:**
+  - `queryContractPersonalData` ✓ 799ms
+  - `callPredefinedEndpoint` ✓ 799ms
+
+### ✅ personalQuoteKeyword_withBillCode_shouldCallQueryContractPersonalData
+
+- **输入:** 826031210000003581下GBILL260312104241050001的个性化报价
+- **输出:** 该请求返回了错误信息，提示"查询团装报价单附件为空，请重试或联系客服"。这表明在查询个性化报价数据时遇到了问题。  ### 建议的解决步骤： 1. **重试查询**：有时可能是临时性的问题，尝试重新执行查询。 2. **检查输入参数**：确保提供的订单号和报价单号是正确的。 3. **联系客服**：如果问题仍然存在，建议联系客服以获取进一步的帮助。  如果需要进一步的帮助，请告知我。
+- **耗时:** 3271ms
+- **工具调用:**
+  - `queryContractPersonalData` ✓ 805ms
+  - `callPredefinedEndpoint` ✓ 805ms
+
+---
+
 ## SkillQueryToolIT
 
 ### ✅ listSkillCategories_shouldReturnCategories
 
 - **输入:** 运维知识库有哪些分类
-- **输出:** SRE运维知识库包含以下分类：  1. **diagnosis（问题诊断）**：用于查询技术问题的排查经验和解决方案，例如超时、报错、异常等。 2. **operations（运维操作）**：提供运维操作指南和步骤，例如服务重启、配置调整等。 3. **knowledge（知识库）**：包含通用的运维知识和概念，例如系统架构、最佳实践等。  如果您有具体的问题或需要了解某个分类的详细内容，请告诉我！
-- **耗时:** 2648ms
+- **输出:** SRE运维知识库包含以下分类：  - **diagnosis**：问题诊断类，用于排查和解决技术问题 - **operations**：运维操作类，提供日常运维操作指导 - **knowledge**：知识类，包含技术原理、系统架构等知识性内容  如需查询具体分类下的内容，可以告诉我需要哪个分类的资料。
+- **耗时:** 1685ms
 - **工具调用:**
-  - `listSkillCategories` ✓ 2ms
+  - `listSkillCategories` ✓ 1ms
 
 ### ✅ querySkills_serviceTimeout_shouldReturnRunbook
 
 - **输入:** 服务超时怎么处理
-- **输出:** 服务超时问题需要根据具体场景进行排查和处理。以下是针对服务超时的详细分析和解决方案：  ### 1. **检查服务健康状态**    - 调用服务健康检查接口，确认服务是否正常运行。    - 示例：`GET /actuator/health`  ### 2. **检查服务指标**    - 查看关键性能指标：      - 响应时间（p95、p99）      - 错误率      - QPS（每秒查询数）  ### 3. **检查日志**    - 查看服务日志中的异常和慢请求记录，定位具体问题。  ### 4. **检查资源使用**    - 监控以下资源使用情况：      - CPU...（截断）
-- **耗时:** 7422ms
+- **输出:** ### 服务超时处理建议  #### 短期解决 1. **扩容实例**：增加服务实例数以分担负载。 2. **调整超时时间**：临时增加客户端超时时间，避免因短暂延迟导致的超时。 3. **限流降级**：对非核心功能进行降级，确保核心功能的可用性。  #### 长期优化 1. **性能优化**：    - 优化慢接口，减少响应时间。    - 增加缓存机制，减少重复计算和数据库查询。    - 异步化处理，将耗时操作放入队列中异步执行。  2. **架构优化**：    - 服务拆分，将复杂业务拆分为独立服务，提高可维护性和扩展性。    - 引入消息队列，解耦系统组件，提高系统的可靠性和伸缩...（截断）
+- **耗时:** 7031ms
 - **工具调用:**
-  - `querySkills` ✓ 39ms
+  - `querySkills` ✓ 13ms
 
 ### ✅ querySkills_databaseTimeout_shouldReturnRunbook
 
 - **输入:** 数据库连接超时怎么排查
-- **输出:** 根据数据库连接超时的排查经验，以下是具体的排查建议：  ### 短期解决 1. **增加连接池大小**：临时调大连接池maximum-pool-size。 2. **释放空闲连接**：重启应用以释放长期占用的连接。 3. **优化慢查询**：识别并优化执行时间长的SQL。  ### 长期优化 1. **优化连接池配置**：    - `maximum-pool-size`：根据业务并发量设置（公式：`(core_count * 2) + effective_spindle_count`）。    - `minimum-idle`：设置为与`maximum-pool-size`相同，避免连接创建...（截断）
-- **耗时:** 3883ms
+- **输出:** 1. **检查数据库连接数**：    - 使用以下SQL查询当前连接数和状态：      ```sql      SHOW PROCESSLIST;      SHOW STATUS LIKE 'Threads_connected';      SHOW STATUS LIKE 'Max_used_connections';      ```    - 关注指标：      - `Threads_connected`：当前活跃连接数      - `Max_used_connections`：历史最大连接数      - `max_connections`：最大允许连接数（通过 `SHOW ...（截断）
+- **耗时:** 10408ms
 - **工具调用:**
-  - `querySkills` ✓ 7ms
+  - `querySkills` ✓ 4ms
 
 ---
 
@@ -56,25 +87,25 @@
 
 - **输入:** C1767173898135504的合同配置表数据
 - **输出:** {"input":"C1767173898135504","projectOrderId":"825123117000001474","contractConfigId":"2_2_2","version":2,"businessType":"1","gbCode":"310000","companyCode":"V201800236","type":"8","signChannelType":1,"contract_city_company_info":[{"id":422,"business_type":1,"gb_code":310000,"company_code":"V2018002...（截断）
-- **耗时:** 5765ms
+- **耗时:** 7024ms
 - **工具调用:**
-  - `queryContractConfig` ✓ 319ms
+  - `queryContractConfig` ✓ 428ms
 
 ### ✅ orderIdWithoutType_shouldCallQueryContractConfig
 
 - **输入:** 825123110000002753的合同配置
 - **输出:** {"input":"825123110000002753","projectOrderId":"825123110000002753","contractConfigId":"2_2_2","version":2,"businessType":"1","gbCode":"310000","companyCode":"V201800236","type":"8","signChannelType":1,"contract_city_company_info":[{"id":422,"business_type":1,"gb_code":310000,"company_code":"V201800...（截断）
-- **耗时:** 7008ms
+- **耗时:** 6946ms
 - **工具调用:**
-  - `queryContractConfig` ✓ 55ms
+  - `queryContractConfig` ✓ 105ms
 
 ### ✅ orderIdWithConfigType_shouldCallQueryContractConfig
 
 - **输入:** 825123110000002753的销售合同配置
 - **输出:** {"input":"825123110000002753","projectOrderId":"825123110000002753","contractConfigId":"2_2_2","version":2,"businessType":"1","gbCode":"310000","companyCode":"V201800236","type":"8","signChannelType":1,"contract_city_company_info":[{"id":422,"business_type":1,"gb_code":310000,"company_code":"V201800...（截断）
-- **耗时:** 5613ms
+- **耗时:** 5965ms
 - **工具调用:**
-  - `queryContractConfig` ✓ 48ms
+  - `queryContractConfig` ✓ 104ms
 
 ---
 
@@ -84,18 +115,18 @@
 
 - **输入:** C1767173898135504的 platform_instance_id 是多少
 - **输出:** {"contractCode":"C1767173898135504","platformInstanceId":0}
-- **耗时:** 1713ms
+- **耗时:** 1187ms
 - **工具调用:**
-  - `queryContractInstanceId` ✓ 19ms
+  - `queryContractInstanceId` ✓ 47ms
 
 ### ✅ formIdKeyword_shouldCallQueryContractFormId
 
 - **输入:** C1767173898135504的版式 form_id 是多少
-- **输出:** 根据接口返回结果，查询合同版式表单数据时出现了服务端异常。建议您稍后重试或联系客服处理。
-- **耗时:** 1725ms
+- **输出:** 根据接口返回结果，查询合同版式表单数据时出现了服务端异常。建议您稍后重试，如果问题仍然存在，请联系客服人员进行进一步处理。
+- **耗时:** 1457ms
 - **工具调用:**
-  - `queryContractFormId` ✓ 267ms
-  - `callPredefinedEndpoint` ✓ 247ms
+  - `queryContractFormId` ✓ 120ms
+  - `callPredefinedEndpoint` ✓ 77ms
 
 ---
 
@@ -105,71 +136,78 @@
 
 - **输入:** 825123110000002753下GBILL260309110407580001的子单信息
 - **输出:** {"code":2000,"message":"操作成功","data":[],"success":true}
-- **耗时:** 1922ms
+- **耗时:** 1912ms
 - **工具调用:**
-  - `querySubOrderInfo` ✓ 151ms
-  - `callPredefinedEndpoint` ✓ 149ms
+  - `querySubOrderInfo` ✓ 101ms
+  - `callPredefinedEndpoint` ✓ 100ms
 
 ### ✅ subOrderKeyword_shouldCallQuerySubOrderInfo
 
 - **输入:** 查询订单825123110000002753的子单信息
-- **输出:** {   "code": 2000,   "message": "操作成功",   "data": [     {       "orderNo": "S14251231110001838",       "status": 1000,       "scmFullNo": "",       "projectChangeNo": "",       "retailSaleProjectNo": "825123110000002459",       "mdmCode": "V201800236",       "orderCreateTime": 1767150675000,       "d...（截断）
-- **耗时:** 28599ms
+- **输出:** {"code":2000,"message":"操作成功","data":[{"orderNo":"S1425123110001838","status":1000,"scmFullNo":"","projectChangeNo":"","retailSaleProjectNo":"825123110000002459","mdmCode":"V201800236","orderCreateTime":1767150675000,"dueAmount":10.00,"compositOrderNo":"CT202512310000285301"},{"orderNo":"S1425123110...（截断）
+- **耗时:** 22363ms
 - **工具调用:**
-  - `querySubOrderInfo` ✓ 135ms
-  - `callPredefinedEndpoint` ✓ 135ms
+  - `querySubOrderInfo` ✓ 122ms
+  - `callPredefinedEndpoint` ✓ 122ms
 
 ---
 
 ## ContractQueryToolIT
 
+### ✅ contractCodePrefix_shouldCallQueryContractBasic
+
+- **输入:** C1767173898135504的合同数据
+- **输出:** {"contractCode":"C1767173898135504","type":8,"status":8,"amount":200.00,"platformInstanceId":0,"projectOrderId":"825123117000001474","ctime":"2025-12-31 17:38:20","contract_node":[{"nodeType":7,"fireTime":"2025-12-31 17:38:01"},{"nodeType":8,"fireTime":"2025-12-31 17:38:01"},{"nodeType":2,"fireTime"...（截断）
+- **耗时:** 9675ms
+- **工具调用:**
+  - `queryContractData` ✓ 55ms
+
 ### ✅ pureDigits_shouldCallQueryContractsByOrderId
 
 - **输入:** 825123110000002753的合同详情
 - **输出:** {"contracts":[{"contractCode":"C1767150648920281","type":3,"status":8,"amount":413580.67,"platformInstanceId":0,"ctime":"2025-12-31 11:10:48","contract_node":[{"nodeType":7,"fireTime":"2025-12-31 11:10:42"},{"nodeType":8,"fireTime":"2025-12-31 11:10:42"},{"nodeType":9,"fireTime":"2025-12-31 11:10:54...（截断）
-- **耗时:** 17477ms
+- **耗时:** 17822ms
 - **工具调用:**
-  - `queryContractsByOrderId` ✓ 84ms
-
-### ✅ contractCodePrefix_shouldCallQueryContractData
-
-- **输入:** C1767173898135504的合同数据
-- **输出:** {"contractCode":"C1767173898135504","type":8,"status":8,"amount":200.00,"platformInstanceId":0,"projectOrderId":"825123117000001474","ctime":"2025-12-31 17:38:20","contract_node":[{"nodeType":7,"fireTime":"2025-12-31 17:38:01"},{"nodeType":8,"fireTime":"2025-12-31 17:38:01"},{"nodeType":2,"fireTime"...（截断）
-- **耗时:** 10847ms
-- **工具调用:**
-  - `queryContractData` ✓ 25ms
+  - `queryContractsByOrderId` ✓ 169ms
 
 ### ✅ contractCodeWithUserType_shouldCallQueryContractData
 
 - **输入:** C1767173898135504的签约人信息
 - **输出:** {"contractCode":"C1767173898135504","type":8,"status":8,"amount":200.00,"platformInstanceId":0,"projectOrderId":"825123117000001474","ctime":"2025-12-31 17:38:20","contract_user":[{"role_type":1,"name":"张云","phone":"B002ɧLƑ5974","is_sign":1,"is_auth":0}]}
-- **耗时:** 2731ms
+- **耗时:** 2920ms
 - **工具调用:**
-  - `queryContractData` ✓ 20ms
+  - `queryContractData` ✓ 50ms
 
 ### ✅ contractCode_shouldNotCallOrderTool
 
 - **输入:** 查询C1767173898135504的合同详情
 - **输出:** {"contractCode":"C1767173898135504","type":8,"status":8,"amount":200.00,"platformInstanceId":0,"projectOrderId":"825123117000001474","ctime":"2025-12-31 17:38:20","contract_node":[{"nodeType":7,"fireTime":"2025-12-31 17:38:01"},{"nodeType":8,"fireTime":"2025-12-31 17:38:01"},{"nodeType":2,"fireTime"...（截断）
-- **耗时:** 10280ms
+- **耗时:** 15159ms
 - **工具调用:**
-  - `queryContractData` ✓ 20ms
+  - `queryContractInstanceId` ✓ 41ms
+  - `queryContractSignedObjects` ✓ 42ms
+  - `queryContractFields` ✓ 43ms
+  - `queryContractNodes` ✓ 61ms
+  - `queryContractBasic` ✓ 42ms
+
+### ✅ contractCodeWithNodeType_shouldCallQueryContractNodes
+
+- **输入:** C1767173898135504的合同节点数据
+- **输出:** {"code":5000,"message":"服务端异常，请稍后重试或联系客服。","data":null,"success":false}
+- **耗时:** 3576ms
+- **工具调用:**
+  - `queryContractFormId` ✓ 123ms
+  - `callPredefinedEndpoint` ✓ 81ms
+  - `queryContractBasic` ✓ 43ms
+  - `queryContractNodes` ✓ 43ms
 
 ### ✅ orderIdKeyword_shouldCallQueryContractsByOrderId
 
 - **输入:** 订单825123110000002753下有哪些合同
 - **输出:** {"contracts":[{"contractCode":"C1767150648920281","type":3,"status":8,"amount":413580.67,"platformInstanceId":0,"ctime":"2025-12-31 11:10:48","contract_node":[{"nodeType":7,"fireTime":"2025-12-31 11:10:42"},{"nodeType":8,"fireTime":"2025-12-31 11:10:42"},{"nodeType":9,"fireTime":"2025-12-31 11:10:54...（截断）
-- **耗时:** 17419ms
+- **耗时:** 18257ms
 - **工具调用:**
-  - `queryContractsByOrderId` ✓ 66ms
-
-### ✅ contractCodeWithNodeType_shouldCallQueryContractData
-
-- **输入:** C1767173898135504的合同节点数据
-- **输出:** {"contractCode":"C1767173898135504","type":8,"status":8,"amount":200.00,"platformInstanceId":0,"projectOrderId":"825123117000001474","ctime":"2025-12-31 17:38:20","contract_node":[{"nodeType":7,"fireTime":"2025-12-31 17:38:01"},{"nodeType":8,"fireTime":"2025-12-31 17:38:01"},{"nodeType":2,"fireTime"...（截断）
-- **耗时:** 7160ms
-- **工具调用:**
-  - `queryContractData` ✓ 35ms
+  - `queryContractsByOrderId` ✓ 161ms
 
 ---
 
@@ -178,18 +216,18 @@
 ### ✅ listEndpointsByCategory_shouldCallListAvailableEndpoints
 
 - **输入:** 查看 contract 分类的接口
-- **输出:** 以下是 contract 分类的可用接口列表：  1. **sub-order-info** - 查询子单基本信息      描述: 根据订单号查询对应的子单信息，支持按报价单号和变更单号筛选。      当用户询问以下问题时使用此接口：      - "查询某订单下某报价单的子单信息"      - "某订单下某报价单对应的子单是什么"      - "查询订单xxx下报价单xxx的子单"      - "826030611000000795下GBILL260309110407580001的子单信息"      参数说明：      - homeOrderNo：订单号（必填），纯数字格式  ...（截断）
-- **耗时:** 8755ms
+- **输出:** 以下是 contract 分类的可用接口列表：  1. **sub-order-info** - 查询子单基本信息    - 描述: 根据订单号查询对应的子单信息，支持按报价单号和变更单号筛选。    - 使用场景：当用户询问以下问题时使用此接口：      - "查询某订单下某报价单的子单信息"      - "某订单下某报价单对应的子单是什么"      - "查询订单xxx下报价单xxx的子单"      - "826030611000000795下GBILL260309110407580001的子单信息"    - 参数说明：      - homeOrderNo：订单号（必填），纯数...（截断）
+- **耗时:** 10498ms
 - **工具调用:**
-  - `listAvailableEndpoints` ✓ 2ms
+  - `listAvailableEndpoints` ✓ 0ms
 
 ### ✅ listEndpointsKeyword_shouldCallListAvailableEndpoints
 
 - **输入:** 有哪些可用的预定义接口
-- **输出:** 以下是可用的预定义接口列表：  1. **sub-order-info** - 查询子单基本信息    - 描述: 根据订单号查询对应的子单信息，支持按报价单号和变更单号筛选。    - 当用户询问以下问题时使用此接口：      - "查询某订单下某报价单的子单信息"      - "某订单下某报价单对应的子单是什么"      - "查询订单xxx下报价单xxx的子单"      - "826030611000000795下GBILL260309110407580001的子单信息"    - 参数说明：      - homeOrderNo：订单号（必填），纯数字格式      - quo...（截断）
-- **耗时:** 8356ms
+- **输出:** 目前可用的预定义接口分类有： - system（系统相关） - database（数据库相关） - monitoring（监控相关） - contract（合同相关）
+- **耗时:** 1182ms
 - **工具调用:**
-  - `listAvailableEndpoints` ✓ 1ms
+  - `listAvailableEndpoints` ✓ 0ms
 
 ---
 

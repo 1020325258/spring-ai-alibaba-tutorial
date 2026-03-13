@@ -1,0 +1,8 @@
+entities:
+  - name: Order
+    description: "测试用"
+relations:
+  - from: Order
+    to: NonExistentEntity
+    label: test
+    domain: test

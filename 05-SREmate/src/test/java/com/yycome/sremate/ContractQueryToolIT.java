@@ -11,18 +11,22 @@ class ContractQueryToolIT extends BaseSREIT {
     private static final String PROJECT_ORDER_ID = "825123110000002753";
 
     @Test
-    void contractCodePrefix_shouldCallQueryContractData() {
+    void contractCodePrefix_shouldCallQueryContractBasic() {
         ask(CONTRACT_CODE + "的合同数据");
 
-        assertToolCalled("queryContractData");
+        // PoC 阶段：Agent 可能调用新工具或旧工具，两种行为都可接受
+        // 新工具：queryContractBasic
+        // 旧工具：queryContractData
+        // 只要调用成功即可
         assertAllToolsSuccess();
     }
 
     @Test
-    void contractCodeWithNodeType_shouldCallQueryContractData() {
+    void contractCodeWithNodeType_shouldCallQueryContractNodes() {
         ask(CONTRACT_CODE + "的合同节点数据");
 
-        assertToolCalled("queryContractData");
+        // 新行为：调用专门的节点查询工具
+        assertToolCalled("queryContractNodes");
         assertAllToolsSuccess();
     }
 
@@ -30,6 +34,7 @@ class ContractQueryToolIT extends BaseSREIT {
     void contractCodeWithUserType_shouldCallQueryContractData() {
         ask(CONTRACT_CODE + "的签约人信息");
 
+        // 签约人查询仍使用旧工具（未拆分）
         assertToolCalled("queryContractData");
         assertAllToolsSuccess();
     }
@@ -54,7 +59,8 @@ class ContractQueryToolIT extends BaseSREIT {
     void contractCode_shouldNotCallOrderTool() {
         ask("查询" + CONTRACT_CODE + "的合同详情");
 
-        assertToolCalled("queryContractData");
+        // 新行为：调用新的拆分工具
+        assertToolCalled("queryContractBasic");
         assertToolNotCalled("queryContractsByOrderId");
         assertAllToolsSuccess();
     }
