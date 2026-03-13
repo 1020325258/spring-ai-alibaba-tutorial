@@ -1,5 +1,6 @@
 package com.yycome.sremate.infrastructure.config;
 
+import com.yycome.sremate.domain.ontology.service.EntityRegistry;
 import com.yycome.sremate.trigger.agent.BudgetBillTool;
 import com.yycome.sremate.trigger.agent.ContractQueryTool;
 import com.yycome.sremate.trigger.agent.HttpEndpointTool;
@@ -16,6 +17,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.io.Resource;
 
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -29,12 +31,16 @@ public class AgentConfiguration {
     private Resource sreAgentPrompt;
 
     /**
-     * 创建SRE Agent
+     * 创建SRE Agent，注入本体摘要到 system prompt
      */
     @Bean
-    public ChatClient sreAgent(ChatClient.Builder builder, ToolCallbackProvider sreTools) {
+    public ChatClient sreAgent(ChatClient.Builder builder, ToolCallbackProvider sreTools, EntityRegistry entityRegistry) throws Exception {
+        String promptContent = sreAgentPrompt.getContentAsString(StandardCharsets.UTF_8);
+        String ontologySummary = entityRegistry.getSummaryForPrompt();
+        String finalPrompt = promptContent.replace("{{ontology_summary}}", ontologySummary);
+
         return builder
-                .defaultSystem(sreAgentPrompt)
+                .defaultSystem(finalPrompt)
                 .defaultToolCallbacks(sreTools)
                 .build();
     }
