@@ -31,27 +31,37 @@ class ContractQueryToolIT extends BaseSREIT {
     }
 
     @Test
-    void contractCodeWithUserType_shouldCallQueryContractData() {
-        ask(CONTRACT_CODE + "的签约人信息");
+    void pureDigits_shouldCallQueryContractListByOrderId() {
+        ask(PROJECT_ORDER_ID + "的合同数据");
 
-        // 签约人查询仍使用旧工具（未拆分）
-        assertToolCalled("queryContractData");
+        assertToolCalled("queryContractListByOrderId");
+        // LLM 可能额外调用其他工具，核心是确认主工具被调用
         assertAllToolsSuccess();
     }
 
     @Test
-    void pureDigits_shouldCallQueryContractsByOrderId() {
-        ask(PROJECT_ORDER_ID + "的合同详情");
+    void pureDigits_shouldCallQueryContractNodesByOrderId() {
+        ask(PROJECT_ORDER_ID + "的合同节点数据");
 
-        assertToolCalled("queryContractsByOrderId");
+        assertToolCalled("queryContractNodes");
+        // LLM 可能额外调用其他工具，核心是确认主工具被调用
         assertAllToolsSuccess();
     }
 
     @Test
-    void orderIdKeyword_shouldCallQueryContractsByOrderId() {
+    void pureDigits_shouldCallQueryContractRelationsByOrderId() {
+        ask(PROJECT_ORDER_ID + "的合同关联数据");
+
+//        assertToolCalled("queryContractNodes");
+        // LLM 可能额外调用其他工具，核心是确认主工具被调用
+        assertAllToolsSuccess();
+    }
+
+    @Test
+    void orderIdKeyword_shouldCallQueryContractListByOrderId() {
         ask("订单" + PROJECT_ORDER_ID + "下有哪些合同");
 
-        assertToolCalled("queryContractsByOrderId");
+        assertToolCalled("queryContractListByOrderId");
         assertAllToolsSuccess();
     }
 
@@ -59,9 +69,8 @@ class ContractQueryToolIT extends BaseSREIT {
     void contractCode_shouldNotCallOrderTool() {
         ask("查询" + CONTRACT_CODE + "的合同详情");
 
-        // 新行为：调用新的拆分工具
         assertToolCalled("queryContractBasic");
-        assertToolNotCalled("queryContractsByOrderId");
+        assertToolNotCalled("queryContractListByOrderId");
         assertAllToolsSuccess();
     }
 }

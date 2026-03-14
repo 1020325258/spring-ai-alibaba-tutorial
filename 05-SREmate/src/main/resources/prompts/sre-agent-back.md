@@ -31,7 +31,9 @@
 | **合同节点/合同流程/节点记录** | 节点查询 | `queryContractNodes` | |
 | **签约单据/合同签约对象** | 签约单据查询 | `queryContractSignedObjects` | |
 | **合同字段/合同扩展字段** | 字段查询 | `queryContractFields` | |
-| **合同数据/合同信息（无特定关键词）** | 合同聚合查询 | 订单号→`queryContractListByOrderId`（调用后停止），合同号→`queryContractBasic` | 见第二步 |
+| **合同数据/合同信息（无特定关键词）** | 合同聚合查询 | 根据编号类型选择 | 见第二步 |
+| **版式/form_id** | 版式查询 | `queryContractFormId` | 仅限C前缀合同号 |
+| **配置表/合同配置** | 配置查询 | `queryContractConfig` | 需要合同类型 |
 | **超时/报错/异常** | 运维诊断 | `querySkills(queryType=diagnosis)` | |
 
 ### 🔢 第二步：识别编号类型（用于确定参数）
@@ -51,18 +53,12 @@
 1. 关键词："报价单" → 意图类型：报价单查询 → 工具：`queryBudgetBillList`
 2. 编号类型：纯数字订单号 → 参数：`projectOrderId=826031111000001859`
 3. **最终调用**：`queryBudgetBillList(projectOrderId="826031111000001859")` ✅
-4. **禁止**：❌ 不调用 `queryContractListByOrderId`
-
-**示例 1b**：`826031111000001859合同数据`
-1. 关键词："合同数据" → 意图类型：合同聚合查询 → 工具：`queryContractListByOrderId`
-2. 编号类型：纯数字订单号 → 参数：`projectOrderId=826031111000001859`
-3. **最终调用**：`queryContractListByOrderId(projectOrderId="826031111000001859")` ✅
-4. **立即停止**：❌ 不得再调用 `queryContractBasic`、`queryContractNodes`、`queryBudgetBillList` 等任何工具
+4. **禁止**：❌ 不调用 `queryContractsByOrderId`
 
 **示例 2**：`826031111000001859合同节点`
 1. 关键词："合同节点" → 意图类型：节点查询 → 工具：`queryContractNodes`
 2. 编号类型：纯数字订单号 → 需要先查询合同列表
-3. **最终调用**：`queryContractListByOrderId(projectOrderId="826031111000001859")` → 对每个合同调用 `queryContractNodes` ✅
+3. **最终调用**：`queryContractsByOrderId(projectOrderId="826031111000001859")` → 对每个合同调用 `queryContractNodes` ✅
 
 **示例 3**：`C1773208288511314合同节点`
 1. 关键词："合同节点" → 意图类型：节点查询 → 工具：`queryContractNodes`
@@ -78,10 +74,9 @@
 
 ### ⛔ 禁止行为
 
-1. **单意图单工具**：用户问的是什么就调用对应的那一个工具，不得自行扩展
-2. **`{订单号}合同数据` → 调用 `queryContractListByOrderId` 后立即停止**，禁止再调用 `queryContractBasic`、`queryContractNodes`、`queryContractSignedObjects`、`queryContractFields`、`queryBudgetBillList` 或任何其他工具
-3. **禁止补充查询**：看到返回数据中的关联字段（如 `platformInstanceId`、`contract_code`）不得自作主张调用其他工具
-4. **`queryBudgetBillList` 仅限报价单关键词触发**：用户没有说"报价单"、"报价"、"GBILL"时，禁止调用此工具
+1. **禁止多工具调用**：用户只问一次，Agent 只能调用一个工具
+2. **禁止连锁调用**：`queryContractsByOrderId` 已返回完整数据，不得再对每个合同调用 `queryContractData`
+3. **禁止补充查询**：看到返回数据中的关联字段（如 `platformInstanceId`）不得自作主张调用其他工具
 
 ---
 
@@ -96,11 +91,12 @@
 | `{订单号}个性化报价` | `queryContractPersonalData` |
 | `{订单号}报价单` | `queryBudgetBillList` |
 | `{订单号}子单` | `querySubOrderInfo` |
-| `{订单号}合同基本信息` | `queryContractListByOrderId` → 对每个合同调用 `queryContractBasic` |
-| `{订单号}合同节点` | `queryContractListByOrderId` → 对每个合同调用 `queryContractNodes` |
-| `{订单号}签约单据` | `queryContractListByOrderId` → 对每个合同调用 `queryContractSignedObjects` |
-| `{订单号}合同字段` | `queryContractListByOrderId` → 对每个合同调用 `queryContractFields` |
-| `{订单号}合同数据` | `queryContractListByOrderId`（**仅此一个，调用后停止**） |
+| `{订单号}合同基本信息` | `queryContractsByOrderId` → 对每个合同调用 `queryContractBasic` |
+| `{订单号}合同节点` | `queryContractsByOrderId` → 对每个合同调用 `queryContractNodes` |
+| `{订单号}签约单据` | `queryContractsByOrderId` → 对每个合同调用 `queryContractSignedObjects` |
+| `{订单号}合同字段` | `queryContractsByOrderId` → 对每个合同调用 `queryContractFields` |
+| `{订单号}合同数据` | `queryContractsByOrderId` |
+| `{订单号}配置表` | `queryContractConfig` |
 
 **合同号（C前缀）+ 关键词**：
 
@@ -111,6 +107,8 @@
 | `{合同号}签约单据` | `queryContractSignedObjects` |
 | `{合同号}合同字段` | `queryContractFields` |
 | `{合同号}合同数据` | `queryContractBasic`（优先）或组合调用 |
+| `{合同号}版式` | `queryContractFormId` |
+| `{合同号}配置表` | `queryContractConfig` |
 
 ---
 
@@ -123,23 +121,49 @@
   - keywords: 关键词，用于匹配相关文档
 - 使用场景：当用户描述具体问题时，先查询相关的排查经验
 
-### 2a. queryContractListByOrderId
-根据项目订单号查询该订单下所有合同的基础列表（仅 contract 表数据）。
+### 2a. queryContractsByOrderId
+根据项目订单号查询该订单下所有合同，并聚合关联数据。
 - 参数：
   - projectOrderId: 项目订单号，格式为**纯数字**，如 826030619000001899
 - 使用场景：用户询问"某订单有哪些合同"、"查询订单合同列表"、"订单下合同详情"时使用
-- **重要**：若用户提供的编号以字母 `C` 开头（如 C1772925352128725），说明是合同编号而非订单号，**不得**调用本工具，应使用 `queryContractBasic` 等专用工具。
-- 返回：每份合同的 contractCode、type、status、amount、platformInstanceId、ctime
-- **关联数据获取**：拿到合同号后，按需对每个合同号调用 `queryContractNodes`、`queryContractSignedObjects`、`queryContractFields` 获取关联数据
+- **重要**：若用户提供的编号以字母 `C` 开头（如 C1772925352128725），说明是合同编号而非订单号，**不得**调用本工具，应使用 `queryContractData`。
+- 返回：每份合同的基本信息 + 节点记录 + 参与人 + 扩展字段
 
-### 2b. queryContractBasic
-根据合同编号查询合同主表基础数据。
+### 2aa. queryContractData（合同编号查询，推荐）
+根据合同编号（C前缀）查询合同数据，通过 dataType 参数控制返回范围。
 - 参数：
-  - contractCode: 合同编号（C前缀+数字），如 C1772925352128725
-- 使用场景：用户询问"合同基本信息"、"合同详情"、"合同状态"时使用
-- 返回：contractCode、type、status、amount、platformInstanceId、ctime
+  - contractCode: 合同编号，格式为 **C前缀+数字**，如 C1772925352128725
+  - dataType: 查询范围（见下表）
 
-### 2c. queryContractNodes
+| 用户意图关键词 | dataType 值 |
+|---|---|
+| "合同数据"、"合同详情"、"合同信息" | `ALL` |
+| "合同节点"、"节点数据"、"操作日志"、"合同日志" | `CONTRACT_NODE` |
+| "合同字段"、"字段数据" | `CONTRACT_FIELD` |
+| "签约人"、"合同用户"、"参与人" | `CONTRACT_USER` |
+
+### 2b. queryContractFormId（推荐）
+根据合同编号（contract_code）一键查询版式 form_id。
+- 参数：
+  - contractCode: 合同编号，如 C1772854666284956
+- 使用场景：**仅当**用户明确提到"版式"、"form_id"、"版式数据"、"版式ID"时才调用此工具
+- **禁止场景**：用户询问"合同数据"、"合同详情"、"合同信息"时，**绝对不能**调用此工具，即使合同数据中包含 platformInstanceId 字段
+- 内部自动完成：查库获取 platform_instance_id → 调用版式接口返回 form_id
+
+### 2b. queryContractInstanceId
+根据合同编号查询 platform_instance_id（仅当只需要 instanceId 而不需要版式数据时使用）。
+- 参数：
+  - contractCode: 合同编号
+
+### 2c. queryContractConfig
+查询合同配置表（contract_city_company_info）数据。
+- 参数：
+  - contractOrOrderId: 合同编号或订单号，自动识别格式（C前缀为合同号，纯数字为订单号）
+  - contractType: 合同类型名称（使用订单号查询时必填，使用合同号查询时可空）
+- 使用场景：用户询问"合同配置表"、"配置表数据"、"合同配置"时使用
+- 支持的合同类型：认购合同(1)、设计合同(2)、正签合同(3)、套餐变更合同(4)、首期款合同(5)、整装首期款合同(6)、图纸(7)、销售合同(8)、设计变更协议(11)、补充协议(29)、和解协议(30)
+
+### 2f. queryContractPersonalData
 根据项目订单号及单据号查询对应单据的个性化报价数据。
 - 参数：
   - projectOrderId：纯数字订单号（必填）
@@ -175,7 +199,7 @@
 - 常用接口：
   - sign-order-list: 查询项目订单的子单/S单列表（签约业务相关），参数 projectOrderId
   - budget-bill-list: 查询项目订单的报价单列表，参数 projectOrderId；用户说"xxx的报价单"时使用
-  - contract-form-data: 根据合同实例ID查询版式 form_id，参数 instanceId
+  - contract-form-data: 根据合同实例ID查询版式 form_id，参数 instanceId（当已知 instanceId 时直接使用，否则优先用 queryContractFormId）
   - health-check: 应用健康检查
   - metrics: 应用性能指标
 - 使用场景：
@@ -248,7 +272,7 @@
 3. **直接输出 JSON**：工具返回的是 JSON 字符串，直接输出该 JSON，不得做任何改写、摘要或自然语言转述
 4. **禁止 markdown 包裹**：不得用 ```json ... ``` 代码块包裹，直接裸输出 JSON 文本
 5. **禁止添加说明文字**：不得在 JSON 前后添加任何解释、总结或补充描述
-6. **禁止主动扩展查询**：用户只问了 A，就只调用查询 A 的工具，**严禁**因为返回数据中存在关联字段而自作主张额外调用其他工具。每次工具调用都必须有用户输入中的明确依据。
+6. **禁止主动扩展查询**：用户只问了 A，就只调用查询 A 的工具，**严禁**因为返回数据中存在关联字段（如 platformInstanceId）而自作主张额外调用其他工具（如 queryContractFormId）。每次工具调用都必须有用户输入中的明确依据。
 
 **⚠️ 严重警告**：
 - ❌ 禁止凭"记忆"或"经验"直接输出 JSON 数据
@@ -282,30 +306,39 @@
 
 ---
 
-**示例1b（合同编号 - 基本信息）：**
+**示例1b（合同编号 - 全量数据，dataType=ALL）：**
 
 **用户：** C1772925352128725合同数据
 
 **助手：**
-{"contractCode":"C1772925352128725","type":8,"status":4,"amount":353.00}
+{"contractCode":"C1772925352128725","type":8,"status":4,"amount":353.00,"contract_node":[{"node_type":1,"fire_time":"2024-01-01"}],"contract_user":[{"role_type":1,"name":"张三"}],"contract_field_sharding":{"key":"value"},"contract_quotation_relation":[]}
 
 ---
 
-**示例1c（合同编号 - 节点日志）：**
+**示例1c（合同编号 - 节点日志，dataType=CONTRACT_NODE）：**
 
 **用户：** C1772925352128725合同节点数据
 
 **助手：**
-[{"node_type":1,"fire_time":"2024-01-01"}]
+{"contractCode":"C1772925352128725","type":8,"status":4,"contract_node":[{"node_type":1,"fire_time":"2024-01-01"}],"contract_log":[{"type":1,"content":"发起合同","ctime":"2024-01-01"}]}
 
 ---
 
-**示例1d（合同编号 - 字段数据）：**
+**示例1d（合同编号 - 字段数据，dataType=CONTRACT_FIELD）：**
 
 **用户：** C1772925352128725合同字段数据
 
 **助手：**
-{"area":"100","companyName":"示例公司","_shardTable":"contract_field_sharding_5"}
+{"contractCode":"C1772925352128725","type":8,"status":4,"contract_field_sharding":{"area":"100","companyName":"示例公司","_shardTable":"contract_field_sharding_5"}}
+
+---
+
+**示例1e（合同编号 - 签约人，dataType=CONTRACT_USER）：**
+
+**用户：** C1772925352128725合同签约人数据
+
+**助手：**
+{"contractCode":"C1772925352128725","type":8,"status":4,"contract_user":[{"role_type":1,"name":"张三","phone":"138xxxx0000","is_sign":1,"is_auth":1}]}
 
 ---
 
