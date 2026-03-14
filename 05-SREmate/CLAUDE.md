@@ -184,12 +184,45 @@ public String queryXxxFull(String key) {
 
 | 层级 | 日志内容 | 示例 |
 |------|---------|------|
-| AOP 层 | 入口：工具名 + 参数 | `[TOOL] queryContractData(contractCode=C..., dataType=ALL)` |
-| 工具层 | 结果：耗时 + 摘要 | `[TOOL] queryContractData → 50ms, 5 rows` |
+| AOP 层 | 入口：工具名 + 参数 | `[TOOL] queryContractBasic(contractCode=C...)` |
+| 工具层 | 结果：耗时 + 摘要 | `[TOOL] queryContractBasic → 50ms, 1 row` |
 
 **结果摘要规则：**
 - SQL 查询：`N rows` 或 `0 rows (not found)`
 - HTTP 请求：`status=200` 或 `error: xxx`
+
+---
+
+## 本体论驱动的数据查询
+
+### 设计理念
+
+工具按本体论模型拆分，每个工具只返回一种类型的数据。Agent 根据用户意图选择工具，DirectOutputHolder 负责智能合并多工具结果。
+
+### 数据关联关系
+
+```
+Contract（合同主表）
+├── contract_quotation_relation（合同报价单关联）
+├── contract_node（合同节点）
+├── contract_field（合同扩展字段）
+└── contract_signed_objects（签约单据）
+```
+
+### 工具选择决策
+
+| 用户输入 | 编号类型 | 工具调用 |
+|----------|----------|----------|
+| `{订单号}合同数据` | 纯数字 | `queryContractListByOrderId`（仅此一个） |
+| `{订单号}合同节点` | 纯数字 | `queryContractListByOrderId` → 对每个合同调用 `queryContractNodes` |
+| `{合同号}合同数据` | C前缀 | `queryContractBasic` |
+| `{合同号}合同节点` | C前缀 | `queryContractNodes` |
+
+### 禁止行为
+
+1. **单意图单工具**：用户问什么就调用对应的一个工具
+2. **禁止扩展查询**：看到返回数据中的关联字段不得自作主张调用其他工具
+3. **`{订单号}合同数据` 后立即停止**：调用 `queryContractListByOrderId` 后不得再调用其他工具
 
 ---
 
@@ -234,9 +267,16 @@ private String resolveFieldShardingTable(String contractCode) {
 
 ```java
 @Test
-void contractCodePrefix_shouldCallQueryContractData() {
+void contractCodePrefix_shouldCallQueryContractBasic() {
     ask("C1767173898135504的合同数据");
-    assertToolCalled("queryContractData");
+    assertToolCalled("queryContractBasic");
+    assertAllToolsSuccess();
+}
+
+@Test
+void pureDigits_shouldCallQueryContractListByOrderId() {
+    ask("825123110000002753的合同数据");
+    assertToolCalled("queryContractListByOrderId");
     assertAllToolsSuccess();
 }
 ```
@@ -279,6 +319,45 @@ ToolResult.notFound("合同", "C123")  // 资源未找到
 
 标记工具为数据查询工具，结果直接输出，绕过 LLM 归纳。
 
+### DirectOutputHolder（直接输出持有者）
+
+数据查询工具结果的累积与智能合并组件，支持按本体论关联关系嵌套组织多工具结果。
+
+**核心机制：**
+
+1. **累积模式**：`append()` 方法累积所有工具调用结果，支持多工具协同
+2. **调用追踪**：`invokedTypes` 追踪已调用的工具类型，区分"没调用工具"和"调用但无数据"
+3. **智能合并**：`trySmartMerge()` 按本体论关系将关联数据嵌套到主表下
+
+**数据类型检测（通过 JSON 特征字段）：**
+
+| 特征字段 | 数据类型 | 说明 |
+|----------|----------|------|
+| `bill_code` / `billCode` | `contract_quotation_relation` | 合同报价单关联 |
+| `node_type` / `fire_time` | `contract_node` | 合同节点 |
+| `_shardTable` | `contract_field` | 合同扩展字段 |
+| `platform_instance_id` | `contract` | 合同主表 |
+
+**输出结构示例：**
+
+```json
+[
+  {
+    "contract_code": "C1773208288511314",
+    "status": 4,
+    "contract_node": [
+      { "node_type": 1, "fire_time": "2024-01-01" }
+    ],
+    "contract_field": { "area": "100" }
+    // 仅显示调用过工具对应的字段
+  }
+]
+```
+
+**注意事项：**
+- 只有调用过对应工具才会显示字段，未调用的不会出现空字段
+- 调用但无数据时，关联字段显示为空数组 `{}` 或 `[]`
+
 ### ContractFormGateway（合同版式网关）
 
 领域层网关接口，根据 `platform_instance_id` 查询版式表单数据。实现类委托 `HttpEndpointTool` 调用预定义接口。
@@ -289,11 +368,17 @@ ToolResult.notFound("合同", "C123")  // 资源未找到
 
 | 工具类 | 职责 | 方法 |
 |--------|------|------|
-| `ContractQueryTool` | 合同数据查询 | queryContractData, queryContractsByOrderId, queryContractInstanceId, queryContractFormId, queryContractConfig |
-| `BudgetBillTool` | 报价单查询 | queryBudgetBillList |
-| `SubOrderTool` | 子单查询 | querySubOrderInfo |
-| `PersonalQuoteTool` | 个性化报价查询 | queryContractPersonalData |
-| `HttpEndpointTool` | HTTP 接口调用 | callPredefinedEndpoint, callPredefinedEndpointRaw |
+| `ContractQueryTool` | 合同数据查询 | `queryContractListByOrderId`（订单号查合同列表）、`queryContractBasic`（合同基本信息）、`queryContractNodes`（合同节点）、`queryContractSignedObjects`（签约单据）、`queryContractFields`（合同字段） |
+| `BudgetBillTool` | 报价单查询 | `queryBudgetBillList` |
+| `SubOrderTool` | 子单查询 | `querySubOrderInfo` |
+| `PersonalQuoteTool` | 个性化报价查询 | `queryContractPersonalData` |
+| `HttpEndpointTool` | HTTP 接口调用 | `callPredefinedEndpoint`, `callPredefinedEndpointRaw` |
+
+**已废弃的工具方法：**
+- ~~`queryContractData`~~：已拆分为专用工具（`queryContractBasic`、`queryContractNodes` 等）
+- ~~`queryContractInstanceId`~~：已移除
+- ~~`queryContractFormId`~~：已移除
+- ~~`queryContractConfig`~~：已移除
 
 ---
 
