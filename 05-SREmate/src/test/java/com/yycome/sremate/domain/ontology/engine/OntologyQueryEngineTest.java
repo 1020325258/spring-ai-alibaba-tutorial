@@ -34,10 +34,9 @@ class OntologyQueryEngineTest {
 
     // ── 工具方法 ───────────────────────────────────────────
 
-    private OntologyEntity makeEntity(String name, int depth, String field, String pattern) {
+    private OntologyEntity makeEntity(String name, String field, String pattern) {
         OntologyEntity e = new OntologyEntity();
         e.setName(name);
-        e.setDefaultDepth(depth);
         LookupStrategy s = new LookupStrategy();
         s.setField(field);
         s.setPattern(pattern);
@@ -67,7 +66,7 @@ class OntologyQueryEngineTest {
 
     @Test
     void matchStrategy_contractCode_shouldMatchCPrefix() {
-        OntologyEntity contract = makeEntity("Contract", 2, "contractCode", "^C\\d+");
+        OntologyEntity contract = makeEntity("Contract", "contractCode", "^C\\d+");
         LookupStrategy s2 = new LookupStrategy();
         s2.setField("projectOrderId");
         s2.setPattern("^\\d{15,}$");
@@ -84,23 +83,85 @@ class OntologyQueryEngineTest {
 
     @Test
     void matchStrategy_noMatch_shouldThrow() {
-        OntologyEntity entity = makeEntity("Contract", 2, "contractCode", "^C\\d+");
+        OntologyEntity entity = makeEntity("Contract", "contractCode", "^C\\d+");
         when(entityRegistry.getEntity("Contract")).thenReturn(entity);
         assertThatThrownBy(() -> engine.query("Contract", "INVALID_FORMAT", null))
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessageContaining("无法识别的 value 格式");
     }
 
-    // ── default 查询测试 ──────────────────────────────────
+    // ── default 查询测试（不展开关联）──────────────────────
 
     @Test
-    void query_default_singleLevel_shouldReturnRecordsWithChildren() {
-        OntologyEntity contractEntity = makeEntity("Contract", 1, "contractCode", "^C\\d+");
+    void query_default_shouldNotExpandRelations() {
+        OntologyEntity contractEntity = makeEntity("Contract", "contractCode", "^C\\d+");
+
+        when(entityRegistry.getEntity("Contract")).thenReturn(contractEntity);
+        when(gatewayRegistry.getGateway("Contract")).thenReturn(contractGateway);
+        when(contractGateway.queryByField("contractCode", "C123"))
+            .thenReturn(List.of(mutableMap("contractCode", "C123", "type", 8)));
+
+        Map<String, Object> result = engine.query("Contract", "C123", null);
+
+        assertThat(result).isNotNull();
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> contracts = (List<Map<String, Object>>) result.get("records");
+        assertThat(contracts).hasSize(1);
+        // default 不展开关联
+        assertThat(contracts.get(0)).doesNotContainKey("nodes");
+    }
+
+    @Test
+    void query_list_shouldNotExpandRelations() {
+        OntologyEntity contractEntity = makeEntity("Contract", "contractCode", "^C\\d+");
+
+        when(entityRegistry.getEntity("Contract")).thenReturn(contractEntity);
+        when(gatewayRegistry.getGateway("Contract")).thenReturn(contractGateway);
+        when(contractGateway.queryByField("contractCode", "C123"))
+            .thenReturn(List.of(mutableMap("contractCode", "C123", "type", 8)));
+
+        Map<String, Object> result = engine.query("Contract", "C123", "list");
+
+        assertThat(result).isNotNull();
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> contracts = (List<Map<String, Object>>) result.get("records");
+        assertThat(contracts).hasSize(1);
+        assertThat(contracts.get(0)).doesNotContainKey("nodes");
+    }
+
+    // ── Order 实体测试（不展开关联）──────────────────────
+
+    @Test
+    void query_order_default_shouldNotExpandRelations() {
+        OntologyEntity orderEntity = makeEntity("Order", "projectOrderId", "^\\d{15,}$");
+
+        when(entityRegistry.getEntity("Order")).thenReturn(orderEntity);
+        EntityDataGateway orderGateway = mock(EntityDataGateway.class);
+        when(gatewayRegistry.getGateway("Order")).thenReturn(orderGateway);
+        when(orderGateway.queryByField("projectOrderId", "825123110000002753"))
+            .thenReturn(List.of(mutableMap("projectOrderId", "825123110000002753")));
+
+        Map<String, Object> result = engine.query("Order", "825123110000002753", null);
+
+        assertThat(result).isNotNull();
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> orders = (List<Map<String, Object>>) result.get("records");
+        assertThat(orders).hasSize(1);
+        // Order 不展开关联
+        assertThat(orders.get(0)).doesNotContainKey("contracts");
+    }
+
+    // ── scoped 查询测试 ──────────────────────────────────
+
+    @Test
+    void query_scoped_singleHop_shouldBuildHierarchy() {
+        OntologyEntity contractEntity = makeEntity("Contract", "contractCode", "^C\\d+");
         OntologyRelation hasNodes = makeRelation("Contract", "ContractNode",
                                                   "has_nodes", "contractCode", "contractCode");
 
         when(entityRegistry.getEntity("Contract")).thenReturn(contractEntity);
-        when(entityRegistry.getOutgoingRelations("Contract")).thenReturn(List.of(hasNodes));
+        when(entityRegistry.findRelationPath("Contract", "ContractNode"))
+            .thenReturn(List.of(hasNodes));
 
         when(gatewayRegistry.getGateway("Contract")).thenReturn(contractGateway);
         when(gatewayRegistry.getGateway("ContractNode")).thenReturn(nodeGateway);
@@ -109,20 +170,19 @@ class OntologyQueryEngineTest {
         when(nodeGateway.queryByField("contractCode", "C123"))
             .thenReturn(List.of(mutableMap("nodeType", 1, "fireTime", "2024-01-01")));
 
-        Map<String, Object> result = engine.query("Contract", "C123", null);
+        Map<String, Object> result = engine.query("Contract", "C123", "ContractNode");
 
         assertThat(result).isNotNull();
         @SuppressWarnings("unchecked")
         List<Map<String, Object>> contracts = (List<Map<String, Object>>) result.get("records");
         assertThat(contracts).hasSize(1);
+        // scoped 查询应该展开关联
         assertThat(contracts.get(0)).containsKey("nodes");
     }
 
-    // ── scoped 查询测试 ──────────────────────────────────
-
     @Test
     void query_scoped_twoHops_shouldBuildHierarchy() {
-        OntologyEntity orderEntity = makeEntity("Order", 2, "projectOrderId", "^\\d{15,}$");
+        OntologyEntity orderEntity = makeEntity("Order", "projectOrderId", "^\\d{15,}$");
         OntologyRelation hasContracts = makeRelation("Order", "Contract",
                                                       "has_contracts", "projectOrderId", "projectOrderId");
         OntologyRelation hasSignedObjects = makeRelation("Contract", "ContractQuotationRelation",
@@ -178,11 +238,51 @@ class OntologyQueryEngineTest {
         assertThat(contracts0.get(0)).containsKey("signedObjects");
     }
 
-    // ── deriveKey 测试 ────────────────────────────────────
+    // ── 多目标查询测试 ─────────────────────────────────────
+
+    @Test
+    void query_multiTarget_shouldExpandMultiplePaths() {
+        OntologyEntity contractEntity = makeEntity("Contract", "contractCode", "^C\\d+");
+        OntologyRelation hasNodes = makeRelation("Contract", "ContractNode",
+                                                  "has_nodes", "contractCode", "contractCode");
+        OntologyRelation hasFields = makeRelation("Contract", "ContractField",
+                                                   "has_fields", "contractCode", "contractCode");
+
+        when(entityRegistry.getEntity("Contract")).thenReturn(contractEntity);
+        when(entityRegistry.findRelationPath("Contract", "ContractNode"))
+            .thenReturn(List.of(hasNodes));
+        when(entityRegistry.findRelationPath("Contract", "ContractField"))
+            .thenReturn(List.of(hasFields));
+
+        EntityDataGateway fieldGateway = mock(EntityDataGateway.class);
+
+        when(gatewayRegistry.getGateway("Contract")).thenReturn(contractGateway);
+        when(gatewayRegistry.getGateway("ContractNode")).thenReturn(nodeGateway);
+        when(gatewayRegistry.getGateway("ContractField")).thenReturn(fieldGateway);
+        when(contractGateway.queryByField("contractCode", "C123"))
+            .thenReturn(List.of(mutableMap("contractCode", "C123", "type", 8)));
+        when(nodeGateway.queryByField("contractCode", "C123"))
+            .thenReturn(List.of(mutableMap("nodeType", 1)));
+        when(fieldGateway.queryByField("contractCode", "C123"))
+            .thenReturn(List.of(mutableMap("field_key", "key1")));
+
+        Map<String, Object> result = engine.query("Contract", "C123",
+                                                   "ContractNode,ContractField");
+
+        assertThat(result).isNotNull();
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> contracts = (List<Map<String, Object>>) result.get("records");
+        assertThat(contracts).hasSize(1);
+        // 两个目标都应该展开
+        assertThat(contracts.get(0)).containsKey("nodes");
+        assertThat(contracts.get(0)).containsKey("fields");
+    }
+
+    // ── 错误处理测试 ────────────────────────────────────
 
     @Test
     void query_scoped_pathNotFound_shouldThrow() {
-        OntologyEntity entity = makeEntity("BudgetBill", 1, "projectOrderId", "^\\d{15,}$");
+        OntologyEntity entity = makeEntity("BudgetBill", "projectOrderId", "^\\d{15,}$");
         when(entityRegistry.getEntity("BudgetBill")).thenReturn(entity);
         when(entityRegistry.findRelationPath("BudgetBill", "ContractNode")).thenReturn(null);
         when(gatewayRegistry.getGateway("BudgetBill")).thenReturn(mock(EntityDataGateway.class));

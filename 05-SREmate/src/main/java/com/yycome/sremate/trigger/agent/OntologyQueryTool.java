@@ -37,33 +37,28 @@ public class OntologyQueryTool {
     );
 
     @Tool(description = """
-        【本体论智能查询】根据起始实体和值，自动查询关联数据。
-
-        使用场景：
-        - 订单号查询合同及关联数据：entity=Order, value=订单号
-        - 合同号查询关联数据：entity=Contract, value=合同号
-        - 订单号查询报价单及子单：entity=BudgetBill, value=订单号
+        【本体论智能查询】根据起始实体和值，查询实体数据及关联数据。
 
         参数：
-        - entity: 起始实体类型（Order/Contract/BudgetBill）
+        - entity: 起始实体类型（根据用户提供的编号格式判断）
+          - 订单号（纯数字）：Order
+          - 合同号（C开头）：Contract
         - value: 起始值（订单号或合同号）
-        - queryScope: 查询范围（可选）
-          - null 或 "default": 使用实体默认深度，查询所有关联数据
-          - "list": 仅返回列表，不展开关联
-          - 单个目标实体: 仅查询指定目标
-            - "ContractNode": 仅查节点
-            - "ContractQuotationRelation": 仅查签约单据
-            - "ContractField": 仅查字段
-            - "ContractForm": 仅查版式
-            - "ContractConfig": 仅查配置表
-          - 多个目标实体（逗号分隔）: 仅查询指定的多个目标，避免查询不需要的数据
-            - "ContractNode,ContractQuotationRelation": 仅查节点和签约单据
+        - queryScope: 目标实体（用户想查询什么数据，就传对应实体名）
+          - 不传或 "list": 仅返回起始实体本身，不展开关联
+          - "Contract": 展开到合同数据
+          - "ContractNode": 展开到节点数据
+          - "ContractQuotationRelation": 展开到签约单据
+          - "ContractField": 展开到字段数据
+          - "ContractForm": 展开到版式数据
+          - "ContractConfig": 展开到配置表数据
+          - 多个目标（逗号分隔）: "ContractNode,ContractQuotationRelation"
 
         示例：
-        - "825123110000002753下的合同数据" → entity=Order, value=825123110000002753
+        - "825123110000002753下的合同" → entity=Order, value=825123110000002753, queryScope=Contract
+        - "C1767150648920281的节点" → entity=Contract, value=C1767150648920281, queryScope=ContractNode
         - "825123110000002753合同的签约单据和节点" → entity=Order, value=825123110000002753, queryScope=ContractNode,ContractQuotationRelation
-        - "C1767150648920281的版式" → entity=Contract, value=C1767150648920281, queryScope=ContractForm
-        - "C1767150648920281的配置表" → entity=Contract, value=C1767150648920281, queryScope=ContractConfig
+        - "826031111000001859的报价单" → entity=Order, value=826031111000001859, queryScope=BudgetBill
         """)
     @DataQueryTool
     public String ontologyQuery(String entity, String value, String queryScope) {

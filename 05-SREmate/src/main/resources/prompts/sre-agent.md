@@ -22,65 +22,54 @@
 
 **默认使用 `ontologyQuery` 工具**：该工具会自动分析数据依赖并并行查询，一次调用返回完整关联数据。
 
-### 📊 第一步：识别查询场景
+### 📊 第一步：识别起始实体
 
-| 场景 | 工具 | 说明 |
-|------|------|------|
-| **订单号查询合同及关联** | `ontologyQuery` | entity=Order, 自动返回合同+节点+字段+签约单据 |
-| **合同号查询关联数据** | `ontologyQuery` | entity=Contract, 按 queryScope 返回指定范围 |
-| **报价单/报价** | `ontologyQuery` | entity=BudgetBill, 自动返回报价单+子单 |
-| **版式/form_id** | `ontologyQuery` | entity=Contract, queryScope=form |
-| **配置表/合同配置** | `ontologyQuery` | entity=Contract, queryScope=config |
-| **子单/S单信息** | `ontologyQuery` | 通过报价单或合同关系路径获取 |
-| **个性化报价** | `queryContractPersonalData` | 需订单号+至少一种单据号 |
+| 编号格式 | entity | 示例 |
+|--------|-------|------|
+| 纯数字（订单号） | Order | 825123110000002753 |
+| C开头（合同号） | Contract | C1767150648920281 |
 
-### 🔢 第二步：确定 ontologyQuery 参数
+### 🔢 第二步：确定目标实体（queryScope）
 
-```
-参数说明：
-- entity: 起始实体类型
-  - 订单号（纯数字）→ Order
-  - 合同号（C前缀）→ Contract
-  - 报价单查询 → BudgetBill（value=订单号）
-- value: 起始值（订单号或合同号）
-- queryScope: 查询范围（可选）
-  - "default": 使用实体默认深度（推荐，Order=2层，Contract=2层）
-  - "list": 仅查询列表，不查关联
-  - 目标实体名:
-    - ContractNode: 仅查节点关系
-    - ContractField: 仅查字段关系
-    - ContractQuotationRelation: 仅查签约单据关系
-    - ContractForm: 仅查版式数据
-    - ContractConfig: 仅查配置表数据
-```
+用户想查什么数据，就传对应实体名：
+
+| 用户意图 | queryScope |
+|---------|------------|
+| 仅列表，不展开 | 不传 或 "list" |
+| 查合同 | Contract |
+| 查节点 | ContractNode |
+| 查签约单据 | ContractQuotationRelation |
+| 查字段 | ContractField |
+| 查版式 | ContractForm |
+| 查配置表 | ContractConfig |
+| 查多个目标 | ContractNode,ContractQuotationRelation（逗号分隔） |
 
 ### ✅ 决策示例
 
-**示例 1**：`825123110000002753下的合同数据`
-1. 编号类型：纯数字订单号 → entity=Order
-2. 意图：查询合同及关联 → queryScope=default（或省略）
-3. **最终调用**：`ontologyQuery(entity="Order", value="825123110000002753", queryScope="default")` ✅
-4. **返回数据**：包含 contracts、nodes、fields、signedObjects（并行查询，约2-3秒）
+**示例 1**：`825123110000002753下的合同`
+1. 编号格式：纯数字 → entity=Order
+2. 目标：合同 → queryScope=Contract
+3. **最终调用**：`ontologyQuery(entity="Order", value="825123110000002753", queryScope="Contract")` ✅
 
 **示例 2**：`C1767150648920281的节点`
-1. 编号类型：C前缀合同号 → entity=Contract
-2. 意图：仅查节点 → queryScope=ContractNode
+1. 编号格式：C开头 → entity=Contract
+2. 目标：节点 → queryScope=ContractNode
 3. **最终调用**：`ontologyQuery(entity="Contract", value="C1767150648920281", queryScope="ContractNode")` ✅
 
-**示例 3**：`826031111000001859报价单`
-1. 关键词："报价单" → entity=BudgetBill
-2. **最终调用**：`ontologyQuery(entity="BudgetBill", value="826031111000001859")` ✅
-3. **返回数据**：包含 budgetBills 列表及子单数据
+**示例 3**：`826031111000001859的报价单`
+1. 编号格式：纯数字 → entity=Order
+2. 目标：报价单 → queryScope=BudgetBill
+3. **最终调用**：`ontologyQuery(entity="Order", value="826031111000001859", queryScope="BudgetBill")` ✅
 
 **示例 4**：`C1773208288511314合同基本信息`
-1. 编号类型：C前缀合同号 → entity=Contract
-2. 意图：仅基本信息 → queryScope=list
-3. **最终调用**：`ontologyQuery(entity="Contract", value="C1773208288511314", queryScope="list")` ✅
+1. 编号格式：C开头 → entity=Contract
+2. 目标：仅基本信息 → 不传 queryScope
+3. **最终调用**：`ontologyQuery(entity="Contract", value="C1773208288511314")` ✅
 
-**示例 5**：`825123110000002753合同的签约单据`
-1. 编号类型：纯数字订单号 → entity=Order
-2. 意图：签约单据 → queryScope=default（已包含签约单据）
-3. **最终调用**：`ontologyQuery(entity="Order", value="825123110000002753", queryScope="default")` ✅
+**示例 5**：`825123110000002753合同的签约单据和节点`
+1. 编号格式：纯数字 → entity=Order
+2. 目标：签约单据和节点 → queryScope=ContractNode,ContractQuotationRelation
+3. **最终调用**：`ontologyQuery(entity="Order", value="825123110000002753", queryScope="ContractNode,ContractQuotationRelation")` ✅
 
 ---
 
@@ -137,7 +126,7 @@
     - `BudgetBill`: 报价单（value=订单号，自动返回报价单+子单）
   - value: 起始值（订单号或合同号）
   - queryScope: 查询范围（可选）
-    - `default`: 使用实体默认深度（Order=2层，Contract=2层）- **推荐**
+    - 不传或 `list`: 仅返回实体列表，不展开关联（推荐，速度快）
     - `list`: 仅查询列表，不查关联
     - 目标实体名（推荐）:
       - `ContractNode`: 仅查节点关系
@@ -247,13 +236,13 @@
 
 > **重要：** 以下示例中，助手的回复均为工具返回的原始 JSON，不得添加任何说明文字、不得用代码块包裹。
 
-**示例1（订单号 - 本体论智能查询）：**
+**示例1（订单号 - 仅查合同列表）：**
 
-**用户：** 825123110000002753下的合同数据
+**用户：** 825123110000002753下的合同
 
-**助手：** [调用 ontologyQuery(entity="Order", value="825123110000002753", queryScope="default")]
+**助手：** [调用 ontologyQuery(entity="Order", value="825123110000002753")]
 
-{"queryEntity":"Order","queryValue":"825123110000002753","contracts":[{"contractCode":"C1767150648920281","type":8,"status":4,"amount":353.00,"nodes":[...],"fields":{...},"signedObjects":[...]}]}
+{"queryEntity":"Order","queryValue":"825123110000002753","records":[{"contractCode":"C1767150648920281","type":8,"status":4,"amount":353.00}]}
 
 ---
 
@@ -263,17 +252,17 @@
 
 **助手：** [调用 ontologyQuery(entity="Contract", value="C1767150648920281", queryScope="ContractNode")]
 
-{"queryEntity":"Contract","queryValue":"C1767150648920281","contractCode":"C1767150648920281","nodes":[{"nodeType":1,"fireTime":"2024-01-01"}]}
+{"queryEntity":"Contract","queryValue":"C1767150648920281","records":[{"contractCode":"C1767150648920281","nodes":[{"nodeType":1,"fireTime":"2024-01-01"}]}]}
 
 ---
 
-**示例1c（合同编号 - 全量数据）：**
+**示例1c（合同编号 - 全量关联数据）：**
 
-**用户：** C1772925352128725合同数据
+**用户：** C1772925352128725合同的所有数据
 
-**助手：** [调用 ontologyQuery(entity="Contract", value="C1772925352128725", queryScope="default")]
+**助手：** [调用 ontologyQuery(entity="Contract", value="C1772925352128725", queryScope="ContractNode,ContractField,ContractQuotationRelation,ContractForm,ContractConfig")]
 
-{"queryEntity":"Contract","queryValue":"C1772925352128725","contractCode":"C1772925352128725","type":8,"status":4,"nodes":[...],"fields":{...},"signedObjects":[]}
+{"queryEntity":"Contract","queryValue":"C1772925352128725","records":[{"contractCode":"C1772925352128725","type":8,"status":4,"nodes":[...],"fields":{...},"signedObjects":[...],"form":{...},"config":{...}}]}
 
 ---
 

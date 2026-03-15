@@ -33,9 +33,8 @@ public class OntologyQueryEngine {
      * @param entityName  起始实体名（Order / Contract / BudgetBill）
      * @param value       标识值（订单号 / 合同号等）
      * @param queryScope  目标实体名，支持多种格式：
-     *                    - null/"default": 按 defaultDepth 展开所有关系
-     *                    - "list": 仅返回列表，不展开关联
-     *                    - 单个目标: "ContractNode" 展开到该目标的路径
+     *                    - null/"default"/"list": 仅返回实体列表，不展开关联
+     *                    - 单个目标: "Contract" 或 "ContractNode" 展开到该目标的路径
      *                    - 多个目标: "ContractNode,ContractQuotationRelation" 展开到多个目标的路径
      * @return 层级结构的查询结果，起始实体无数据时返回 null
      */
@@ -48,25 +47,22 @@ public class OntologyQueryEngine {
 
         if (records.isEmpty()) return null;
 
-        // "list" 表示仅返回列表，不展开关联
-        if (!"list".equals(queryScope)) {
-            if (queryScope == null || "default".equals(queryScope)) {
-                expandDefault(entityName, records, entity.getDefaultDepth());
-            } else {
-                // 支持多目标查询：按逗号分隔
-                List<String> targets = Arrays.asList(queryScope.split(","));
-                List<List<OntologyRelation>> paths = new ArrayList<>();
-                for (String target : targets) {
-                    List<OntologyRelation> path = entityRegistry.findRelationPath(entityName, target.trim());
-                    if (path == null) {
-                        throw new IllegalArgumentException(
-                            "找不到路径: " + entityName + " -> " + target.trim() +
-                            "，请检查 domain-ontology.yaml 中的关系定义");
-                    }
-                    paths.add(path);
+        // null/"default"/"list" 均表示仅返回列表，不展开关联
+        // 只有明确指定目标实体时才展开关联
+        if (queryScope != null && !"default".equals(queryScope) && !"list".equals(queryScope)) {
+            // 支持多目标查询：按逗号分隔
+            List<String> targets = Arrays.asList(queryScope.split(","));
+            List<List<OntologyRelation>> paths = new ArrayList<>();
+            for (String target : targets) {
+                List<OntologyRelation> path = entityRegistry.findRelationPath(entityName, target.trim());
+                if (path == null) {
+                    throw new IllegalArgumentException(
+                        "找不到路径: " + entityName + " -> " + target.trim() +
+                        "，请检查 domain-ontology.yaml 中的关系定义");
                 }
-                attachMultiPathResults(records, paths);
+                paths.add(path);
             }
+            attachMultiPathResults(records, paths);
         }
 
         Map<String, Object> result = new LinkedHashMap<>();
@@ -74,33 +70,6 @@ public class OntologyQueryEngine {
         result.put("queryValue", value);
         result.put("records", records);
         return result;
-    }
-
-    /**
-     * 按 defaultDepth 递归展开所有出边（同层并行）
-     */
-    private void expandDefault(String entityName, List<Map<String, Object>> records, int depth) {
-        if (depth <= 0) return;
-
-        List<OntologyRelation> outgoing = entityRegistry.getOutgoingRelations(entityName);
-        if (outgoing.isEmpty()) return;
-
-        // 对每条记录，并行展开所有出边
-        List<CompletableFuture<Void>> futures = records.stream()
-            .map(record -> CompletableFuture.runAsync(() -> {
-                for (OntologyRelation rel : outgoing) {
-                    Object childValue = record.get(rel.getVia().get("source_field"));
-                    if (childValue == null) continue;
-                    List<Map<String, Object>> children =
-                        gatewayRegistry.getGateway(rel.getTo())
-                            .queryByField(rel.getVia().get("target_field"), childValue);
-                    expandDefault(rel.getTo(), children, depth - 1);
-                    record.put(deriveKey(rel.getLabel()), children);
-                }
-            }, executor))
-            .toList();
-
-        CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
     }
 
     /**
