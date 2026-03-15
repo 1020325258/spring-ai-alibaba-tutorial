@@ -4,53 +4,69 @@
 
 ## 项目亮点
 
-### 1. 极速响应 - 性能数十倍提升
+### 1. 本体论驱动架构 - 查询性能提升 10 倍+
 
-传统 Agent 架构：用户提问 → LLM 调用工具 → 工具返回数据 → LLM 归纳输出
+传统 Agent 架构：LLM 串行调用多个工具 → 每次调用都需要 LLM 决策 → 耗时 30+ 秒
 
-SREmate 优化架构：用户提问 → LLM 识别意图 → 工具返回数据 → **直接输出**
+SREmate 本体论架构：LLM 调用一次 → 引擎自动并行查询 → 耗时 ~3 秒
 
 ```
-┌─────────────┐     ┌─────────────┐     ┌─────────────┐
-│   用户提问   │ ──▶ │  LLM 意图识别 │ ──▶ │  工具查询数据 │
-└─────────────┘     └─────────────┘     └─────────────┘
-                                                │
-                                                ▼
-                                        ┌─────────────┐
-                                        │  直接输出结果 │  ← 绕过 LLM 二次处理
-                                        └─────────────┘
+┌─────────────┐     ┌─────────────────────┐     ┌─────────────────────┐
+│   用户提问   │ ──▶ │  LLM 识别意图        │ ──▶ │  ontologyQuery()    │
+│  "订单xxx"  │     │  entity=Order       │     │  一次调用完成       │
+└─────────────┘     └─────────────────────┘     └─────────────────────┘
+                                                          │
+                        ┌─────────────────────────────────┼─────────────────────────────────┐
+                        ▼                                 ▼                                 ▼
+                ┌─────────────┐                   ┌─────────────┐                   ┌─────────────┐
+                │ 查询合同列表 │                   │ 查询节点数据 │                   │ 查询签约单据 │
+                └─────────────┘                   └─────────────┘                   └─────────────┘
+                        │                                 │                                 │
+                        └─────────────────────────────────┴─────────────────────────────────┘
+                                                          ▼
+                                                  ┌─────────────┐
+                                                  │  并行执行    │  ← CompletableFuture
+                                                  │  同时返回    │
+                                                  └─────────────┘
 ```
 
-**实现原理：** 通过 `DirectOutputHolder` 机制，数据查询类工具的结果绕过 LLM 归纳，直接流式输出给用户，节省 LLM 处理时间和 Token 消耗。
+**核心优势：**
+- LLM 只做意图识别，不参与执行优化
+- 引擎自动分析数据依赖，并行执行无依赖的查询
+- 新增实体只需实现 Gateway + 配置 YAML，无需修改查询引擎
 
-### 2. 清晰的模型定位 - 仅做意图识别
+### 2. 极速响应 - 绕过 LLM 二次处理
+
+```
+传统模式：用户提问 → LLM 调用工具 → 工具返回数据 → LLM 归纳输出
+
+SREmate：用户提问 → LLM 识别意图 → 工具返回数据 → **直接输出**
+```
+
+**实现原理：** 通过 `@DataQueryTool` 注解，数据查询类工具的结果绕过 LLM 归纳，直接流式输出给用户，节省 LLM 处理时间和 Token 消耗。
+
+### 3. 清晰的模型定位 - 仅做意图识别
 
 | 职责 | 执行方 | 说明 |
 |------|--------|------|
-| 意图识别 | LLM | 理解用户需求，选择合适的工具 |
-| 数据查询 | 工具层 | 聚合多数据源，执行业务逻辑 |
+| 意图识别 | LLM | 理解用户需求，调用 `ontologyQuery` |
+| 依赖分析 | 引擎 | 根据本体定义确定查询路径 |
+| 并行执行 | 引擎 | 同时查询无依赖的关联数据 |
 | 结果输出 | 系统层 | 直接输出，无需 LLM 归纳 |
 
-**优势：**
-- 避免让 LLM 做数据处理等非擅长任务
-- 工具层可组合多步操作（查库 + 调接口），一次完成
-- 模型专注意图理解，响应更快、更准确
+### 4. 实体默认深度控制
 
-### 3. 输出字段控制 - 精准返回
-
-通过 `responseFields` 配置，过滤接口返回字段，只输出用户关心的数据：
+每个实体可配置默认查询深度，灵活控制返回数据范围：
 
 ```yaml
-responseFields:
-  decorateBudgetList:
-    - billType
-    - billCode
-    - statusDesc
+entities:
+  - name: Order
+    defaultDepth: 2    # Order → Contract → Node/Field/SignedObject
+  - name: ContractNode
+    defaultDepth: 0    # 叶子节点，不再继续查询
 ```
 
-**效果：** 原始返回 50+ 字段 → 过滤后仅 3 字段，减少干扰，提升可读性。
-
-### 4. 完善的集成测试 - 基于 Claude Code 开发
+### 5. 完善的集成测试 - 基于 Claude Code 开发
 
 - 测试验证**工具调用行为**，而非输出内容
 - 不受业务数据变化影响，测试稳定可靠
@@ -58,38 +74,55 @@ responseFields:
 
 ```java
 @Test
-void contractCodePrefix_shouldCallQueryContractData() {
-    ask("C1767173898135504的合同数据");
-    assertToolCalled("queryContractData");
+void orderContract_allData_shouldCallOntologyQuery() {
+    ask("825123110000002753下的合同数据");
+    assertToolCalled("ontologyQuery");
+    // 禁止调用旧的工具
+    assertToolNotCalled("queryContractsByOrderId");
     assertAllToolsSuccess();
 }
 ```
 
-### 5. YAML 驱动的接口配置
+### 6. YAML 驱动的配置
 
-新增接口无需修改 Java 代码，只需在 YAML 中追加配置：
+**接口配置：** 新增 HTTP 接口无需修改 Java 代码
 
 ```yaml
 - id: sign-order-list
   name: 查询可签约子单列表
   urlTemplate: "http://service.${env}.ttb.test.ke.com/api/..."
-  method: GET
-  parameters:
-    - name: projectOrderId
-      type: string
-      required: true
 ```
 
-### 6. 分层精炼日志
+**本体配置：** 定义实体和关系
+
+```yaml
+entities:
+  - name: Contract
+    description: "合同实体"
+    defaultDepth: 2
+    attributes:
+      - name: contractCode
+        type: string
+        description: "合同编号"
+
+relations:
+  - label: has_nodes
+    from: Contract
+    to: ContractNode
+    via:
+      source_field: contractCode
+      target_field: contractCode
+```
+
+### 7. 分层精炼日志
 
 | 层级 | 内容 | 示例 |
 |------|------|------|
-| AOP 层 | 入口：工具名 + 参数 | `[TOOL] queryContractData(contractCode=C..., dataType=ALL)` |
-| 工具层 | 结果：耗时 + 摘要 | `[TOOL] queryContractData → 50ms, 5 rows` |
+| AOP 层 | 入口：工具名 + 参数 | `[TOOL] ontologyQuery(entity=Order, value=xxx)` |
+| 工具层 | 结果：耗时 + 摘要 | `[TOOL] ontologyQuery → 133ms, ok` |
+| Gateway 层 | 查询详情 | `[ContractGateway] queryByField: contractCode = C1767...` |
 
-**优势：** 无重复日志，关键信息一目了然。
-
-### 7. 多环境支持
+### 8. 多环境支持
 
 命令行一键切换测试环境：
 
@@ -99,30 +132,13 @@ void contractCodePrefix_shouldCallQueryContractData() {
 
 支持环境：`nrs-escrow`（测试）、`offline-beta`（基准）
 
-### 8. DDD 架构与代码质量
-
-**按业务领域拆分工具类：**
-
-| 工具类 | 职责 |
-|--------|------|
-| `ContractQueryTool` | 合同数据查询 |
-| `BudgetBillTool` | 报价单查询 |
-| `SubOrderTool` | 子单查询 |
-
-**基础设施组件：**
-
-| 组件 | 作用 |
-|------|------|
-| `ToolExecutionTemplate` | 统一工具执行模式，消除重复的 try-catch-log |
-| `ToolResult` | 统一 JSON 结果格式 |
-| `@DataQueryTool` | 注解标记数据查询工具，替代白名单维护 |
-
 ---
 
 ## 技术栈
 
 - **框架：** Spring AI + Spring Boot 3.x
 - **模型：** Qwen-Turbo（通义千问）
+- **并行执行：** Java CompletableFuture
 - **终端：** JLine（支持 Tab 补全、历史记录）
 - **测试：** JUnit 5 + Spring Boot Test
 
@@ -132,8 +148,9 @@ void contractCodePrefix_shouldCallQueryContractData() {
 # 配置 API Key
 export AI_DASHSCOPE_API_KEY=your_api_key_here
 
-# 运行集成测试
-./05-SREmate/scripts/run-integration-tests.sh
+# 运行集成测试（需要 Java 21）
+export JAVA_HOME=/Library/Java/JavaVirtualMachines/jdk-21.jdk/Contents/Home
+mvn test -Dtest=ContractOntologyIT
 
 # 启动交互式命令行
 cd 05-SREmate && mvn spring-boot:run
@@ -155,7 +172,9 @@ cd 05-SREmate && mvn spring-boot:run
   /env    查看或切换环境
   /quit   退出程序
 
-[nrs-escrow] 你: C1767173898135504的合同数据
+[nrs-escrow] 你: 825123110000002753下的合同数据
+[助手] 正在查询...
+{"queryEntity":"Order","contracts":[...]}  ← 直接输出 JSON，3秒内返回
 ```
 
 ## 项目结构
@@ -164,19 +183,103 @@ cd 05-SREmate && mvn spring-boot:run
 05-SREmate/
 ├── src/main/
 │   ├── java/com/yycome/sremate/
-│   │   ├── trigger/agent/   # @Tool 工具类（按业务领域拆分）
-│   │   ├── domain/contract/ # 合同领域（DDD）
+│   │   ├── trigger/agent/   # @Tool 工具类
+│   │   │   └── OntologyQueryTool.java  # 统一查询入口
+│   │   ├── domain/ontology/ # 本体论领域（核心）
+│   │   │   ├── model/       # 本体模型
+│   │   │   ├── service/     # 实体注册中心
+│   │   │   ├── engine/      # 查询引擎
+│   │   │   └── gateway/     # 实体数据网关
 │   │   ├── infrastructure/  # 基础设施（注解、模板）
 │   │   ├── config/          # Spring 配置
 │   │   └── aspect/          # AOP 切面
 │   └── resources/
 │       ├── endpoints/       # HTTP 接口模板（YAML）
+│       ├── ontology/        # 本体论定义（YAML）
 │       ├── prompts/         # LLM 系统提示词
 │       └── skills/          # SRE 知识库
 └── src/test/                # 集成测试
 ```
 
 详细开发规范见 [CLAUDE.md](./CLAUDE.md)
+
+## 性能对比
+
+| 场景 | 优化前 | 优化后 | 提升 |
+|------|--------|--------|------|
+| 订单→合同→关联数据 | 34秒（13次串行 LLM 调用） | 2-4秒 | **8-17倍** |
+| 合同→关联数据 | 8秒（4次串行 LLM 调用） | 1-2秒 | **4-8倍** |
+
+### 耗时分析（实际测试数据）
+
+```
+⏱ 首字节: 1198ms | 工具耗时: 419ms | 总耗时: 1198ms
+[DirectOutput] ✓ 已生效，绕过 LLM 处理
+```
+
+**关键优化**：DirectOutput 生效后立即终止流，总耗时 = 首字节时间。
+
+- **首字节时间（ttfb）**：1-2.5秒，LLM 意图识别（Qwen API 固有延迟）
+- **工具耗时**：100-500ms，本体论引擎并行查询数据库
+- **总耗时**：与首字节时间一致，无额外等待
+
+### DirectOutput 机制
+
+SREmate 的核心优化之一：数据查询工具的结果**直接输出**，绕过 LLM 二次处理。
+
+```java
+@Tool(description = "...")
+@DataQueryTool  // 标记后，结果直接输出
+public String ontologyQuery(String entity, String value, String queryScope) {
+    // 工具执行后，结果存入 DirectOutputHolder
+    // LLM 首字节到达时，直接返回结果，跳过 LLM 归纳
+}
+```
+
+**效果**：
+- 避免让 LLM 处理大量 JSON 数据
+- 减少响应时间和 Token 消耗
+- 集成测试也支持此机制，测试结果更准确
+
+## 架构升级历史
+
+### v2.1 - 本体论驱动并行查询引擎 (2026-03)
+
+**核心变更：**
+
+1. **新增 `ontologyQuery` 统一查询入口**
+   - 替代原有的串行工具调用模式
+   - LLM 只需调用一次，引擎自动并行查询关联数据
+
+2. **DirectOutput 机制优化**
+   - 数据查询结果直接输出，绕过 LLM 二次处理
+   - 使用 `subscribe()` + `dispose()` 实现流式即时终止
+   - 总耗时 = 首字节时间，无额外等待
+
+3. **实体数据网关（Gateway）模式**
+   - 每个实体实现 `EntityDataGateway` 接口
+   - 新增实体只需：Gateway 实现 + YAML 配置
+
+4. **集成测试框架增强**
+   - `BaseSREIT` 支持 DirectOutput 旁路
+   - 耗时分析：首字节、工具耗时、总耗时分离
+   - 测试报告自动生成到 `docs/test-execution-report.md`
+
+**性能提升：**
+
+| 指标 | 优化前 | 优化后 |
+|------|--------|--------|
+| 订单→合同→关联数据 | 34秒 | 2-4秒 |
+| LLM 调用次数 | 13次串行 | 1次 |
+| 数据输出方式 | LLM 归纳 | 直接输出 |
+
+**新增文件：**
+- `domain/ontology/engine/` - 查询引擎核心组件
+- `domain/ontology/gateway/` - 实体数据网关实现
+- `trigger/agent/OntologyQueryTool.java` - 统一查询入口
+- `docs/plans/2026-03-14-ontology-query-engine-design.md` - 架构设计文档
+
+---
 
 ## 许可证
 

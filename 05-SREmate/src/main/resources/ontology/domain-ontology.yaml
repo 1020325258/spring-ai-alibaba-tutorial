@@ -1,20 +1,24 @@
 entities:
   - name: Order
     description: "项目订单，纯数字编号"
+    defaultDepth: 2
     attributes:
       - { name: projectOrderId, type: string, description: "订单号，纯数字" }
 
   - name: Contract
     description: "合同实体，C前缀编号"
     table: contract
+    defaultDepth: 2
     attributes:
       - { name: contractCode,  type: string, description: "合同编号，C前缀+数字" }
       - { name: contractType,  type: enum,   description: "合同类型：认购/正签/销售等" }
       - { name: status,        type: string, description: "合同状态" }
+      - { name: projectOrderId, type: string, description: "所属订单号" }
 
   - name: ContractNode
     description: "合同节点/流程节点"
     table: contract_node
+    defaultDepth: 0
     attributes:
       - { name: contractCode, type: string }
       - { name: nodeType,     type: string }
@@ -23,6 +27,7 @@ entities:
   - name: ContractQuotationRelation
     description: "合同签约的单据对象，存储合同关联的报价单和S单"
     table: contract_quotation_relation
+    defaultDepth: 0
     attributes:
       - { name: contractCode, type: string }
       - { name: bill_code,    type: string, description: "签约单据编号，可为报价单或S单" }
@@ -32,19 +37,23 @@ entities:
   - name: ContractField
     description: "合同字段数据，按contractCode取模分10张表"
     table: contract_field_sharding
+    defaultDepth: 0
     attributes:
       - { name: contractCode, type: string }
       - { name: field_key,    type: string }
       - { name: field_value,  type: string }
+      - { name: _shardTable,  type: string, description: "分表名" }
 
   - name: BudgetBill
     description: "报价单，挂在订单下"
+    defaultDepth: 1
     attributes:
       - { name: billCode,       type: string, description: "报价单编号" }
       - { name: projectOrderId, type: string, description: "所属订单号" }
 
   - name: SubOrder
     description: "S单，可从报价单或合同两个维度关联"
+    defaultDepth: 0
     attributes:
       - { name: orderNo,          type: string }
       - { name: quotationOrderNo, type: string, description: "关联报价单的字段" }
