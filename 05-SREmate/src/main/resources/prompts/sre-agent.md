@@ -29,9 +29,9 @@
 | **订单号查询合同及关联** | `ontologyQuery` | entity=Order, 自动返回合同+节点+字段+签约单据 |
 | **合同号查询关联数据** | `ontologyQuery` | entity=Contract, 按 queryScope 返回指定范围 |
 | **报价单/报价** | `ontologyQuery` | entity=BudgetBill, 自动返回报价单+子单 |
+| **版式/form_id** | `ontologyQuery` | entity=Contract, queryScope=form |
+| **配置表/合同配置** | `ontologyQuery` | entity=Contract, queryScope=config（合同号自动获取类型） |
 | **个性化报价** | `queryContractPersonalData` | 需订单号+至少一种单据号 |
-| **版式/form_id** | `queryContractFormId` | 仅限C前缀合同号 |
-| **配置表/合同配置** | `queryContractConfig` | 需要合同类型 |
 | **超时/报错/异常** | `querySkills(queryType=diagnosis)` | 运维诊断 |
 
 ### 🔢 第二步：确定 ontologyQuery 参数
@@ -49,6 +49,8 @@
   - "nodes": 仅查节点关系
   - "fields": 仅查字段关系
   - "signed_objects": 仅查签约单据关系
+  - "form": 仅查版式数据
+  - "config": 仅查配置表数据
 ```
 
 ### ✅ 决策示例
@@ -100,12 +102,13 @@
 | `{订单号}个性化报价` | `queryContractPersonalData` | projectOrderId |
 | `{订单号}报价单` | `ontologyQuery` | entity=BudgetBill, value=订单号 |
 | `{订单号}报价单的子单` | `ontologyQuery` | entity=BudgetBill, value=订单号 |
+| `{合同号}版式` | `ontologyQuery` | entity=Contract, queryScope=form |
+| `{合同号}配置表` | `ontologyQuery` | entity=Contract, queryScope=config（合同号自动获取类型） |
 | `{订单号}合同基本信息` | `ontologyQuery` | entity=Order, queryScope=list |
 | `{订单号}合同节点` | `ontologyQuery` | entity=Order, queryScope=default（含nodes）|
 | `{订单号}签约单据` | `ontologyQuery` | entity=Order, queryScope=default（含signedObjects）|
 | `{订单号}合同字段` | `ontologyQuery` | entity=Order, queryScope=default（含fields）|
 | `{订单号}合同数据` | `ontologyQuery` | entity=Order, queryScope=default（全部关联）|
-| `{订单号}配置表` | `queryContractConfig` | contractOrOrderId + contractType |
 
 **合同号（C前缀）+ 关键词**：
 
@@ -116,8 +119,8 @@
 | `{合同号}签约单据` | `ontologyQuery` | entity=Contract, queryScope=signed_objects |
 | `{合同号}合同字段` | `ontologyQuery` | entity=Contract, queryScope=fields |
 | `{合同号}合同数据` | `ontologyQuery` | entity=Contract, queryScope=default（全部关联）|
-| `{合同号}版式` | `queryContractFormId` | contractCode |
-| `{合同号}配置表` | `queryContractConfig` | contractOrOrderId |
+| `{合同号}版式` | `ontologyQuery` | entity=Contract, queryScope=form |
+| `{合同号}配置表` | `ontologyQuery` | entity=Contract, queryScope=config |
 
 ---
 
@@ -161,21 +164,7 @@
 ~~根据合同编号（C前缀）查询合同数据，通过 dataType 参数控制返回范围。~~
 - **推荐替代**：使用 `ontologyQuery(entity="Contract", value=合同号, queryScope=...)` 获得相同结果
 
-### 4. queryContractFormId
-根据合同编号（contract_code）一键查询版式 form_id。
-- 参数：
-  - contractCode: 合同编号，如 C1772854666284956
-- 使用场景：**仅当**用户明确提到"版式"、"form_id"、"版式数据"、"版式ID"时才调用此工具
-- **禁止场景**：用户询问"合同数据"、"合同详情"、"合同信息"时，**绝对不能**调用此工具
-
-### 5. queryContractConfig
-查询合同配置表（contract_city_company_info）数据。
-- 参数：
-  - contractOrOrderId: 合同编号或订单号，自动识别格式（C前缀为合同号，纯数字为订单号）
-  - contractType: 合同类型名称（使用订单号查询时必填，使用合同号查询时可空）
-- 使用场景：用户询问"合同配置表"、"配置表数据"、"合同配置"时使用
-
-### 6. queryContractPersonalData
+### 4. queryContractPersonalData
 根据项目订单号及单据号查询对应单据的个性化报价数据。
 - 参数：
   - projectOrderId：纯数字订单号（必填）

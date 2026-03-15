@@ -86,34 +86,6 @@ public class ContractQueryTool {
     }
 
     /**
-     * 根据合同编号查询 platform_instance_id
-     */
-    @Tool(description = """
-            【查询实例ID】仅查询platform_instance_id时使用。
-
-            触发条件：用户明确问"instance_id"或"实例ID"
-
-            参数：
-            - contractCode：C前缀合同号（必填）
-
-            示例："C1767173898135504的instance_id"
-
-            提示：如需版式form_id，直接用queryContractFormId""")
-    @DataQueryTool
-    public String queryContractInstanceId(String contractCode) {
-        return ToolExecutionTemplate.execute("queryContractInstanceId", () -> {
-            Long instanceId = contractQueryService.queryInstanceId(contractCode);
-            if (instanceId == null) {
-                return ToolResult.notFound("合同", contractCode);
-            }
-            Map<String, Object> result = new LinkedHashMap<>();
-            result.put("contractCode", contractCode);
-            result.put("platformInstanceId", instanceId);
-            return contractQueryService.toJson(result);
-        });
-    }
-
-    /**
      * 根据合同编号查询版式 form_id
      */
     @Tool(description = """

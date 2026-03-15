@@ -138,13 +138,6 @@ public class ContractQueryService {
     }
 
     /**
-     * 查询合同的 platform_instance_id
-     */
-    public Long queryInstanceId(String contractCode) {
-        return contractDao.findPlatformInstanceId(contractCode);
-    }
-
-    /**
      * 查询合同版式 form_id（查库获取 instanceId + 调用网关）
      */
     public String queryFormId(String contractCode) {

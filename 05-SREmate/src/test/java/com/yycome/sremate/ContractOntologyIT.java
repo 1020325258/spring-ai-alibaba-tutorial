@@ -99,4 +99,24 @@ class ContractOntologyIT extends BaseSREIT {
         assertToolCalled("ontologyQuery");
         assertAllToolsSuccess();
     }
+
+    // ── 版式查询：使用 ontologyQuery(entity=Contract, queryScope=form) ────────────────────────
+
+    @Test
+    void contractForm_shouldCallOntologyQuery() {
+        ask("C1767173898135504的版式");
+        assertToolCalled("ontologyQuery");
+        assertToolNotCalled("queryContractFormId");
+        assertAllToolsSuccess();
+    }
+
+    // ── 配置表查询：使用 ontologyQuery(entity=Contract, queryScope=config) ────────────────────────
+
+    @Test
+    void contractConfig_shouldCallOntologyQuery() {
+        ask("C1767173898135504的配置表");
+        assertToolCalled("ontologyQuery");
+        assertToolNotCalled("queryContractConfig");
+        assertAllToolsSuccess();
+    }
 }

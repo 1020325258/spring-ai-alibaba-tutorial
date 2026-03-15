@@ -49,10 +49,13 @@ public class OntologyQueryTool {
           - "fields": 仅查字段关系
           - "signed_objects": 仅查签约单据关系
           - "budget_bills": 仅查报价单关系
+          - "form": 仅查版式数据
+          - "config": 仅查配置表数据
 
         示例：
         - "825123110000002753下的合同数据" → entity=Order, value=825123110000002753, queryScope=default
-        - "C1767150648920281的节点" → entity=Contract, value=C1767150648920281, queryScope=nodes
+        - "C1767150648920281的版式" → entity=Contract, value=C1767150648920281, queryScope=form
+        - "C1767150648920281的配置表" → entity=Contract, value=C1767150648920281, queryScope=config
         - "826031111000001859的报价单" → entity=BudgetBill, value=826031111000001859
         """)
     @DataQueryTool
@@ -91,6 +94,8 @@ public class OntologyQueryTool {
             case "fields" -> List.of("has_fields");
             case "signed_objects" -> List.of("has_signed_objects");
             case "budget_bills" -> List.of("has_budget_bills");
+            case "form" -> List.of("has_form");
+            case "config" -> List.of("has_config");
             default -> null;
         };
     }
@@ -294,6 +299,26 @@ public class OntologyQueryTool {
                 EntityDataGateway gateway = gatewayRegistry.getGateway("ContractQuotationRelation");
                 List<Map<String, Object>> signedObjects = gateway.queryByField("contractCode", contractCode);
                 result.put("signedObjects", signedObjects);
+            }, dbQueryExecutor));
+        }
+
+        if (relationsToQuery.contains("has_form")) {
+            futures.add(CompletableFuture.runAsync(() -> {
+                EntityDataGateway gateway = gatewayRegistry.getGateway("ContractForm");
+                List<Map<String, Object>> formData = gateway.queryByField("contractCode", contractCode);
+                if (!formData.isEmpty()) {
+                    result.put("form", formData.get(0));
+                }
+            }, dbQueryExecutor));
+        }
+
+        if (relationsToQuery.contains("has_config")) {
+            futures.add(CompletableFuture.runAsync(() -> {
+                EntityDataGateway gateway = gatewayRegistry.getGateway("ContractConfig");
+                List<Map<String, Object>> configData = gateway.queryByField("contractCode", contractCode);
+                if (!configData.isEmpty()) {
+                    result.put("config", configData.get(0));
+                }
             }, dbQueryExecutor));
         }
 
