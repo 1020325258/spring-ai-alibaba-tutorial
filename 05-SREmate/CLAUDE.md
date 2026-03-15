@@ -61,6 +61,49 @@ ask("825123110000002753下的合同数据");
 // [DirectOutput] ✓ 已生效
 ```
 
+### ⚠️ @DataQueryTool 注解使用规范（重要）
+
+**核心原则**：`@DataQueryTool` 只能标记在**最外层的用户直调工具**上，内部工具禁止标记。
+
+```
+用户 → LLM 调用 → ontologyQuery (有 @DataQueryTool) → DirectOutput 输出
+                    ↓ 内部调用
+                    callPredefinedEndpoint (无 @DataQueryTool)
+                    ↓
+                    其他 Gateway 工具 (无 @DataQueryTool)
+```
+
+**为什么必须这样？**
+
+DirectOutput 机制会捕获**第一个**带有 `@DataQueryTool` 注解的工具结果并直接输出。如果内部工具（如 `callPredefinedEndpoint`）也有此注解，会导致：
+
+| 错误场景 | 后果 |
+|---------|------|
+| `ontologyQuery` 内部调用 `callPredefinedEndpoint` | DirectOutput 捕获 `callPredefinedEndpoint` 的中间结果，而非 `ontologyQuery` 的最终结果 |
+| 用户查询报价单子单 | 输出只有报价单列表，丢失了子单数据 |
+
+**正确示例**：
+
+```java
+// ✅ 正确：最外层工具标记注解
+@Tool(description = "本体论统一查询入口")
+@DataQueryTool
+public String ontologyQuery(String entity, String value, String queryScope) {
+    // 内部调用其他工具，结果会被 DirectOutput 捕获
+}
+
+// ✅ 正确：内部工具不标记注解
+// 注意：不添加 @DataQueryTool，因为此方法常被其他工具内部调用
+// DirectOutput 应该只捕获最外层工具的结果
+public String callPredefinedEndpoint(String endpointId, Map<String, String> params) {
+    // 这个方法被 Gateway 内部调用，不应触发 DirectOutput
+}
+```
+
+**设计原则**：
+
+> 用户所有的查询请求都只触发 `ontologyQuery` 工具，其余工具仅在内部调用。
+
 ---
 
 ## 项目结构
@@ -390,14 +433,25 @@ public class XxxTool {
 }
 ```
 
-### 必须添加 @DataQueryTool 注解
+### @DataQueryTool 注解使用判断
 
-新增数据查询工具方法时，**必须**添加 `@DataQueryTool` 注解：
+**添加注解**：最外层、用户直接调用的数据查询工具
 
 ```java
 @DataQueryTool  // 标记后，工具结果直接输出，绕过 LLM 归纳
 public String queryXxxList(...) { ... }
 ```
+
+**不添加注解**：内部工具、被其他工具调用的方法
+
+```java
+// 不添加 @DataQueryTool，避免中间结果覆盖最终结果
+public String callPredefinedEndpoint(String endpointId, Map<String, String> params) { ... }
+```
+
+**判断标准**：该工具是否会被 LLM 直接调用？
+- ✅ 是 → 添加 `@DataQueryTool`
+- ❌ 否（仅被其他工具内部调用）→ 不添加
 
 ---
 
@@ -507,14 +561,16 @@ ToolResult.notFound("合同", "C123")  // 资源未找到
 
 ## 工具类职责划分
 
-| 工具类 | 职责 | 状态 |
-|--------|------|------|
-| `OntologyQueryTool` | 本体论统一查询入口 | **推荐使用** |
-| `ContractQueryTool` | 合同数据查询 | 逐步废弃 |
-| `BudgetBillTool` | 报价单查询 | - |
-| `SubOrderTool` | 子单查询 | - |
-| `PersonalQuoteTool` | 个性化报价查询 | - |
-| `HttpEndpointTool` | HTTP 接口调用 | - |
+| 工具类 | 职责 | @DataQueryTool | 状态 |
+|--------|------|----------------|------|
+| `OntologyQueryTool` | 本体论统一查询入口 | ✅ 有 | **推荐使用** |
+| `ContractQueryTool` | 合同数据查询 | ✅ 有 | 逐步废弃 |
+| `BudgetBillTool` | 报价单查询 | ✅ 有 | - |
+| `SubOrderTool` | 子单查询 | ✅ 有 | - |
+| `PersonalQuoteTool` | 个性化报价查询 | ✅ 有 | - |
+| `HttpEndpointTool` | HTTP 接口调用 | ❌ 无（内部工具） | - |
+
+**说明**：`HttpEndpointTool.callPredefinedEndpoint` 不添加 `@DataQueryTool`，因为它是被 Gateway 内部调用的工具，结果应由外层的 `ontologyQuery` 捕获。
 
 ---
 
