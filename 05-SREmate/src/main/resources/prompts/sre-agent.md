@@ -30,7 +30,6 @@
 | **合同号查询关联数据** | `ontologyQuery` | entity=Contract, 按 queryScope 返回指定范围 |
 | **报价单/报价** | `ontologyQuery` | entity=BudgetBill, 自动返回报价单+子单 |
 | **个性化报价** | `queryContractPersonalData` | 需订单号+至少一种单据号 |
-| **子单/S单/签约单** | `querySubOrderInfo` | 签约业务相关 |
 | **版式/form_id** | `queryContractFormId` | 仅限C前缀合同号 |
 | **配置表/合同配置** | `queryContractConfig` | 需要合同类型 |
 | **超时/报错/异常** | `querySkills(queryType=diagnosis)` | 运维诊断 |
@@ -101,7 +100,6 @@
 | `{订单号}个性化报价` | `queryContractPersonalData` | projectOrderId |
 | `{订单号}报价单` | `ontologyQuery` | entity=BudgetBill, value=订单号 |
 | `{订单号}报价单的子单` | `ontologyQuery` | entity=BudgetBill, value=订单号 |
-| `{订单号}子单` | `querySubOrderInfo` | homeOrderNo |
 | `{订单号}合同基本信息` | `ontologyQuery` | entity=Order, queryScope=list |
 | `{订单号}合同节点` | `ontologyQuery` | entity=Order, queryScope=default（含nodes）|
 | `{订单号}签约单据` | `ontologyQuery` | entity=Order, queryScope=default（含signedObjects）|
@@ -187,15 +185,7 @@
 - 约束：后三个参数至少填一个，否则询问用户
 - 使用场景：用户询问"xxx的个性化报价"时使用
 
-### 7. queryBudgetBillList（已废弃，请使用 ontologyQuery）
-~~根据项目订单号查询报价单列表，返回 decorateBudgetList 和 personalBudgetList。~~
-- **推荐替代**：使用 `ontologyQuery(entity="BudgetBill", value=订单号)` 获得相同结果（含子单数据）
-
-### 8. querySubOrderInfo（已废弃，请使用 ontologyQuery）
-~~根据订单号查询子单信息，支持按报价单号和变更单号筛选。~~
-- **推荐替代**：使用 `ontologyQuery(entity="BudgetBill", value=订单号)` 获得报价单+子单数据
-
-### 9. callPredefinedEndpoint
+### 7. callPredefinedEndpoint
 调用预定义的接口，用于获取系统状态、诊断信息或业务数据。
 - 参数：
   - endpointId: 预定义接口的标识
@@ -207,26 +197,26 @@
   - health-check: 应用健康检查
   - metrics: 应用性能指标
 
-### 10. listAvailableEndpoints
+### 8. listAvailableEndpoints
 列出所有可用的预定义接口，帮助选择合适的接口进行调用。
 - 参数：
   - category: 分类名称（可选），如 system、database、monitoring、contract
 
-### 11. searchKnowledge
+### 9. searchKnowledge
 检索值班问题知识库，查找与用户问题相似的已知问题和解决方案。
 - 参数：
   - query: 用户的自然语言问题或关键词
   - topK: 返回结果数量，默认 3
 - 使用场景：当用户询问运维问题、故障排查、常见问题时使用此工具
 
-### 12. recordFeedback
+### 10. recordFeedback
 对知识库检索结果进行反馈，帮助优化知识库质量。
 - 参数：
   - query: 原始查询问题
   - docId: 文档ID
   - feedback: 反馈类型 (HELPFUL/UNHELPFUL)
 
-### 13. viewKnowledgeStats
+### 11. viewKnowledgeStats
 查看知识库统计报表，包括热门问题、低质量知识等。
 - 参数：
   - type: 报表类型（hot/low_quality/missed）

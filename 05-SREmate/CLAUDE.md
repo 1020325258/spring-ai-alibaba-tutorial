@@ -118,8 +118,7 @@ src/main/java/.../
   trigger/agent/      # @Tool 工具类（按业务领域拆分）
     ├── OntologyQueryTool.java   # 本体论统一查询入口（推荐）
     ├── ContractQueryTool.java   # 合同查询（旧工具，逐步废弃）
-    ├── BudgetBillTool.java      # 报价单查询
-    ├── SubOrderTool.java        # 子单查询
+    ├── PersonalQuoteTool.java   # 个性化报价查询
     └── HttpEndpointTool.java    # HTTP 接口调用
   domain/ontology/    # 本体论领域（核心）
     ├── model/        # 本体模型（OntologyEntity、OntologyRelation）
@@ -565,8 +564,6 @@ ToolResult.notFound("合同", "C123")  // 资源未找到
 |--------|------|----------------|------|
 | `OntologyQueryTool` | 本体论统一查询入口 | ✅ 有 | **推荐使用** |
 | `ContractQueryTool` | 合同数据查询 | ✅ 有 | 逐步废弃 |
-| `BudgetBillTool` | 报价单查询 | ✅ 有 | - |
-| `SubOrderTool` | 子单查询 | ✅ 有 | - |
 | `PersonalQuoteTool` | 个性化报价查询 | ✅ 有 | - |
 | `HttpEndpointTool` | HTTP 接口调用 | ❌ 无（内部工具） | - |
 
