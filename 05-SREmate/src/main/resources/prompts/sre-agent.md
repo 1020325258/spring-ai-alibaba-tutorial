@@ -100,6 +100,7 @@
 | `{订单号}下{GBILL单号}的个性化报价` | `queryContractPersonalData` | projectOrderId + billCodeList |
 | `{订单号}个性化报价` | `queryContractPersonalData` | projectOrderId |
 | `{订单号}报价单` | `ontologyQuery` | entity=BudgetBill, value=订单号 |
+| `{订单号}报价单的子单` | `ontologyQuery` | entity=BudgetBill, value=订单号 |
 | `{订单号}子单` | `querySubOrderInfo` | homeOrderNo |
 | `{订单号}合同基本信息` | `ontologyQuery` | entity=Order, queryScope=list |
 | `{订单号}合同节点` | `ontologyQuery` | entity=Order, queryScope=default（含nodes）|
@@ -186,23 +187,13 @@
 - 约束：后三个参数至少填一个，否则询问用户
 - 使用场景：用户询问"xxx的个性化报价"时使用
 
-### 7. queryBudgetBillList
-根据项目订单号查询报价单列表，返回 decorateBudgetList 和 personalBudgetList。
-- 参数：
-  - projectOrderId: 项目订单号，纯数字格式，如 826031111000001859
-- 使用场景：用户询问"xxx的报价单"、"报价单列表"、"报价"时使用
-- **注意：报价单 ≠ 子单，不要混用**
+### 7. queryBudgetBillList（已废弃，请使用 ontologyQuery）
+~~根据项目订单号查询报价单列表，返回 decorateBudgetList 和 personalBudgetList。~~
+- **推荐替代**：使用 `ontologyQuery(entity="BudgetBill", value=订单号)` 获得相同结果（含子单数据）
 
-### 8. querySubOrderInfo
-根据订单号查询子单信息，支持按报价单号和变更单号筛选。
-- 参数：
-  - homeOrderNo: 订单号（必填），纯数字格式，如 826030611000000795
-  - quotationOrderNo: 报价单号（可选），GBILL前缀+数字，如 GBILL260309110407580001
-  - projectChangeNo: 变更单号（可选）
-- 使用场景：
-  - "查询某订单下某报价单的子单信息"
-  - "某订单下某报价单对应的子单是什么"
-  - "查询订单xxx下报价单xxx的子单"
+### 8. querySubOrderInfo（已废弃，请使用 ontologyQuery）
+~~根据订单号查询子单信息，支持按报价单号和变更单号筛选。~~
+- **推荐替代**：使用 `ontologyQuery(entity="BudgetBill", value=订单号)` 获得报价单+子单数据
 
 ### 9. callPredefinedEndpoint
 调用预定义的接口，用于获取系统状态、诊断信息或业务数据。
