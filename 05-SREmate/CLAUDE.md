@@ -162,24 +162,44 @@ ontologyQuery(entity="Order", value="825123110000002753", queryScope="default")
 }
 ```
 
-### 新增实体 SOP
+### 新增实体 SOP（数据驱动化）
 
-> 将新的查询能力接入本体论架构，按以下步骤执行：
+> **改造后，新增实体只需两步，无需修改 OntologyQueryTool 和 OntologyQueryEngine！**
 
-#### 第一步：定义实体（YAML）
+#### 第一步：定义实体和关系（YAML）
 
 在 `src/main/resources/ontology/domain-ontology.yaml` 添加：
 
 ```yaml
 entities:
   - name: NewEntity                    # 实体名称（大驼峰）
-    description: "实体描述"             # 用于 LLM 理解
-    table: table_name                  # 数据库表名（可选，HTTP 接口无需）
-    defaultDepth: 1                    # 默认查询深度（0=叶子节点）
+    displayName: "新实体中文名"         # 中文显示名，注入 LLM 提示词
+    aliases: ["别名1", "别名2"]         # 中文别名列表，帮助 LLM 理解
+    description: "实体描述"
+    table: table_name                  # 数据库表名（可选）
+    defaultDepth: 0                    # 默认查询深度（0=叶子节点）
+    lookupStrategies:                  # 查询入口策略（多格式支持）
+      - field: contractCode
+        pattern: "^C\\d+"              # 正则匹配 value 格式
+      - field: projectOrderId
+        pattern: "^\\d{15,}$"
     attributes:
       - { name: id, type: string, description: "主键" }
-      - { name: relatedField, type: string, description: "关联字段" }
+
+relations:
+  - from: Contract                     # 从 Contract 出发
+    to: NewEntity                      # 到 NewEntity
+    label: has_new_entities            # 关系标签（自动推导 resultKey）
+    via: { source_field: contractCode, target_field: contractCode }
 ```
+
+**lookupStrategies 说明**：
+- 引擎按顺序匹配 pattern，第一个命中的 strategy 决定传给 Gateway 的 fieldName
+- 支持多格式入口，如合同号(C前缀)和订单号(纯数字)都能查询
+
+**resultKey 推导规则**：
+- `has_new_entities` → `newEntities`
+- 去掉 `has_` 前缀，snake_case 转 camelCase
 
 #### 第二步：实现 Gateway
 
@@ -192,7 +212,7 @@ entities:
 @RequiredArgsConstructor
 public class NewEntityGateway implements EntityDataGateway {
 
-    private final JdbcTemplate jdbcTemplate;  // 或 DAO
+    private final JdbcTemplate jdbcTemplate;
     private final EntityGatewayRegistry registry;
 
     @PostConstruct
@@ -204,8 +224,7 @@ public class NewEntityGateway implements EntityDataGateway {
     @Override
     public List<Map<String, Object>> queryByField(String fieldName, Object value) {
         log.debug("[NewEntityGateway] queryByField: {} = {}", fieldName, value);
-        // 实现数据库查询逻辑
-        return jdbcTemplate.queryForList("SELECT * FROM table WHERE field = ?", value);
+        return jdbcTemplate.queryForList("SELECT * FROM table WHERE " + fieldName + " = ?", value);
     }
 }
 ```
@@ -236,7 +255,7 @@ public class NewEntityGateway implements EntityDataGateway {
             return parseAndTransform(json);
         } catch (Exception e) {
             log.warn("[NewEntityGateway] 查询失败: {}", e.getMessage());
-            return Collections.emptyList();  // 失败时返回空列表
+            return Collections.emptyList();
         }
     }
 
@@ -246,60 +265,33 @@ public class NewEntityGateway implements EntityDataGateway {
 }
 ```
 
-#### 第三步：更新 OntologyQueryTool
-
-在 `OntologyQueryTool.java` 添加查询分支：
-
-```java
-// 在 executeQuery 方法中添加
-if ("NewEntity".equals(startEntity)) {
-    return executeNewEntityQuery(startValue, result);
-}
-
-// 添加新方法
-private Map<String, Object> executeNewEntityQuery(Object value, Map<String, Object> result) {
-    EntityDataGateway gateway = gatewayRegistry.getGateway("NewEntity");
-    List<Map<String, Object>> data = gateway.queryByField("fieldName", value);
-    if (data.isEmpty()) { return null; }
-    result.put("newEntityData", data);
-    return result;
-}
-```
-
-#### 第四步：更新 LLM 提示词
+#### 第三步：更新 LLM 提示词
 
 在 `prompts/sre-agent.md` 更新：
 
 1. **场景表**：添加 `| **新实体关键词** | ontologyQuery | entity=NewEntity |`
-2. **参数说明**：添加 `NewEntity: 新实体描述`
+2. **queryScope 参数**：添加 `NewEntity: 新实体描述`
 3. **示例**：添加调用示例
-4. **快速决策表**：添加对应行
 
-#### 第五步：添加集成测试
+#### 第四步：添加集成测试
 
 在 `ContractOntologyIT.java` 添加：
 
 ```java
 @Test
 void newEntity_shouldCallOntologyQuery() {
-    ask("xxx的新实体数据");
+    ask("C1767173898135504的新实体数据");
     assertToolCalled("ontologyQuery");
-    assertToolNotCalled("queryOldTool");  // 禁止调用旧工具
     assertAllToolsSuccess();
 }
 ```
 
-#### 第六步：运行测试验证
+#### 第五步：运行测试验证
 
 ```bash
 export JAVA_HOME=/Library/Java/JavaVirtualMachines/jdk-21.jdk/Contents/Home
 mvn test -Dtest=ContractOntologyIT
 ```
-
-#### 第七步：更新文档
-
-- README.md：更新实体列表和使用示例
-- CLAUDE.md：更新实体默认深度表
 
 ---
 

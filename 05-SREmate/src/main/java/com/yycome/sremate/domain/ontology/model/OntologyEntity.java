@@ -9,8 +9,11 @@ import java.util.List;
 @Data
 public class OntologyEntity {
     private String name;
+    private String displayName;                     // 中文显示名，注入 system prompt
+    private List<String> aliases;                   // 中文别名列表
     private String description;
-    private String table;                         // 对应数据库表名（可空）
+    private String table;
     private List<OntologyAttribute> attributes;
-    private int defaultDepth = 2;                 // 默认查询深度，0=叶子节点不继续查询
+    private int defaultDepth = 2;
+    private List<LookupStrategy> lookupStrategies;  // 替换原 lookupField，支持多格式入口
 }

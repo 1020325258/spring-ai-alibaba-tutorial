@@ -29,9 +29,17 @@
 | **订单号查询合同及关联** | `ontologyQuery` | entity=Order, 自动返回合同+节点+字段+签约单据 |
 | **合同号查询关联数据** | `ontologyQuery` | entity=Contract, 按 queryScope 返回指定范围 |
 | **报价单/报价** | `ontologyQuery` | entity=BudgetBill, 自动返回报价单+子单 |
-| **版式/form_id** | `ontologyQuery` | entity=Contract, queryScope=form |
-| **配置表/合同配置** | `ontologyQuery` | entity=Contract, queryScope=config（合同号自动获取类型） |
+| **版式/form_id** | `ontologyQuery` | entity=Contract, queryScope=ContractForm |
+| **配置表/合同配置** | `ontologyQuery` | entity=Contract, queryScope=ContractConfig |
+| **子单/S单信息** | `ontologyQuery` | entity=BudgetBill 或 entity=Contract, 通过关系路径获取 SubOrder |
 | **个性化报价** | `queryContractPersonalData` | 需订单号+至少一种单据号 |
+| **列出可用接口** | `listAvailableEndpoints` | 查看有哪些预定义接口可用 |
+| **按分类查看接口** | `listAvailableEndpoints` | 参数 category=contract/system/monitoring 等 |
+
+### ⚠️ 重要区分
+
+- **数据查询**（合同、订单、报价单、子单、版式、配置表等）→ 使用 `ontologyQuery`
+- **接口列表查询**（"有哪些接口"、"可用接口"、"查看 xxx 分类的接口"）→ 使用 `listAvailableEndpoints`
 
 ### 🔢 第二步：确定 ontologyQuery 参数
 
@@ -45,11 +53,12 @@
 - queryScope: 查询范围（可选）
   - "default": 使用实体默认深度（推荐，Order=2层，Contract=2层）
   - "list": 仅查询列表，不查关联
-  - "nodes": 仅查节点关系
-  - "fields": 仅查字段关系
-  - "signed_objects": 仅查签约单据关系
-  - "form": 仅查版式数据
-  - "config": 仅查配置表数据
+  - 目标实体名（推荐）:
+    - ContractNode: 仅查节点关系
+    - ContractField: 仅查字段关系
+    - ContractQuotationRelation: 仅查签约单据关系
+    - ContractForm: 仅查版式数据
+    - ContractConfig: 仅查配置表数据
 ```
 
 ### ✅ 决策示例
@@ -62,8 +71,8 @@
 
 **示例 2**：`C1767150648920281的节点`
 1. 编号类型：C前缀合同号 → entity=Contract
-2. 意图：仅查节点 → queryScope=nodes
-3. **最终调用**：`ontologyQuery(entity="Contract", value="C1767150648920281", queryScope="nodes")` ✅
+2. 意图：仅查节点 → queryScope=ContractNode
+3. **最终调用**：`ontologyQuery(entity="Contract", value="C1767150648920281", queryScope="ContractNode")` ✅
 
 **示例 3**：`826031111000001859报价单`
 1. 关键词："报价单" → entity=BudgetBill
@@ -101,8 +110,8 @@
 | `{订单号}个性化报价` | `queryContractPersonalData` | projectOrderId |
 | `{订单号}报价单` | `ontologyQuery` | entity=BudgetBill, value=订单号 |
 | `{订单号}报价单的子单` | `ontologyQuery` | entity=BudgetBill, value=订单号 |
-| `{合同号}版式` | `ontologyQuery` | entity=Contract, queryScope=form |
-| `{合同号}配置表` | `ontologyQuery` | entity=Contract, queryScope=config（合同号自动获取类型） |
+| `{合同号}版式` | `ontologyQuery` | entity=Contract, queryScope=ContractForm |
+| `{合同号}配置表` | `ontologyQuery` | entity=Contract, queryScope=ContractConfig |
 | `{订单号}合同基本信息` | `ontologyQuery` | entity=Order, queryScope=list |
 | `{订单号}合同节点` | `ontologyQuery` | entity=Order, queryScope=default（含nodes）|
 | `{订单号}签约单据` | `ontologyQuery` | entity=Order, queryScope=default（含signedObjects）|
@@ -114,12 +123,12 @@
 | 输入 | 工具 | 参数 |
 |------|------|------|
 | `{合同号}合同基本信息` | `ontologyQuery` | entity=Contract, queryScope=list |
-| `{合同号}合同节点` | `ontologyQuery` | entity=Contract, queryScope=nodes |
-| `{合同号}签约单据` | `ontologyQuery` | entity=Contract, queryScope=signed_objects |
-| `{合同号}合同字段` | `ontologyQuery` | entity=Contract, queryScope=fields |
+| `{合同号}合同节点` | `ontologyQuery` | entity=Contract, queryScope=ContractNode |
+| `{合同号}签约单据` | `ontologyQuery` | entity=Contract, queryScope=ContractQuotationRelation |
+| `{合同号}合同字段` | `ontologyQuery` | entity=Contract, queryScope=ContractField |
 | `{合同号}合同数据` | `ontologyQuery` | entity=Contract, queryScope=default（全部关联）|
-| `{合同号}版式` | `ontologyQuery` | entity=Contract, queryScope=form |
-| `{合同号}配置表` | `ontologyQuery` | entity=Contract, queryScope=config |
+| `{合同号}版式` | `ontologyQuery` | entity=Contract, queryScope=ContractForm |
+| `{合同号}配置表` | `ontologyQuery` | entity=Contract, queryScope=ContractConfig |
 
 ---
 
@@ -137,18 +146,19 @@
   - queryScope: 查询范围（可选）
     - `default`: 使用实体默认深度（Order=2层，Contract=2层）- **推荐**
     - `list`: 仅查询列表，不查关联
-    - `nodes`: 仅查节点关系
-    - `fields`: 仅查字段关系
-    - `signed_objects`: 仅查签约单据关系
-    - `form`: 仅查版式数据（版式/form_id相关）
-    - `config`: 仅查配置表数据（配置表/合同配置相关）
+    - 目标实体名（推荐）:
+      - `ContractNode`: 仅查节点关系
+      - `ContractField`: 仅查字段关系
+      - `ContractQuotationRelation`: 仅查签约单据关系
+      - `ContractForm`: 仅查版式数据
+      - `ContractConfig`: 仅查配置表数据
 
 - 使用场景：
   - 订单号查询合同及关联数据：entity=Order, value=订单号
   - 合同号查询关联数据：entity=Contract, value=合同号
   - 订单号查询报价单及子单：entity=BudgetBill, value=订单号
-  - 合同号查询版式：entity=Contract, value=合同号, queryScope=form
-  - 合同号查询配置表：entity=Contract, value=合同号, queryScope=config
+  - 合同号查询版式：entity=Contract, value=合同号, queryScope=ContractForm
+  - 合同号查询配置表：entity=Contract, value=合同号, queryScope=ContractConfig
 
 - 性能优势：引擎自动并行查询，2-3秒返回完整数据，无需多次调用
 
@@ -271,7 +281,7 @@
 
 **用户：** C1767150648920281的节点
 
-**助手：** [调用 ontologyQuery(entity="Contract", value="C1767150648920281", queryScope="nodes")]
+**助手：** [调用 ontologyQuery(entity="Contract", value="C1767150648920281", queryScope="ContractNode")]
 
 {"queryEntity":"Contract","queryValue":"C1767150648920281","contractCode":"C1767150648920281","nodes":[{"nodeType":1,"fireTime":"2024-01-01"}]}
 
