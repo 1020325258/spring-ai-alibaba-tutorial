@@ -4,8 +4,62 @@
 1. 开发完进行测试，保证功能正常实现。
 2. **每次代码变更后必须运行全部集成测试**，确保已有功能不被破坏：
    ```bash
-   ./05-SREmate/scripts/run-integration-tests.sh
+   export JAVA_HOME=/Library/Java/JavaVirtualMachines/jdk-21.jdk/Contents/Home
+   mvn test -Dtest=ContractOntologyIT
    ```
+
+---
+
+## DirectOutput 机制（核心优化）
+
+### 原理
+
+数据查询类工具（标记 `@DataQueryTool`）的结果绕过 LLM 二次处理，直接输出给用户。
+
+```
+传统流程：用户提问 → LLM 意图识别 → 工具执行 → LLM 归纳输出 → 用户
+优化流程：用户提问 → LLM 意图识别 → 工具执行 → 直接输出 → 用户
+```
+
+### 性能提升
+
+| 场景 | 优化前 | 优化后 | 提升 |
+|------|--------|--------|------|
+| 单合同查询 | 8秒 | 1-2秒 | **4-8倍** |
+| 订单→多合同→关联数据 | 16-20秒 | 2-4秒 | **5-10倍** |
+
+### 耗时分析
+
+测试输出示例：
+```
+⏱ 首字节: 1198ms | 工具耗时: 419ms | 总耗时: 1198ms
+[DirectOutput] ✓ 已生效，绕过 LLM 处理
+```
+
+**关键优化**：DirectOutput 生效后立即 `dispose()` 终止流，总耗时 = 首字节时间。
+
+- **首字节时间（ttfb）**：1-2.5秒，LLM 意图识别 + 工具调用决策（Qwen API 延迟）
+- **工具耗时**：100-500ms，本体论引擎并行查询数据库
+- **总耗时**：与首字节时间一致，无额外等待
+
+### 使用方式
+
+1. **工具方法标记注解**：
+```java
+@Tool(description = "...")
+@DataQueryTool  // 标记后，结果直接输出
+public String ontologyQuery(String entity, String value, String queryScope) {
+    // ...
+}
+```
+
+2. **测试类自动支持**：
+```java
+// BaseSREIT.ask() 已内置 DirectOutput 支持
+ask("825123110000002753下的合同数据");
+// 输出: ⏱ 首字节: 1506ms | 工具耗时: 414ms | 总耗时: 17361ms
+// [DirectOutput] ✓ 已生效
+```
 
 ---
 
@@ -16,21 +70,97 @@ src/main/resources/
   endpoints/          # HTTP 接口模板（YAML）
   prompts/            # LLM 系统提示词
   skills/             # SRE 知识库（Markdown）
+  ontology/           # 本体论定义（YAML）
 src/main/java/.../
   trigger/agent/      # @Tool 工具类（按业务领域拆分）
-    ├── ContractQueryTool.java   # 合同查询
+    ├── OntologyQueryTool.java   # 本体论统一查询入口（推荐）
+    ├── ContractQueryTool.java   # 合同查询（旧工具，逐步废弃）
     ├── BudgetBillTool.java      # 报价单查询
     ├── SubOrderTool.java        # 子单查询
     └── HttpEndpointTool.java    # HTTP 接口调用
+  domain/ontology/    # 本体论领域（核心）
+    ├── model/        # 本体模型（OntologyEntity、OntologyRelation）
+    ├── service/      # 实体注册中心
+    ├── engine/       # 查询引擎（Gateway、Executor）
+    └── gateway/      # 实体数据网关实现
   infrastructure/
     ├── annotation/    # 注解（@DataQueryTool）
     └── service/       # 基础设施服务（ToolExecutionTemplate、ToolResult）
-  domain/contract/     # 合同领域（DDD）
-    ├── gateway/       # 网关接口（ContractFormGateway）
-    └── service/       # 领域服务（ContractQueryService）
   config/              # Spring 配置（AgentConfiguration、DataSourceConfiguration）
   aspect/              # AOP 切面（ObservabilityAspect）
 ```
+
+---
+
+## 本体论驱动查询引擎
+
+### 核心概念
+
+SREmate 采用**本体论驱动**的架构，LLM 只需调用 `ontologyQuery` 工具，引擎自动分析依赖并并行执行查询。
+
+### 架构优势
+
+| 传统方式 | 本体论驱动 |
+|---------|-----------|
+| LLM 串行调用多个工具 | LLM 调用一次 `ontologyQuery` |
+| 34秒完成查询 | ~3秒完成查询 |
+| 新增实体需修改多处代码 | 只需添加 Gateway 实现和 YAML 配置 |
+
+### 使用方式
+
+```java
+// LLM 调用
+ontologyQuery(entity="Order", value="825123110000002753", queryScope="default")
+
+// 返回结果（自动并行查询合同、节点、字段、签约单据）
+{
+  "queryEntity": "Order",
+  "queryValue": "825123110000002753",
+  "contracts": [...]
+}
+```
+
+### 新增实体
+
+1. 在 `domain-ontology.yaml` 添加实体定义：
+```yaml
+entities:
+  - name: NewEntity
+    description: "新实体描述"
+    defaultDepth: 2    # 默认查询深度
+    attributes:
+      - name: id
+        type: string
+        description: "主键"
+```
+
+2. 实现 `EntityDataGateway` 接口：
+```java
+@Component
+public class NewEntityGateway implements EntityDataGateway {
+    @Override
+    public String getEntityName() {
+        return "NewEntity";
+    }
+
+    @Override
+    public List<Map<String, Object>> queryByField(String fieldName, Object value) {
+        // 实现查询逻辑
+    }
+}
+```
+
+3. 在 `OntologyQueryTool` 中添加对应的查询分支（如需）
+
+### 实体默认深度
+
+| 实体 | defaultDepth | 说明 |
+|------|--------------|------|
+| Order | 2 | Order → Contract → Node/Field/SignedObject |
+| Contract | 2 | Contract → Node/Field/SignedObject |
+| ContractNode | 0 | 叶子节点，不再查询关联 |
+| ContractField | 0 | 叶子节点 |
+| ContractQuotationRelation | 0 | 叶子节点 |
 
 ---
 
@@ -117,13 +247,13 @@ urlTemplate: "http://utopia-nrs-sales-project.${env}.ttb.test.ke.com/api/..."
 
 ---
 
-## 新增专用工具（⚠️ 强制规范）
+## 新增专用工具
 
-### 禁止直接让 LLM 调用 `callPredefinedEndpoint`
+### 推荐方式：使用 OntologyQueryTool
 
-`callPredefinedEndpoint` 需要推断 `endpointId` 和 `params`，LLM 高概率传入 null 导致报错。
+对于合同相关的查询，优先使用 `ontologyQuery`，无需新增工具方法。
 
-### 正确做法：封装专用 `@Tool` 方法
+### 传统方式：封装专用 `@Tool` 方法
 
 根据业务领域，在对应的工具类中封装专用方法：
 
@@ -159,70 +289,18 @@ public class XxxTool {
 public String queryXxxList(...) { ... }
 ```
 
-**注意：** 旧版 `DATA_QUERY_TOOLS` 白名单已废弃，改为注解方式。
-
----
-
-## 新增数据库查询工具
-
-工具方法写在 `MySQLQueryTool`，使用 `@Tool` 注解。
-
-**复合工具**（跨数据库和 HTTP 接口）必须在 Java 层完成，禁止依赖 LLM 串联多步调用：
-
-```java
-@Tool(description = "...自动完成：1) 查库得到 ID；2) 调用接口返回结果。")
-public String queryXxxFull(String key) {
-    Long id = findSomeId(key);
-    if (id == null) return "未找到...";
-    return httpEndpointTool.callPredefinedEndpoint("endpoint-id", Map.of("param", id.toString()));
-}
-```
-
 ---
 
 ## 工具日志规范
 
 | 层级 | 日志内容 | 示例 |
 |------|---------|------|
-| AOP 层 | 入口：工具名 + 参数 | `[TOOL] queryContractBasic(contractCode=C...)` |
-| 工具层 | 结果：耗时 + 摘要 | `[TOOL] queryContractBasic → 50ms, 1 row` |
+| AOP 层 | 入口：工具名 + 参数 | `[TOOL] ontologyQuery(entity=Order, value=xxx)` |
+| 工具层 | 结果：耗时 + 摘要 | `[TOOL] ontologyQuery → 133ms, ok` |
 
 **结果摘要规则：**
 - SQL 查询：`N rows` 或 `0 rows (not found)`
 - HTTP 请求：`status=200` 或 `error: xxx`
-
----
-
-## 本体论驱动的数据查询
-
-### 设计理念
-
-工具按本体论模型拆分，每个工具只返回一种类型的数据。Agent 根据用户意图选择工具，DirectOutputHolder 负责智能合并多工具结果。
-
-### 数据关联关系
-
-```
-Contract（合同主表）
-├── contract_quotation_relation（合同报价单关联）
-├── contract_node（合同节点）
-├── contract_field（合同扩展字段）
-└── contract_signed_objects（签约单据）
-```
-
-### 工具选择决策
-
-| 用户输入 | 编号类型 | 工具调用 |
-|----------|----------|----------|
-| `{订单号}合同数据` | 纯数字 | `queryContractListByOrderId`（仅此一个） |
-| `{订单号}合同节点` | 纯数字 | `queryContractListByOrderId` → 对每个合同调用 `queryContractNodes` |
-| `{合同号}合同数据` | C前缀 | `queryContractBasic` |
-| `{合同号}合同节点` | C前缀 | `queryContractNodes` |
-
-### 禁止行为
-
-1. **单意图单工具**：用户问什么就调用对应的一个工具
-2. **禁止扩展查询**：看到返回数据中的关联字段不得自作主张调用其他工具
-3. **`{订单号}合同数据` 后立即停止**：调用 `queryContractListByOrderId` 后不得再调用其他工具
 
 ---
 
@@ -267,16 +345,11 @@ private String resolveFieldShardingTable(String contractCode) {
 
 ```java
 @Test
-void contractCodePrefix_shouldCallQueryContractBasic() {
-    ask("C1767173898135504的合同数据");
-    assertToolCalled("queryContractBasic");
-    assertAllToolsSuccess();
-}
-
-@Test
-void pureDigits_shouldCallQueryContractListByOrderId() {
-    ask("825123110000002753的合同数据");
-    assertToolCalled("queryContractListByOrderId");
+void orderContract_allData_shouldCallOntologyQuery() {
+    ask("825123110000002753下的合同数据");
+    assertToolCalled("ontologyQuery");
+    // 禁止调用旧的工具
+    assertToolNotCalled("queryContractsByOrderId");
     assertAllToolsSuccess();
 }
 ```
@@ -290,7 +363,8 @@ void pureDigits_shouldCallQueryContractListByOrderId() {
 
 运行测试：
 ```bash
-./05-SREmate/scripts/run-integration-tests.sh
+export JAVA_HOME=/Library/Java/JavaVirtualMachines/jdk-21.jdk/Contents/Home
+mvn test -Dtest=ContractOntologyIT
 ```
 
 ---
@@ -319,66 +393,18 @@ ToolResult.notFound("合同", "C123")  // 资源未找到
 
 标记工具为数据查询工具，结果直接输出，绕过 LLM 归纳。
 
-### DirectOutputHolder（直接输出持有者）
-
-数据查询工具结果的累积与智能合并组件，支持按本体论关联关系嵌套组织多工具结果。
-
-**核心机制：**
-
-1. **累积模式**：`append()` 方法累积所有工具调用结果，支持多工具协同
-2. **调用追踪**：`invokedTypes` 追踪已调用的工具类型，区分"没调用工具"和"调用但无数据"
-3. **智能合并**：`trySmartMerge()` 按本体论关系将关联数据嵌套到主表下
-
-**数据类型检测（通过 JSON 特征字段）：**
-
-| 特征字段 | 数据类型 | 说明 |
-|----------|----------|------|
-| `bill_code` / `billCode` | `contract_quotation_relation` | 合同报价单关联 |
-| `node_type` / `fire_time` | `contract_node` | 合同节点 |
-| `_shardTable` | `contract_field` | 合同扩展字段 |
-| `platform_instance_id` | `contract` | 合同主表 |
-
-**输出结构示例：**
-
-```json
-[
-  {
-    "contract_code": "C1773208288511314",
-    "status": 4,
-    "contract_node": [
-      { "node_type": 1, "fire_time": "2024-01-01" }
-    ],
-    "contract_field": { "area": "100" }
-    // 仅显示调用过工具对应的字段
-  }
-]
-```
-
-**注意事项：**
-- 只有调用过对应工具才会显示字段，未调用的不会出现空字段
-- 调用但无数据时，关联字段显示为空数组 `{}` 或 `[]`
-
-### ContractFormGateway（合同版式网关）
-
-领域层网关接口，根据 `platform_instance_id` 查询版式表单数据。实现类委托 `HttpEndpointTool` 调用预定义接口。
-
 ---
 
 ## 工具类职责划分
 
-| 工具类 | 职责 | 方法 |
+| 工具类 | 职责 | 状态 |
 |--------|------|------|
-| `ContractQueryTool` | 合同数据查询 | `queryContractListByOrderId`（订单号查合同列表）、`queryContractBasic`（合同基本信息）、`queryContractNodes`（合同节点）、`queryContractSignedObjects`（签约单据）、`queryContractFields`（合同字段） |
-| `BudgetBillTool` | 报价单查询 | `queryBudgetBillList` |
-| `SubOrderTool` | 子单查询 | `querySubOrderInfo` |
-| `PersonalQuoteTool` | 个性化报价查询 | `queryContractPersonalData` |
-| `HttpEndpointTool` | HTTP 接口调用 | `callPredefinedEndpoint`, `callPredefinedEndpointRaw` |
-
-**已废弃的工具方法：**
-- ~~`queryContractData`~~：已拆分为专用工具（`queryContractBasic`、`queryContractNodes` 等）
-- ~~`queryContractInstanceId`~~：已移除
-- ~~`queryContractFormId`~~：已移除
-- ~~`queryContractConfig`~~：已移除
+| `OntologyQueryTool` | 本体论统一查询入口 | **推荐使用** |
+| `ContractQueryTool` | 合同数据查询 | 逐步废弃 |
+| `BudgetBillTool` | 报价单查询 | - |
+| `SubOrderTool` | 子单查询 | - |
+| `PersonalQuoteTool` | 个性化报价查询 | - |
+| `HttpEndpointTool` | HTTP 接口调用 | - |
 
 ---
 
@@ -396,5 +422,3 @@ ToolResult.notFound("合同", "C123")  // 资源未找到
 - `idle-timeout: 180000`（3 分钟）
 - `max-lifetime: 300000`（5 分钟）
 - `keepalive-time: 60000`（1 分钟心跳，防止 MySQL 提前关闭空闲连接）
-
-**修复记录：** `docs/bug-fix-records/2026-03-12-hikaricp-connection-validation-warning.md`

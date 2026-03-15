@@ -1,5 +1,6 @@
 package com.yycome.sremate;
 
+import com.yycome.sremate.infrastructure.service.DirectOutputHolder;
 import com.yycome.sremate.infrastructure.service.TracingService;
 import com.yycome.sremate.infrastructure.service.model.TracingContext;
 import org.junit.jupiter.api.AfterAll;
@@ -22,6 +23,11 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ConcurrentLinkedDeque;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
 /**
@@ -45,6 +51,9 @@ abstract class BaseSREIT {
 
     @Autowired
     protected TracingService tracingService;
+
+    @Autowired
+    protected DirectOutputHolder directOutputHolder;
 
     /** 当前测试类的所有测试记录 */
     private final List<TestRecord> classResults = new ArrayList<>();
@@ -137,20 +146,77 @@ abstract class BaseSREIT {
     /**
      * 向 Agent 发起自然语言请求，自动捕获耗时和工具调用情况。
      * 所有集成测试方法应使用此方法而非直接调用 sreAgent。
+     *
+     * 支持 DirectOutput 机制：如果工具标记为 @DataQueryTool，
+     * 结果直接返回，绕过 LLM 处理。
+     *
+     * 耗时分析：
+     * - ttfb: 首字节时间（LLM 响应开始）
+     * - toolTime: 工具执行时间
+     * - totalTime: 总耗时
      */
     protected String ask(String question) {
         int tracesBefore = tracingService.getTraceCount();
+
+        // 清空之前的直接输出（防止污染）
+        directOutputHolder.clear();
+
+        // 耗时分析
+        AtomicLong ttfbMs = new AtomicLong(-1);
+        AtomicBoolean directOutputUsed = new AtomicBoolean(false);
+        StringBuilder responseBuilder = new StringBuilder();
+        java.util.concurrent.CountDownLatch latch = new java.util.concurrent.CountDownLatch(1);
+        java.util.concurrent.atomic.AtomicReference<reactor.core.Disposable> subscription = new java.util.concurrent.atomic.AtomicReference<>();
+
         long start = System.currentTimeMillis();
 
-        String response = sreAgent.prompt()
+        // 使用流式调用，支持 DirectOutput 旁路
+        reactor.core.Disposable sub = sreAgent.prompt()
                 .user(question)
-                .call()
-                .content();
+                .stream()
+                .content()
+                .doOnNext(chunk -> {
+                    // 记录首字节时间
+                    if (ttfbMs.get() < 0) {
+                        ttfbMs.set(System.currentTimeMillis() - start);
 
-        long duration = System.currentTimeMillis() - start;
+                        // 首字节到达时，检查是否有直接输出
+                        if (directOutputHolder.hasOutput() && !directOutputUsed.get()) {
+                            directOutputUsed.set(true);
+                            String directOutput = directOutputHolder.getAndClear();
+                            responseBuilder.append(directOutput);
+                            // 关键：立即中断流，不再等待 LLM 完成剩余输出
+                            reactor.core.Disposable current = subscription.get();
+                            if (current != null) current.dispose();
+                            return;
+                        }
+                    }
+
+                    // 已走直接输出路径，忽略后续 LLM token
+                    if (directOutputUsed.get()) return;
+
+                    responseBuilder.append(chunk);
+                })
+                .doOnComplete(latch::countDown)
+                .doOnError(e -> latch.countDown())
+                .doOnCancel(latch::countDown)
+                .subscribe();
+        subscription.set(sub);
+        try {
+            latch.await();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+
+        long totalMs = System.currentTimeMillis() - start;
         int newTraceCount = tracingService.getTraceCount() - tracesBefore;
 
+        String response = responseBuilder.toString();
+
         List<ToolCall> toolCalls = captureNewToolCalls(newTraceCount);
+
+        // 计算工具总耗时
+        long toolTotalMs = toolCalls.stream().mapToLong(t -> t.durationMs).sum();
 
         // 填充当前测试记录
         if (currentRecord != null) {
@@ -159,14 +225,22 @@ abstract class BaseSREIT {
             currentRecord.toolCalls = toolCalls;
         }
 
-        // 控制台结构化输出
+        // 控制台结构化输出（含耗时分析）
         System.out.println("=== 问题: " + question + " ===");
         System.out.println(response);
         String toolSummary = toolCalls.isEmpty() ? "无"
                 : toolCalls.stream()
                         .map(t -> t.name + "(" + t.durationMs + "ms" + (t.success ? "" : " FAILED") + ")")
                         .collect(Collectors.joining(", "));
-        System.out.printf("⏱ 耗时: %dms | 工具: %s%n%n", duration, toolSummary);
+
+        // 耗时分析日志
+        System.out.printf("⏱ 首字节: %dms | 工具耗时: %dms | 总耗时: %dms | 工具: %s%n%n",
+                ttfbMs.get(), toolTotalMs, totalMs, toolSummary);
+
+        // 如果 DirectOutput 生效，会有明显的时间差异
+        if (directOutputUsed.get()) {
+            System.out.println("[DirectOutput] ✓ 已生效，绕过 LLM 处理");
+        }
 
         return response;
     }
@@ -184,22 +258,14 @@ abstract class BaseSREIT {
     protected void assertToolCalled(String toolName) {
         List<ToolCall> calls = getToolCalls();
         boolean found = calls.stream()
-                .anyMatch(t -> t.name.equals(toolName) && t.success);
+                .anyMatch(c -> c.name.equals(toolName) && c.success);
         if (!found) {
-            String actualTools = calls.stream()
-                    .map(t -> t.name + (t.success ? "" : "(FAILED)"))
+            String actual = calls.stream()
+                    .map(c -> c.name)
                     .collect(Collectors.joining(", "));
             throw new AssertionError(
-                    "期望调用工具: " + toolName + ", 实际调用: " + (actualTools.isEmpty() ? "无" : actualTools));
+                    "期望调用工具: " + toolName + ", 实际调用: " + (actual.isEmpty() ? "无" : actual));
         }
-    }
-
-    /**
-     * 断言指定工具被调用（包含参数校验）
-     */
-    protected void assertToolCalled(String toolName, String... expectedParams) {
-        // 目前只验证工具名，后续可扩展参数验证
-        assertToolCalled(toolName);
     }
 
     /**
@@ -207,76 +273,78 @@ abstract class BaseSREIT {
      */
     protected void assertToolNotCalled(String toolName) {
         List<ToolCall> calls = getToolCalls();
-        boolean found = calls.stream().anyMatch(t -> t.name.equals(toolName));
+        boolean found = calls.stream()
+                .anyMatch(c -> c.name.equals(toolName));
         if (found) {
-            throw new AssertionError("不期望调用工具: " + toolName + ", 但实际被调用了");
+            throw new AssertionError("不期望工具被调用: " + toolName);
         }
     }
 
     /**
-     * 断言工具调用成功（无失败的工具调用）
+     * 断言所有工具调用都成功
      */
     protected void assertAllToolsSuccess() {
-        List<ToolCall> failed = getToolCalls().stream()
-                .filter(t -> !t.success)
+        List<ToolCall> calls = getToolCalls();
+        List<String> failed = calls.stream()
+                .filter(c -> !c.success)
+                .map(c -> c.name)
                 .toList();
         if (!failed.isEmpty()) {
-            String failedNames = failed.stream()
-                    .map(t -> t.name)
-                    .collect(Collectors.joining(", "));
-            throw new AssertionError("工具调用失败: " + failedNames);
+            throw new AssertionError("以下工具调用失败: " + String.join(", ", failed));
         }
     }
 
     /**
-     * 断言至少调用了一个工具
+     * 从 TracingService 中捕获最近的工具调用记录
      */
-    protected void assertAnyToolCalled() {
-        if (getToolCalls().isEmpty()) {
-            throw new AssertionError("期望至少调用一个工具，但未调用任何工具");
-        }
-    }
-
     private List<ToolCall> captureNewToolCalls(int count) {
-        List<ToolCall> result = new ArrayList<>();
+        ConcurrentLinkedDeque<TracingContext> allContexts = tracingService.getRecentTraces();
+        // 取最近的 count 个
+        List<TracingContext> contexts = new ArrayList<>();
+        int skip = Math.max(0, allContexts.size() - count);
         int i = 0;
-        for (TracingContext ctx : tracingService.getRecentTraces()) {
-            if (i >= count) break;
-            result.add(new ToolCall(ctx.getToolName(), ctx.getDuration(), ctx.isSuccess()));
+        for (TracingContext ctx : allContexts) {
+            if (i >= skip) {
+                contexts.add(ctx);
+            }
             i++;
         }
-        return result;
+        return contexts.stream()
+                .map(ctx -> new ToolCall(
+                        ctx.getToolName(),
+                        ctx.getDuration(),
+                        ctx.isSuccess()
+                ))
+                .collect(Collectors.toList());
     }
 
-    private String truncate(String text, int maxLen) {
-        if (text == null) return "";
-        String single = text.replace("\n", " ").replace("\r", "");
-        if (single.length() <= maxLen) return single;
-        return single.substring(0, maxLen) + "...（截断）";
+    private String truncate(String s, int maxLen) {
+        if (s == null) return "null";
+        return s.length() > maxLen ? s.substring(0, maxLen) + "..." : s;
     }
 
-    // ---- 内部数据结构 ----
+    // --- 内部记录类 ---
 
     static class TestRecord {
-        final String testClass;
-        final String testName;
+        String className;
+        String testName;
         String input;
         String output;
         long totalDurationMs;
         List<ToolCall> toolCalls = new ArrayList<>();
-        boolean failed = false;
+        boolean failed;
         String failureMessage;
 
-        TestRecord(String testClass, String testName) {
-            this.testClass = testClass;
+        TestRecord(String className, String testName) {
+            this.className = className;
             this.testName = testName;
         }
     }
 
     static class ToolCall {
-        final String name;
-        final long durationMs;
-        final boolean success;
+        String name;
+        long durationMs;
+        boolean success;
 
         ToolCall(String name, long durationMs, boolean success) {
             this.name = name;

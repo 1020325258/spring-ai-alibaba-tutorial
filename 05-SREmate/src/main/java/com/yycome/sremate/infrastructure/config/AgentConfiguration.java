@@ -5,6 +5,7 @@ import com.yycome.sremate.trigger.agent.BudgetBillTool;
 import com.yycome.sremate.trigger.agent.ContractQueryTool;
 import com.yycome.sremate.trigger.agent.HttpEndpointTool;
 import com.yycome.sremate.trigger.agent.KnowledgeQueryTool;
+import com.yycome.sremate.trigger.agent.OntologyQueryTool;
 import com.yycome.sremate.trigger.agent.PersonalQuoteTool;
 import com.yycome.sremate.trigger.agent.SkillQueryTool;
 import com.yycome.sremate.trigger.agent.SubOrderTool;
@@ -52,6 +53,7 @@ public class AgentConfiguration {
     @Bean
     public ToolCallbackProvider sreTools(
             SkillQueryTool skillQueryTool,
+            OntologyQueryTool ontologyQueryTool,
             ContractQueryTool contractQueryTool,
             BudgetBillTool budgetBillTool,
             SubOrderTool subOrderTool,
@@ -60,6 +62,7 @@ public class AgentConfiguration {
             @Autowired(required = false) KnowledgeQueryTool knowledgeQueryTool) {
         List<Object> tools = new ArrayList<>();
         tools.add(skillQueryTool);
+        tools.add(ontologyQueryTool);
         tools.add(contractQueryTool);
         tools.add(budgetBillTool);
         tools.add(subOrderTool);
