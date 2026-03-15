@@ -20,11 +20,7 @@ public class CommandRegistry {
     }
 
     private void initTools() {
-        tools.add(new ToolInfo("queryBudgetBillList", "报价单/报价", "826031111000001859报价单"));
-        tools.add(new ToolInfo("queryContractsByOrderId", "订单号查合同", "826031111000001859合同数据"));
-        tools.add(new ToolInfo("queryContractData", "C前缀合同号查询", "C1773208288511314合同数据"));
-        tools.add(new ToolInfo("queryContractFormId", "版式/form_id", "C1773208288511314版式"));
-        tools.add(new ToolInfo("queryContractConfig", "配置表", "826031111000001859配置表"));
+        tools.add(new ToolInfo("ontologyQuery", "合同/订单/报价单/版式/配置表", "C1773208288511314合同数据"));
         tools.add(new ToolInfo("querySubOrderInfo", "子单/S单", "826031111000001859子单"));
     }
 

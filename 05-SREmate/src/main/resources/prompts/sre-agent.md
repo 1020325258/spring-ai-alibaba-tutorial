@@ -28,12 +28,10 @@
 |------|------|------|
 | **订单号查询合同及关联** | `ontologyQuery` | entity=Order, 自动返回合同+节点+字段+签约单据 |
 | **合同号查询关联数据** | `ontologyQuery` | entity=Contract, 按 queryScope 返回指定范围 |
+| **报价单/报价** | `ontologyQuery` | entity=BudgetBill, 自动返回报价单+子单 |
+| **版式/form_id** | `ontologyQuery` | entity=Contract, queryScope=form |
+| **配置表/合同配置** | `ontologyQuery` | entity=Contract, queryScope=config（合同号自动获取类型） |
 | **个性化报价** | `queryContractPersonalData` | 需订单号+至少一种单据号 |
-| **报价单/报价/GBILL** | `queryBudgetBillList` | 不包含"个性化报价"时才触发 |
-| **子单/S单/签约单** | `querySubOrderInfo` | 签约业务相关 |
-| **版式/form_id** | `queryContractFormId` | 仅限C前缀合同号 |
-| **配置表/合同配置** | `queryContractConfig` | 需要合同类型 |
-| **超时/报错/异常** | `querySkills(queryType=diagnosis)` | 运维诊断 |
 
 ### 🔢 第二步：确定 ontologyQuery 参数
 
@@ -42,6 +40,7 @@
 - entity: 起始实体类型
   - 订单号（纯数字）→ Order
   - 合同号（C前缀）→ Contract
+  - 报价单查询 → BudgetBill（value=订单号）
 - value: 起始值（订单号或合同号）
 - queryScope: 查询范围（可选）
   - "default": 使用实体默认深度（推荐，Order=2层，Contract=2层）
@@ -49,6 +48,8 @@
   - "nodes": 仅查节点关系
   - "fields": 仅查字段关系
   - "signed_objects": 仅查签约单据关系
+  - "form": 仅查版式数据
+  - "config": 仅查配置表数据
 ```
 
 ### ✅ 决策示例
@@ -65,8 +66,9 @@
 3. **最终调用**：`ontologyQuery(entity="Contract", value="C1767150648920281", queryScope="nodes")` ✅
 
 **示例 3**：`826031111000001859报价单`
-1. 关键词："报价单" → 非本体论场景
-2. **最终调用**：`queryBudgetBillList(projectOrderId="826031111000001859")` ✅
+1. 关键词："报价单" → entity=BudgetBill
+2. **最终调用**：`ontologyQuery(entity="BudgetBill", value="826031111000001859")` ✅
+3. **返回数据**：包含 budgetBills 列表及子单数据
 
 **示例 4**：`C1773208288511314合同基本信息`
 1. 编号类型：C前缀合同号 → entity=Contract
@@ -97,14 +99,15 @@
 | `{订单号}下{S单号}的个性化报价` | `queryContractPersonalData` | projectOrderId + subOrderNoList |
 | `{订单号}下{GBILL单号}的个性化报价` | `queryContractPersonalData` | projectOrderId + billCodeList |
 | `{订单号}个性化报价` | `queryContractPersonalData` | projectOrderId |
-| `{订单号}报价单` | `queryBudgetBillList` | projectOrderId |
-| `{订单号}子单` | `querySubOrderInfo` | homeOrderNo |
+| `{订单号}报价单` | `ontologyQuery` | entity=BudgetBill, value=订单号 |
+| `{订单号}报价单的子单` | `ontologyQuery` | entity=BudgetBill, value=订单号 |
+| `{合同号}版式` | `ontologyQuery` | entity=Contract, queryScope=form |
+| `{合同号}配置表` | `ontologyQuery` | entity=Contract, queryScope=config（合同号自动获取类型） |
 | `{订单号}合同基本信息` | `ontologyQuery` | entity=Order, queryScope=list |
 | `{订单号}合同节点` | `ontologyQuery` | entity=Order, queryScope=default（含nodes）|
 | `{订单号}签约单据` | `ontologyQuery` | entity=Order, queryScope=default（含signedObjects）|
 | `{订单号}合同字段` | `ontologyQuery` | entity=Order, queryScope=default（含fields）|
 | `{订单号}合同数据` | `ontologyQuery` | entity=Order, queryScope=default（全部关联）|
-| `{订单号}配置表` | `queryContractConfig` | contractOrOrderId + contractType |
 
 **合同号（C前缀）+ 关键词**：
 
@@ -115,8 +118,8 @@
 | `{合同号}签约单据` | `ontologyQuery` | entity=Contract, queryScope=signed_objects |
 | `{合同号}合同字段` | `ontologyQuery` | entity=Contract, queryScope=fields |
 | `{合同号}合同数据` | `ontologyQuery` | entity=Contract, queryScope=default（全部关联）|
-| `{合同号}版式` | `queryContractFormId` | contractCode |
-| `{合同号}配置表` | `queryContractConfig` | contractOrOrderId |
+| `{合同号}版式` | `ontologyQuery` | entity=Contract, queryScope=form |
+| `{合同号}配置表` | `ontologyQuery` | entity=Contract, queryScope=config |
 
 ---
 
@@ -129,6 +132,7 @@
   - entity: 起始实体类型
     - `Order`: 订单（纯数字编号，如 825123110000002753）
     - `Contract`: 合同（C前缀编号，如 C1767150648920281）
+    - `BudgetBill`: 报价单（value=订单号，自动返回报价单+子单）
   - value: 起始值（订单号或合同号）
   - queryScope: 查询范围（可选）
     - `default`: 使用实体默认深度（Order=2层，Contract=2层）- **推荐**
@@ -136,21 +140,19 @@
     - `nodes`: 仅查节点关系
     - `fields`: 仅查字段关系
     - `signed_objects`: 仅查签约单据关系
+    - `form`: 仅查版式数据（版式/form_id相关）
+    - `config`: 仅查配置表数据（配置表/合同配置相关）
 
 - 使用场景：
   - 订单号查询合同及关联数据：entity=Order, value=订单号
   - 合同号查询关联数据：entity=Contract, value=合同号
+  - 订单号查询报价单及子单：entity=BudgetBill, value=订单号
+  - 合同号查询版式：entity=Contract, value=合同号, queryScope=form
+  - 合同号查询配置表：entity=Contract, value=合同号, queryScope=config
 
 - 性能优势：引擎自动并行查询，2-3秒返回完整数据，无需多次调用
 
-### 2. querySkills
-查询SRE运维知识库，获取问题排查经验和解决方案。
-- 参数：
-  - queryType: 查询类型（diagnosis/operations/knowledge）
-  - keywords: 关键词，用于匹配相关文档
-- 使用场景：当用户描述具体问题时，先查询相关的排查经验
-
-### 3a. queryContractsByOrderId（已废弃，请使用 ontologyQuery）
+### 2. queryContractsByOrderId（已废弃，请使用 ontologyQuery）
 ~~根据项目订单号查询该订单下所有合同，并聚合关联数据。~~
 - **推荐替代**：使用 `ontologyQuery(entity="Order", value=订单号)` 获得相同结果且性能更优
 
@@ -158,21 +160,7 @@
 ~~根据合同编号（C前缀）查询合同数据，通过 dataType 参数控制返回范围。~~
 - **推荐替代**：使用 `ontologyQuery(entity="Contract", value=合同号, queryScope=...)` 获得相同结果
 
-### 4. queryContractFormId
-根据合同编号（contract_code）一键查询版式 form_id。
-- 参数：
-  - contractCode: 合同编号，如 C1772854666284956
-- 使用场景：**仅当**用户明确提到"版式"、"form_id"、"版式数据"、"版式ID"时才调用此工具
-- **禁止场景**：用户询问"合同数据"、"合同详情"、"合同信息"时，**绝对不能**调用此工具
-
-### 5. queryContractConfig
-查询合同配置表（contract_city_company_info）数据。
-- 参数：
-  - contractOrOrderId: 合同编号或订单号，自动识别格式（C前缀为合同号，纯数字为订单号）
-  - contractType: 合同类型名称（使用订单号查询时必填，使用合同号查询时可空）
-- 使用场景：用户询问"合同配置表"、"配置表数据"、"合同配置"时使用
-
-### 6. queryContractPersonalData
+### 4. queryContractPersonalData
 根据项目订单号及单据号查询对应单据的个性化报价数据。
 - 参数：
   - projectOrderId：纯数字订单号（必填）
@@ -182,25 +170,7 @@
 - 约束：后三个参数至少填一个，否则询问用户
 - 使用场景：用户询问"xxx的个性化报价"时使用
 
-### 7. queryBudgetBillList
-根据项目订单号查询报价单列表，返回 decorateBudgetList 和 personalBudgetList。
-- 参数：
-  - projectOrderId: 项目订单号，纯数字格式，如 826031111000001859
-- 使用场景：用户询问"xxx的报价单"、"报价单列表"、"报价"时使用
-- **注意：报价单 ≠ 子单，不要混用**
-
-### 8. querySubOrderInfo
-根据订单号查询子单信息，支持按报价单号和变更单号筛选。
-- 参数：
-  - homeOrderNo: 订单号（必填），纯数字格式，如 826030611000000795
-  - quotationOrderNo: 报价单号（可选），GBILL前缀+数字，如 GBILL260309110407580001
-  - projectChangeNo: 变更单号（可选）
-- 使用场景：
-  - "查询某订单下某报价单的子单信息"
-  - "某订单下某报价单对应的子单是什么"
-  - "查询订单xxx下报价单xxx的子单"
-
-### 9. callPredefinedEndpoint
+### 7. callPredefinedEndpoint
 调用预定义的接口，用于获取系统状态、诊断信息或业务数据。
 - 参数：
   - endpointId: 预定义接口的标识
@@ -212,26 +182,26 @@
   - health-check: 应用健康检查
   - metrics: 应用性能指标
 
-### 10. listAvailableEndpoints
+### 8. listAvailableEndpoints
 列出所有可用的预定义接口，帮助选择合适的接口进行调用。
 - 参数：
   - category: 分类名称（可选），如 system、database、monitoring、contract
 
-### 11. searchKnowledge
+### 9. searchKnowledge
 检索值班问题知识库，查找与用户问题相似的已知问题和解决方案。
 - 参数：
   - query: 用户的自然语言问题或关键词
   - topK: 返回结果数量，默认 3
 - 使用场景：当用户询问运维问题、故障排查、常见问题时使用此工具
 
-### 12. recordFeedback
+### 10. recordFeedback
 对知识库检索结果进行反馈，帮助优化知识库质量。
 - 参数：
   - query: 原始查询问题
   - docId: 文档ID
   - feedback: 反馈类型 (HELPFUL/UNHELPFUL)
 
-### 13. viewKnowledgeStats
+### 11. viewKnowledgeStats
 查看知识库统计报表，包括热门问题、低质量知识等。
 - 参数：
   - type: 报表类型（hot/low_quality/missed）

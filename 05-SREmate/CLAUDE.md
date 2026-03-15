@@ -61,6 +61,49 @@ ask("825123110000002753下的合同数据");
 // [DirectOutput] ✓ 已生效
 ```
 
+### ⚠️ @DataQueryTool 注解使用规范（重要）
+
+**核心原则**：`@DataQueryTool` 只能标记在**最外层的用户直调工具**上，内部工具禁止标记。
+
+```
+用户 → LLM 调用 → ontologyQuery (有 @DataQueryTool) → DirectOutput 输出
+                    ↓ 内部调用
+                    callPredefinedEndpoint (无 @DataQueryTool)
+                    ↓
+                    其他 Gateway 工具 (无 @DataQueryTool)
+```
+
+**为什么必须这样？**
+
+DirectOutput 机制会捕获**第一个**带有 `@DataQueryTool` 注解的工具结果并直接输出。如果内部工具（如 `callPredefinedEndpoint`）也有此注解，会导致：
+
+| 错误场景 | 后果 |
+|---------|------|
+| `ontologyQuery` 内部调用 `callPredefinedEndpoint` | DirectOutput 捕获 `callPredefinedEndpoint` 的中间结果，而非 `ontologyQuery` 的最终结果 |
+| 用户查询报价单子单 | 输出只有报价单列表，丢失了子单数据 |
+
+**正确示例**：
+
+```java
+// ✅ 正确：最外层工具标记注解
+@Tool(description = "本体论统一查询入口")
+@DataQueryTool
+public String ontologyQuery(String entity, String value, String queryScope) {
+    // 内部调用其他工具，结果会被 DirectOutput 捕获
+}
+
+// ✅ 正确：内部工具不标记注解
+// 注意：不添加 @DataQueryTool，因为此方法常被其他工具内部调用
+// DirectOutput 应该只捕获最外层工具的结果
+public String callPredefinedEndpoint(String endpointId, Map<String, String> params) {
+    // 这个方法被 Gateway 内部调用，不应触发 DirectOutput
+}
+```
+
+**设计原则**：
+
+> 用户所有的查询请求都只触发 `ontologyQuery` 工具，其余工具仅在内部调用。
+
 ---
 
 ## 项目结构
@@ -75,8 +118,7 @@ src/main/java/.../
   trigger/agent/      # @Tool 工具类（按业务领域拆分）
     ├── OntologyQueryTool.java   # 本体论统一查询入口（推荐）
     ├── ContractQueryTool.java   # 合同查询（旧工具，逐步废弃）
-    ├── BudgetBillTool.java      # 报价单查询
-    ├── SubOrderTool.java        # 子单查询
+    ├── PersonalQuoteTool.java   # 个性化报价查询
     └── HttpEndpointTool.java    # HTTP 接口调用
   domain/ontology/    # 本体论领域（核心）
     ├── model/        # 本体模型（OntologyEntity、OntologyRelation）
@@ -120,37 +162,146 @@ ontologyQuery(entity="Order", value="825123110000002753", queryScope="default")
 }
 ```
 
-### 新增实体
+### 新增实体 SOP
 
-1. 在 `domain-ontology.yaml` 添加实体定义：
+> 将新的查询能力接入本体论架构，按以下步骤执行：
+
+#### 第一步：定义实体（YAML）
+
+在 `src/main/resources/ontology/domain-ontology.yaml` 添加：
+
 ```yaml
 entities:
-  - name: NewEntity
-    description: "新实体描述"
-    defaultDepth: 2    # 默认查询深度
+  - name: NewEntity                    # 实体名称（大驼峰）
+    description: "实体描述"             # 用于 LLM 理解
+    table: table_name                  # 数据库表名（可选，HTTP 接口无需）
+    defaultDepth: 1                    # 默认查询深度（0=叶子节点）
     attributes:
-      - name: id
-        type: string
-        description: "主键"
+      - { name: id, type: string, description: "主键" }
+      - { name: relatedField, type: string, description: "关联字段" }
 ```
 
-2. 实现 `EntityDataGateway` 接口：
+#### 第二步：实现 Gateway
+
+在 `domain/ontology/gateway/` 创建 `NewEntityGateway.java`：
+
+**数据库查询方式：**
 ```java
+@Slf4j
 @Component
+@RequiredArgsConstructor
 public class NewEntityGateway implements EntityDataGateway {
+
+    private final JdbcTemplate jdbcTemplate;  // 或 DAO
+    private final EntityGatewayRegistry registry;
+
+    @PostConstruct
+    public void init() { registry.register(this); }
+
     @Override
-    public String getEntityName() {
-        return "NewEntity";
-    }
+    public String getEntityName() { return "NewEntity"; }
 
     @Override
     public List<Map<String, Object>> queryByField(String fieldName, Object value) {
-        // 实现查询逻辑
+        log.debug("[NewEntityGateway] queryByField: {} = {}", fieldName, value);
+        // 实现数据库查询逻辑
+        return jdbcTemplate.queryForList("SELECT * FROM table WHERE field = ?", value);
     }
 }
 ```
 
-3. 在 `OntologyQueryTool` 中添加对应的查询分支（如需）
+**HTTP 接口方式：**
+```java
+@Slf4j
+@Component
+@RequiredArgsConstructor
+public class NewEntityGateway implements EntityDataGateway {
+
+    private final HttpEndpointTool httpEndpointTool;
+    private final ObjectMapper objectMapper;
+    private final EntityGatewayRegistry registry;
+
+    @PostConstruct
+    public void init() { registry.register(this); }
+
+    @Override
+    public String getEntityName() { return "NewEntity"; }
+
+    @Override
+    public List<Map<String, Object>> queryByField(String fieldName, Object value) {
+        log.debug("[NewEntityGateway] queryByField: {} = {}", fieldName, value);
+        try {
+            String json = httpEndpointTool.callPredefinedEndpoint("endpoint-id",
+                    Map.of("paramName", value));
+            return parseAndTransform(json);
+        } catch (Exception e) {
+            log.warn("[NewEntityGateway] 查询失败: {}", e.getMessage());
+            return Collections.emptyList();  // 失败时返回空列表
+        }
+    }
+
+    private List<Map<String, Object>> parseAndTransform(String json) {
+        // 解析 JSON 并转换为 List<Map>
+    }
+}
+```
+
+#### 第三步：更新 OntologyQueryTool
+
+在 `OntologyQueryTool.java` 添加查询分支：
+
+```java
+// 在 executeQuery 方法中添加
+if ("NewEntity".equals(startEntity)) {
+    return executeNewEntityQuery(startValue, result);
+}
+
+// 添加新方法
+private Map<String, Object> executeNewEntityQuery(Object value, Map<String, Object> result) {
+    EntityDataGateway gateway = gatewayRegistry.getGateway("NewEntity");
+    List<Map<String, Object>> data = gateway.queryByField("fieldName", value);
+    if (data.isEmpty()) { return null; }
+    result.put("newEntityData", data);
+    return result;
+}
+```
+
+#### 第四步：更新 LLM 提示词
+
+在 `prompts/sre-agent.md` 更新：
+
+1. **场景表**：添加 `| **新实体关键词** | ontologyQuery | entity=NewEntity |`
+2. **参数说明**：添加 `NewEntity: 新实体描述`
+3. **示例**：添加调用示例
+4. **快速决策表**：添加对应行
+
+#### 第五步：添加集成测试
+
+在 `ContractOntologyIT.java` 添加：
+
+```java
+@Test
+void newEntity_shouldCallOntologyQuery() {
+    ask("xxx的新实体数据");
+    assertToolCalled("ontologyQuery");
+    assertToolNotCalled("queryOldTool");  // 禁止调用旧工具
+    assertAllToolsSuccess();
+}
+```
+
+#### 第六步：运行测试验证
+
+```bash
+export JAVA_HOME=/Library/Java/JavaVirtualMachines/jdk-21.jdk/Contents/Home
+mvn test -Dtest=ContractOntologyIT
+```
+
+#### 第七步：更新文档
+
+- README.md：更新实体列表和使用示例
+- CLAUDE.md：更新实体默认深度表
+
+---
 
 ### 实体默认深度
 
@@ -158,6 +309,9 @@ public class NewEntityGateway implements EntityDataGateway {
 |------|--------------|------|
 | Order | 2 | Order → Contract → Node/Field/SignedObject |
 | Contract | 2 | Contract → Node/Field/SignedObject |
+| BudgetBill | 1 | BudgetBill → SubOrders |
+| ContractForm | 0 | 叶子节点，版式数据 |
+| ContractConfig | 0 | 叶子节点，配置表数据 |
 | ContractNode | 0 | 叶子节点，不再查询关联 |
 | ContractField | 0 | 叶子节点 |
 | ContractQuotationRelation | 0 | 叶子节点 |
@@ -280,14 +434,25 @@ public class XxxTool {
 }
 ```
 
-### 必须添加 @DataQueryTool 注解
+### @DataQueryTool 注解使用判断
 
-新增数据查询工具方法时，**必须**添加 `@DataQueryTool` 注解：
+**添加注解**：最外层、用户直接调用的数据查询工具
 
 ```java
 @DataQueryTool  // 标记后，工具结果直接输出，绕过 LLM 归纳
 public String queryXxxList(...) { ... }
 ```
+
+**不添加注解**：内部工具、被其他工具调用的方法
+
+```java
+// 不添加 @DataQueryTool，避免中间结果覆盖最终结果
+public String callPredefinedEndpoint(String endpointId, Map<String, String> params) { ... }
+```
+
+**判断标准**：该工具是否会被 LLM 直接调用？
+- ✅ 是 → 添加 `@DataQueryTool`
+- ❌ 否（仅被其他工具内部调用）→ 不添加
 
 ---
 
@@ -397,14 +562,14 @@ ToolResult.notFound("合同", "C123")  // 资源未找到
 
 ## 工具类职责划分
 
-| 工具类 | 职责 | 状态 |
-|--------|------|------|
-| `OntologyQueryTool` | 本体论统一查询入口 | **推荐使用** |
-| `ContractQueryTool` | 合同数据查询 | 逐步废弃 |
-| `BudgetBillTool` | 报价单查询 | - |
-| `SubOrderTool` | 子单查询 | - |
-| `PersonalQuoteTool` | 个性化报价查询 | - |
-| `HttpEndpointTool` | HTTP 接口调用 | - |
+| 工具类 | 职责 | @DataQueryTool | 状态 |
+|--------|------|----------------|------|
+| `OntologyQueryTool` | 本体论统一查询入口 | ✅ 有 | **推荐使用** |
+| `ContractQueryTool` | 合同数据查询 | ✅ 有 | 逐步废弃 |
+| `PersonalQuoteTool` | 个性化报价查询 | ✅ 有 | - |
+| `HttpEndpointTool` | HTTP 接口调用 | ❌ 无（内部工具） | - |
+
+**说明**：`HttpEndpointTool.callPredefinedEndpoint` 不添加 `@DataQueryTool`，因为它是被 Gateway 内部调用的工具，结果应由外层的 `ontologyQuery` 捕获。
 
 ---
 

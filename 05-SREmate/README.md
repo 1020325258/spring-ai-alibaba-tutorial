@@ -245,6 +245,19 @@ public String ontologyQuery(String entity, String value, String queryScope) {
 
 ### v2.1 - 本体论驱动并行查询引擎 (2026-03)
 
+#### 新增功能（v2.1.1）
+
+**报价单查询接入本体论架构：**
+- 新增 `BudgetBillGateway` 封装 HTTP 接口调用
+- 支持通过 `ontologyQuery(entity=BudgetBill, value=订单号)` 查询报价单及子单
+- 报价单数据自动聚合子单信息
+
+**使用示例：**
+```
+用户: 826031111000001859的报价单
+助手: {"queryEntity":"BudgetBill","queryValue":"826031111000001859","budgetBills":[...]}
+```
+
 #### 升级背景
 
 **原架构痛点：**
@@ -308,9 +321,22 @@ public String ontologyQuery(String entity, String value, String queryScope) {
 
 **新增文件：**
 - `domain/ontology/engine/` - 查询引擎核心组件
-- `domain/ontology/gateway/` - 实体数据网关实现
+- `domain/ontology/gateway/` - 实体数据网关实现（含 BudgetBillGateway）
 - `trigger/agent/OntologyQueryTool.java` - 统一查询入口
 - `docs/plans/2026-03-14-ontology-query-engine-design.md` - 架构设计文档
+
+#### v2.1.1 - 报价单查询接入（2026-03）
+
+**新增功能：**
+- 新增 `BudgetBillGateway` 封装 HTTP 接口调用
+- 支持通过 `entity=BudgetBill` 查询报价单及子单
+- 报价单数据自动聚合子单信息
+
+**使用示例：**
+```
+用户: 826031111000001859的报价单
+助手: {"queryEntity":"BudgetBill","queryValue":"826031111000001859","budgetBills":[{"billCode":"GBILL...","subOrders":[...]}]}
+```
 
 ---
 
