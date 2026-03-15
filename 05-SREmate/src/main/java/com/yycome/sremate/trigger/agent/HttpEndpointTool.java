@@ -71,7 +71,8 @@ public class HttpEndpointTool {
             - params：参数Map
 
             示例：{"endpointId":"health-check","params":{}}""")
-    @DataQueryTool
+    // 注意：不添加 @DataQueryTool，因为此方法常被其他工具（如 ontologyQuery）内部调用
+    // DirectOutput 应该只捕获最外层工具的结果，避免中间结果覆盖最终结果
     public String callPredefinedEndpoint(String endpointId, Map<String, String> params) {
         return ToolExecutionTemplate.execute("callPredefinedEndpoint", () -> {
             EndpointTemplate template = endpointTemplateService.getTemplate(endpointId);
