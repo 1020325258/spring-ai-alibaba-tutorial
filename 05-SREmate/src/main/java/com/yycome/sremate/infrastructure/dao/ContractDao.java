@@ -145,13 +145,13 @@ public class ContractDao {
                 "SELECT contract_code, type, status, platform_instance_id, amount, ctime " +
                 "FROM contract WHERE project_order_id = ? AND status != 9 AND del_status = 0",
                 projectOrderId);
-        // 格式化时间字段
+        // 格式化时间字段，转换为驼峰格式
         return rows.stream().map(row -> {
             Map<String, Object> result = new LinkedHashMap<>();
-            result.put("contract_code", row.get("contract_code"));
+            result.put("contractCode", row.get("contract_code"));
             result.put("type", row.get("type"));
             result.put("status", row.get("status"));
-            result.put("platform_instance_id", row.get("platform_instance_id"));
+            result.put("platformInstanceId", row.get("platform_instance_id"));
             result.put("amount", row.get("amount"));
             result.put("ctime", DateTimeUtil.format(row.get("ctime")));
             return result;

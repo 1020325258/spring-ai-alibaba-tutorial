@@ -243,6 +243,32 @@ public String ontologyQuery(String entity, String value, String queryScope) {
 
 ## 架构升级历史
 
+### v2.3 - 多目标查询优化 (2026-03-15)
+
+#### 新增功能
+
+**多目标查询**: `queryScope` 支持逗号分隔多个目标实体，只查询用户需要的数据。
+
+```java
+// 只查节点和签约单据，不查 fields、form、config
+ontologyQuery(entity=Order, value=825123110000002753, queryScope=ContractNode,ContractQuotationRelation)
+```
+
+#### 性能提升
+
+| 场景 | 优化前 | 优化后 |
+|------|--------|--------|
+| 用户要"签约单据和节点" | 查询所有关联数据（fields、form、config 等） | 只查询 nodes、signedObjects |
+| 工具耗时 | 36秒+ | 2-3秒 |
+
+#### 其他优化
+
+- **删除废弃代码**: 移除未使用的 `OntologyQueryPlannerTool`
+- **OrderGateway 简化**: Order 作为虚拟实体，只返回 `projectOrderId`，Contract 通过关系展开获取
+- **DirectOutput 跨线程支持**: 使用 `requestId + ConcurrentHashMap` 替代 `ThreadLocal`
+
+---
+
 ### v2.2 - 本体论引擎数据驱动化改造 (2026-03-15)
 
 #### 改造目标

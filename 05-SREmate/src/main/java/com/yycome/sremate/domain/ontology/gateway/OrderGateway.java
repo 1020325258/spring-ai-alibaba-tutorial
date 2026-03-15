@@ -2,7 +2,6 @@ package com.yycome.sremate.domain.ontology.gateway;
 
 import com.yycome.sremate.domain.ontology.engine.EntityDataGateway;
 import com.yycome.sremate.domain.ontology.engine.EntityGatewayRegistry;
-import com.yycome.sremate.infrastructure.dao.ContractDao;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -14,14 +13,13 @@ import java.util.Map;
 
 /**
  * Order 实体的数据网关
- * 负责根据订单号查询合同列表（作为 Order -> Contract 的桥梁）
+ * Order 是虚拟实体（无独立表），返回订单基本信息用于关系展开
  */
 @Slf4j
 @Component
 @RequiredArgsConstructor
 public class OrderGateway implements EntityDataGateway {
 
-    private final ContractDao contractDao;
     private final EntityGatewayRegistry registry;
 
     @PostConstruct
@@ -42,19 +40,10 @@ public class OrderGateway implements EntityDataGateway {
             throw new IllegalArgumentException("Order 不支持字段: " + fieldName);
         }
 
-        // 查询该订单下的所有合同
-        List<Map<String, Object>> contracts = contractDao.fetchContractsByOrderId((String) value);
-
-        // 转换字段名为驼峰格式
-        return contracts.stream().map(c -> {
-            Map<String, Object> result = new LinkedHashMap<>();
-            result.put("contractCode", c.get("contract_code"));
-            result.put("type", c.get("type"));
-            result.put("status", c.get("status"));
-            result.put("amount", c.get("amount"));
-            result.put("platformInstanceId", c.get("platform_instance_id"));
-            result.put("ctime", c.get("ctime"));
-            return result;
-        }).toList();
+        // Order 是虚拟实体，返回一条记录包含 projectOrderId
+        // 后续 Order → Contract 关系展开会查询实际的合同数据
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("projectOrderId", value);
+        return List.of(result);
     }
 }

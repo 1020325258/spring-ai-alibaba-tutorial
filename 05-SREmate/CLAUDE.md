@@ -162,6 +162,34 @@ ontologyQuery(entity="Order", value="825123110000002753", queryScope="default")
 }
 ```
 
+### 多目标查询（v2.3 新增）
+
+`queryScope` 支持逗号分隔多个目标实体，只查询用户需要的数据：
+
+```java
+// 用户只要"签约单据和节点"
+ontologyQuery(entity="Order", value="825123110000002753", queryScope="ContractNode,ContractQuotationRelation")
+
+// 只返回 nodes 和 signedObjects，不查 fields、form、config
+{
+  "queryEntity": "Order",
+  "contracts": [
+    {
+      "contractCode": "C1767150648920281",
+      "nodes": [...],
+      "signedObjects": [...]
+      // 无 fields、form、config
+    }
+  ]
+}
+```
+
+**性能对比**：
+
+| 场景 | 优化前（scope=default） | 优化后（scope=ContractNode,ContractQuotationRelation） |
+|------|------------------------|-------------------------------------------------------|
+| 用户要"签约单据和节点" | 查询所有关联数据，36秒+ | 只查 nodes、signedObjects，2-3秒 |
+
 ### 新增实体 SOP（数据驱动化）
 
 > **改造后，新增实体只需两步，无需修改 OntologyQueryTool 和 OntologyQueryEngine！**

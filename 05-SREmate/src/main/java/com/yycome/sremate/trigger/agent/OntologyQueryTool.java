@@ -10,7 +10,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.stereotype.Component;
 
+import java.util.Arrays;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * 本体论驱动的统一查询工具（薄层）
@@ -46,21 +48,29 @@ public class OntologyQueryTool {
         - entity: 起始实体类型（Order/Contract/BudgetBill）
         - value: 起始值（订单号或合同号）
         - queryScope: 查询范围（可选）
-          - "default": 使用实体默认深度（推荐）
-          - 目标实体名（如 ContractNode/ContractField/ContractForm/ContractConfig）: 沿关系路径查询
+          - null 或 "default": 使用实体默认深度，查询所有关联数据
+          - "list": 仅返回列表，不展开关联
+          - 单个目标实体: 仅查询指定目标
+            - "ContractNode": 仅查节点
+            - "ContractQuotationRelation": 仅查签约单据
+            - "ContractField": 仅查字段
+            - "ContractForm": 仅查版式
+            - "ContractConfig": 仅查配置表
+          - 多个目标实体（逗号分隔）: 仅查询指定的多个目标，避免查询不需要的数据
+            - "ContractNode,ContractQuotationRelation": 仅查节点和签约单据
 
         示例：
-        - "825123110000002753下的合同数据" → entity=Order, value=825123110000002753, queryScope=default
+        - "825123110000002753下的合同数据" → entity=Order, value=825123110000002753
+        - "825123110000002753合同的签约单据和节点" → entity=Order, value=825123110000002753, queryScope=ContractNode,ContractQuotationRelation
         - "C1767150648920281的版式" → entity=Contract, value=C1767150648920281, queryScope=ContractForm
         - "C1767150648920281的配置表" → entity=Contract, value=C1767150648920281, queryScope=ContractConfig
-        - "826031111000001859的报价单" → entity=BudgetBill, value=826031111000001859
         """)
     @DataQueryTool
     public String ontologyQuery(String entity, String value, String queryScope) {
         return ToolExecutionTemplate.execute("ontologyQuery", () -> {
             log.info("[OntologyQueryTool] 查询: entity={}, value={}, scope={}", entity, value, queryScope);
 
-            // 映射 scope 简写到目标实体名
+            // 映射 scope 简写到目标实体名（支持多目标）
             String resolvedScope = resolveScope(queryScope);
 
             Map<String, Object> result = queryEngine.query(entity, value, resolvedScope);
@@ -74,12 +84,17 @@ public class OntologyQueryTool {
     }
 
     /**
-     * 解析 queryScope，支持简写和实体名
+     * 解析 queryScope，支持简写、实体名和多目标
      */
     private String resolveScope(String queryScope) {
         if (queryScope == null || "default".equals(queryScope) || "list".equals(queryScope)) {
             return queryScope;
         }
-        return SCOPE_ALIAS.getOrDefault(queryScope, queryScope);
+
+        // 支持多目标：按逗号分隔，分别映射
+        return Arrays.stream(queryScope.split(","))
+                .map(String::trim)
+                .map(s -> SCOPE_ALIAS.getOrDefault(s, s))
+                .collect(Collectors.joining(","));
     }
 }

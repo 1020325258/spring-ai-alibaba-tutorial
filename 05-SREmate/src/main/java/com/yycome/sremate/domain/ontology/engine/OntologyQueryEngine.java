@@ -32,7 +32,11 @@ public class OntologyQueryEngine {
      *
      * @param entityName  起始实体名（Order / Contract / BudgetBill）
      * @param value       标识值（订单号 / 合同号等）
-     * @param queryScope  目标实体名（ContractNode 等），null/default 按 defaultDepth 展开，list 仅返回列表
+     * @param queryScope  目标实体名，支持多种格式：
+     *                    - null/"default": 按 defaultDepth 展开所有关系
+     *                    - "list": 仅返回列表，不展开关联
+     *                    - 单个目标: "ContractNode" 展开到该目标的路径
+     *                    - 多个目标: "ContractNode,ContractQuotationRelation" 展开到多个目标的路径
      * @return 层级结构的查询结果，起始实体无数据时返回 null
      */
     public Map<String, Object> query(String entityName, String value, String queryScope) {
@@ -49,13 +53,19 @@ public class OntologyQueryEngine {
             if (queryScope == null || "default".equals(queryScope)) {
                 expandDefault(entityName, records, entity.getDefaultDepth());
             } else {
-                List<OntologyRelation> path = entityRegistry.findRelationPath(entityName, queryScope);
-                if (path == null) {
-                    throw new IllegalArgumentException(
-                        "找不到路径: " + entityName + " -> " + queryScope +
-                        "，请检查 domain-ontology.yaml 中的关系定义");
+                // 支持多目标查询：按逗号分隔
+                List<String> targets = Arrays.asList(queryScope.split(","));
+                List<List<OntologyRelation>> paths = new ArrayList<>();
+                for (String target : targets) {
+                    List<OntologyRelation> path = entityRegistry.findRelationPath(entityName, target.trim());
+                    if (path == null) {
+                        throw new IllegalArgumentException(
+                            "找不到路径: " + entityName + " -> " + target.trim() +
+                            "，请检查 domain-ontology.yaml 中的关系定义");
+                    }
+                    paths.add(path);
                 }
-                attachPathResults(records, path, 0);
+                attachMultiPathResults(records, paths);
             }
         }
 
@@ -112,6 +122,61 @@ public class OntologyQueryEngine {
                         .queryByField(rel.getVia().get("target_field"), childValue);
                 attachPathResults(children, path, hop + 1);
                 record.put(resultKey, children);
+            }, executor))
+            .toList();
+
+        CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
+    }
+
+    /**
+     * 多目标路径展开
+     * 对每条记录，展开所有目标路径，合并相同层级的查询结果
+     */
+    private void attachMultiPathResults(List<Map<String, Object>> records,
+                                         List<List<OntologyRelation>> paths) {
+        // 按层级分组：hop -> 关系列表（去重）
+        Map<Integer, Set<OntologyRelation>> hopRelations = new LinkedHashMap<>();
+        for (List<OntologyRelation> path : paths) {
+            for (int hop = 0; hop < path.size(); hop++) {
+                hopRelations.computeIfAbsent(hop, k -> new LinkedHashSet<>()).add(path.get(hop));
+            }
+        }
+
+        // 逐层展开
+        attachLayer(records, hopRelations, 0);
+    }
+
+    /**
+     * 递归展开某一层的关系
+     */
+    private void attachLayer(List<Map<String, Object>> records,
+                              Map<Integer, Set<OntologyRelation>> hopRelations,
+                              int hop) {
+        if (!hopRelations.containsKey(hop)) return;
+
+        Set<OntologyRelation> relsAtHop = hopRelations.get(hop);
+
+        // 对每条记录，并行展开当前层的所有关系
+        List<CompletableFuture<Void>> futures = records.stream()
+            .map(record -> CompletableFuture.runAsync(() -> {
+                for (OntologyRelation rel : relsAtHop) {
+                    Object childValue = record.get(rel.getVia().get("source_field"));
+                    if (childValue == null) continue;
+
+                    String resultKey = deriveKey(rel.getLabel());
+
+                    // 如果已有该 key，跳过（避免重复查询）
+                    if (record.containsKey(resultKey)) continue;
+
+                    List<Map<String, Object>> children =
+                        gatewayRegistry.getGateway(rel.getTo())
+                            .queryByField(rel.getVia().get("target_field"), childValue);
+
+                    // 递归展开下一层
+                    attachLayer(children, hopRelations, hop + 1);
+
+                    record.put(resultKey, children);
+                }
             }, executor))
             .toList();
 

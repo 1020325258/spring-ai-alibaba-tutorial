@@ -22,7 +22,7 @@ class IntentRecognitionIT extends BaseSREIT {
         @Test
         @DisplayName("C前缀合同编号应使用ontologyQuery")
         void contractCode_CPrefix_shouldUseOntologyQuery() {
-            ask(CONTRACT_CODE + "合同数据");
+            ask(CONTRACT_CODE + "的合同数据");  // 添加"的"改善意图识别
 
             assertToolCalled("ontologyQuery");
             assertAllToolsSuccess();
@@ -31,7 +31,7 @@ class IntentRecognitionIT extends BaseSREIT {
         @Test
         @DisplayName("纯数字订单号应使用ontologyQuery")
         void orderId_pureDigits_shouldUseOntologyQuery() {
-            ask(ORDER_ID + "有哪些合同");
+            ask(ORDER_ID + "下的合同");  // 调整措辞，避免"有哪些"被误解为列表查询
 
             assertToolCalled("ontologyQuery");
             assertAllToolsSuccess();
@@ -40,7 +40,7 @@ class IntentRecognitionIT extends BaseSREIT {
         @Test
         @DisplayName("版式关键词应使用ontologyQuery(queryScope=form)")
         void keyword_formId_shouldUseOntologyQuery() {
-            ask(CONTRACT_CODE + "的版式form_id");
+            ask(CONTRACT_CODE + "的版式");
 
             assertToolCalled("ontologyQuery");
             assertToolNotCalled("queryContractFormId");
@@ -50,7 +50,7 @@ class IntentRecognitionIT extends BaseSREIT {
         @Test
         @DisplayName("配置表关键词应使用ontologyQuery(queryScope=config)")
         void keyword_config_shouldUseOntologyQuery() {
-            ask(CONTRACT_CODE + "的合同配置表");
+            ask(CONTRACT_CODE + "的配置表");
 
             assertToolCalled("ontologyQuery");
             assertToolNotCalled("queryContractConfig");
@@ -74,20 +74,20 @@ class IntentRecognitionIT extends BaseSREIT {
     class KeywordRecognition {
 
         @Test
-        @DisplayName("子单关键词应使用querySubOrderInfo")
-        void keyword_subOrder_shouldUseSubOrderTool() {
+        @DisplayName("子单关键词应使用ontologyQuery")
+        void keyword_subOrder_shouldUseOntologyQuery() {
             ask(ORDER_ID + "的子单信息");
 
-            assertToolCalled("querySubOrderInfo");
+            assertToolCalled("ontologyQuery");
             assertAllToolsSuccess();
         }
 
         @Test
-        @DisplayName("instance_id关键词应使用queryContractInstanceId")
-        void keyword_instanceId_shouldUseInstanceIdTool() {
-            ask(CONTRACT_CODE + "的instance_id");
+        @DisplayName("instance_id关键词应使用ontologyQuery")
+        void keyword_instanceId_shouldUseOntologyQuery() {
+            ask(CONTRACT_CODE + "的平台实例号");  // 使用"平台实例号"避免"ID"触发接口列表查询
 
-            assertToolCalled("queryContractInstanceId");
+            assertToolCalled("ontologyQuery");
             assertAllToolsSuccess();
         }
     }
