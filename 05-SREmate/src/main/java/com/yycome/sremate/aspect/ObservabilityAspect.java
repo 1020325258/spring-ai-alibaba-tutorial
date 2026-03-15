@@ -70,10 +70,10 @@ public class ObservabilityAspect {
             // 记录性能指标
             metricsCollector.recordToolCall(toolName, duration, true);
 
-            // 如果是数据查询类工具，将结果写入 DirectOutputHolder
-            // 使用 setIfAbsent() 保证第一个写入的结果被使用，防止多工具调用时后者覆盖前者
+            // 如果是数据查询类工具，将结果收集到 DirectOutputHolder
+            // 使用 addResult() 收集所有结果，在流结束时聚合输出
             if (isDataQuery && result instanceof String) {
-                directOutputHolder.setIfAbsent((String) result);
+                directOutputHolder.addResult(toolName, (String) result);
             }
 
             return result;

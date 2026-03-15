@@ -1,5 +1,6 @@
 package com.yycome.sremate.trigger.console;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.yycome.sremate.infrastructure.config.EnvironmentConfig;
 import com.yycome.sremate.infrastructure.service.DirectOutputHolder;
 import com.yycome.sremate.infrastructure.service.MetricsCollector;
@@ -17,6 +18,7 @@ import org.springframework.boot.CommandLineRunner;
 import org.springframework.stereotype.Component;
 import reactor.core.Disposable;
 
+import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import org.jline.terminal.Terminal.Signal;
@@ -50,6 +52,9 @@ public class SREConsole implements CommandLineRunner {
 
     @Autowired
     private CommandRegistry commandRegistry;
+
+    @Autowired
+    private ObjectMapper objectMapper;
 
     private SlashCommandCompleter slashCompleter;
 
@@ -156,6 +161,8 @@ public class SREConsole implements CommandLineRunner {
                 java.util.concurrent.CountDownLatch latch = new java.util.concurrent.CountDownLatch(1);
                 // 标记是否已触发直接输出旁路
                 java.util.concurrent.atomic.AtomicBoolean directOutputUsed = new java.util.concurrent.atomic.AtomicBoolean(false);
+                // 记录工具调用耗时
+                java.util.concurrent.atomic.AtomicLong totalToolDuration = new java.util.concurrent.atomic.AtomicLong(0);
 
                 // 每次请求独立处理，不传入对话历史，防止 LLM 模仿历史模式跳过工具调用
                 Disposable sub = sreAgent.prompt()
@@ -163,28 +170,25 @@ public class SREConsole implements CommandLineRunner {
                         .stream()
                         .content()
                         .doOnNext(chunk -> {
-                            // 首个 token 到达时，工具调用已全部完成。
-                            // 若 DirectOutputHolder 有值，说明这是数据查询请求，直接输出结果，跳过 LLM 归纳。
-                            if (firstTokenMs[0] < 0 && directOutputHolder.hasOutput()) {
-                                firstTokenMs[0] = System.currentTimeMillis();
-                                directOutputUsed.set(true);
-                                String directOutput = directOutputHolder.getAndClear();
-                                System.out.println(directOutput);
-                                responseBuilder.append(directOutput);
-                                Disposable current = currentSubscription.get();
-                                if (current != null) current.dispose();
-                                return;
-                            }
-                            // 已走直接输出路径，忽略后续 LLM token
-                            if (directOutputUsed.get()) return;
-
+                            // 不再在首个 token 到达时立即输出
+                            // 改为收集所有工具结果，在流结束时聚合输出
                             if (firstTokenMs[0] < 0) {
                                 firstTokenMs[0] = System.currentTimeMillis();
                             }
-                            System.out.print(chunk);
-                            responseBuilder.append(chunk);
+                            // 如果没有工具结果，正常输出 LLM 内容
+                            if (!directOutputHolder.hasOutput()) {
+                                System.out.print(chunk);
+                                responseBuilder.append(chunk);
+                            }
                         })
                         .doOnComplete(() -> {
+                            // 流结束时，聚合输出所有工具结果
+                            if (directOutputHolder.hasOutput()) {
+                                directOutputUsed.set(true);
+                                String aggregatedOutput = aggregateToolResults(directOutputHolder);
+                                System.out.println(aggregatedOutput);
+                                responseBuilder.append(aggregatedOutput);
+                            }
                             System.out.println();
                             latch.countDown();
                         })
@@ -202,8 +206,19 @@ public class SREConsole implements CommandLineRunner {
 
                 long totalMs = System.currentTimeMillis() - startMs;
                 long ttfbMs  = firstTokenMs[0] < 0 ? totalMs : firstTokenMs[0] - startMs;
-                System.out.println(Ansi.ansi().fg(Ansi.Color.CYAN)
-                        .a(String.format("⏱ 首字节: %dms  总耗时: %dms", ttfbMs, totalMs)).reset());
+
+                // 显示耗时信息
+                if (directOutputUsed.get()) {
+                    System.out.println(Ansi.ansi().fg(Ansi.Color.CYAN)
+                            .a(String.format("⏱ 首字节: %dms | 工具耗时: %dms | 总耗时: %dms",
+                                    ttfbMs, totalToolDuration.get(), totalMs)).reset());
+                    // 显示工具调用列表
+                    System.out.println(Ansi.ansi().fg(Ansi.Color.CYAN)
+                            .a(formatToolSummary(directOutputHolder)).reset());
+                } else {
+                    System.out.println(Ansi.ansi().fg(Ansi.Color.CYAN)
+                            .a(String.format("⏱ 首字节: %dms | 总耗时: %dms", ttfbMs, totalMs)).reset());
+                }
 
                 String response = responseBuilder.toString();
 
@@ -369,5 +384,169 @@ public class SREConsole implements CommandLineRunner {
         } catch (Exception e) {
             // 剪贴板复制失败不影响主流程
         }
+    }
+
+    /**
+     * 聚合多个工具调用结果
+     * 策略：
+     * 1. 如果只有一个结果，直接输出
+     * 2. 如果是多个 ontologyQuery 结果，尝试按层级合并
+     */
+    private String aggregateToolResults(DirectOutputHolder holder) {
+        List<DirectOutputHolder.ToolResult> results = holder.getResults();
+        if (results.isEmpty()) {
+            return "";
+        }
+
+        // 单个结果直接返回
+        if (results.size() == 1) {
+            return results.get(0).result;
+        }
+
+        // 多个结果：尝试聚合 ontologyQuery 结果
+        try {
+            return aggregateOntologyQueryResults(results);
+        } catch (Exception e) {
+            // 聚合失败，按原样输出每个结果
+            StringBuilder sb = new StringBuilder();
+            for (DirectOutputHolder.ToolResult r : results) {
+                if (sb.length() > 0) sb.append("\n\n");
+                sb.append(r.result);
+            }
+            return sb.toString();
+        }
+    }
+
+    /**
+     * 聚合多个 ontologyQuery 结果
+     * 场景：先查 Order 获取合同列表，再查每个合同的签约单据和节点
+     */
+    @SuppressWarnings("unchecked")
+    private String aggregateOntologyQueryResults(List<DirectOutputHolder.ToolResult> results) {
+        if (results.isEmpty()) {
+            return "";
+        }
+
+        // 解析所有结果
+        List<Map<String, Object>> parsedResults = new ArrayList<>();
+        Map<String, Object> baseResult = null; // Order 查询结果
+        List<Map<String, Object>> contractResults = new ArrayList<>(); // Contract 查询结果
+
+        for (DirectOutputHolder.ToolResult r : results) {
+            try {
+                Map<String, Object> parsed = objectMapper.readValue(r.result, Map.class);
+                parsedResults.add(parsed);
+
+                // 区分 Order 查询和 Contract 查询
+                if ("Order".equals(parsed.get("queryEntity"))) {
+                    baseResult = parsed;
+                } else if ("Contract".equals(parsed.get("queryEntity"))) {
+                    contractResults.add(parsed);
+                }
+            } catch (Exception e) {
+                // 解析失败，跳过
+            }
+        }
+
+        // 如果有 Order 结果，将 Contract 结果合并到对应合同
+        if (baseResult != null && !contractResults.isEmpty()) {
+            Object recordsObj = baseResult.get("records");
+            if (recordsObj instanceof List) {
+                List<Map<String, Object>> records = (List<Map<String, Object>>) recordsObj;
+
+                // 构建合同编号到详细结果的映射
+                Map<String, Map<String, Object>> contractDetails = new HashMap<>();
+                for (Map<String, Object> cr : contractResults) {
+                    Object crRecords = cr.get("records");
+                    if (crRecords instanceof List && !((List<?>) crRecords).isEmpty()) {
+                        // 从 Contract 结果中提取关联数据
+                        extractContractRelations(cr, contractDetails);
+                    }
+                }
+
+                // 将关联数据合并到 Order 结果的合同中
+                for (Map<String, Object> contract : records) {
+                    String contractCode = (String) contract.get("contractCode");
+                    if (contractCode != null && contractDetails.containsKey(contractCode)) {
+                        contract.putAll(contractDetails.get(contractCode));
+                    }
+                }
+            }
+
+            try {
+                return objectMapper.writeValueAsString(baseResult);
+            } catch (Exception e) {
+                return baseResult.toString();
+            }
+        }
+
+        // 无法聚合，按原样输出第一个结果
+        try {
+            return objectMapper.writeValueAsString(parsedResults.get(0));
+        } catch (Exception e) {
+            return results.get(0).result;
+        }
+    }
+
+    /**
+     * 从 Contract 查询结果中提取关联数据
+     */
+    @SuppressWarnings("unchecked")
+    private void extractContractRelations(Map<String, Object> contractResult,
+                                          Map<String, Map<String, Object>> contractDetails) {
+        String queryValue = (String) contractResult.get("queryValue");
+        if (queryValue == null) return;
+
+        // 获取所有非基础字段作为关联数据
+        Map<String, Object> details = new LinkedHashMap<>();
+
+        for (Map.Entry<String, Object> entry : contractResult.entrySet()) {
+            String key = entry.getKey();
+            // 跳过基础字段
+            if ("queryEntity".equals(key) || "queryValue".equals(key) || "records".equals(key)) {
+                continue;
+            }
+            // 保留关联数据
+            details.put(key, entry.getValue());
+        }
+
+        // 合并到已有的详情中
+        if (!details.isEmpty()) {
+            contractDetails.merge(queryValue, details, (oldVal, newVal) -> {
+                Map<String, Object> merged = new LinkedHashMap<>(oldVal);
+                merged.putAll(newVal);
+                return merged;
+            });
+        }
+    }
+
+    /**
+     * 格式化工具调用摘要
+     */
+    private String formatToolSummary(DirectOutputHolder holder) {
+        List<DirectOutputHolder.ToolResult> results = holder.getResults();
+        if (results.isEmpty()) {
+            return "";
+        }
+
+        StringBuilder sb = new StringBuilder();
+        sb.append(" | 工具: ");
+
+        Map<String, Long> toolCounts = new LinkedHashMap<>();
+        for (DirectOutputHolder.ToolResult r : results) {
+            toolCounts.merge(r.toolName, 1L, Long::sum);
+        }
+
+        boolean first = true;
+        for (Map.Entry<String, Long> entry : toolCounts.entrySet()) {
+            if (!first) sb.append(", ");
+            sb.append(entry.getKey());
+            if (entry.getValue() > 1) {
+                sb.append("(").append(entry.getValue()).append(")");
+            }
+            first = false;
+        }
+
+        return sb.toString();
     }
 }
