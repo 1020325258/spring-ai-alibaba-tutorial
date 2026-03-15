@@ -158,8 +158,8 @@ abstract class BaseSREIT {
     protected String ask(String question) {
         int tracesBefore = tracingService.getTraceCount();
 
-        // 清空之前的直接输出（防止污染）
-        directOutputHolder.clear();
+        // 开始新请求（生成请求ID，支持跨线程结果收集）
+        directOutputHolder.startRequest();
 
         // 耗时分析
         AtomicLong ttfbMs = new AtomicLong(-1);
@@ -183,7 +183,7 @@ abstract class BaseSREIT {
                         // 首字节到达时，检查是否有直接输出
                         if (directOutputHolder.hasOutput() && !directOutputUsed.get()) {
                             directOutputUsed.set(true);
-                            String directOutput = directOutputHolder.getAndClear();
+                            String directOutput = directOutputHolder.getAndClearAggregated();
                             responseBuilder.append(directOutput);
                             // 关键：立即中断流，不再等待 LLM 完成剩余输出
                             reactor.core.Disposable current = subscription.get();

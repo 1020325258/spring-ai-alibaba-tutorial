@@ -110,4 +110,63 @@ public class EntityRegistry {
         }
         return sb.toString();
     }
+
+    /**
+     * BFS 找从 from 到 to 的最短 relation 链。
+     * 返回 relation 列表（按跳顺序），找不到返回 null。
+     */
+    public List<OntologyRelation> findRelationPath(String from, String to) {
+        if (from.equals(to)) return Collections.emptyList();
+
+        // BFS：队列中存储"到达当前节点所经过的 relation 链"
+        Queue<List<OntologyRelation>> queue = new LinkedList<>();
+        Set<String> visited = new HashSet<>();
+        visited.add(from);
+
+        // 初始：从 from 出发的所有出边各自作为一条路径入队
+        for (OntologyRelation rel : getOutgoingRelations(from)) {
+            List<OntologyRelation> path = new ArrayList<>();
+            path.add(rel);
+            queue.add(path);
+            if (rel.getTo().equals(to)) return path;
+            visited.add(rel.getTo());
+        }
+
+        while (!queue.isEmpty()) {
+            List<OntologyRelation> currentPath = queue.poll();
+            String currentNode = currentPath.get(currentPath.size() - 1).getTo();
+
+            for (OntologyRelation rel : getOutgoingRelations(currentNode)) {
+                if (visited.contains(rel.getTo())) continue;
+                visited.add(rel.getTo());
+
+                List<OntologyRelation> newPath = new ArrayList<>(currentPath);
+                newPath.add(rel);
+                if (rel.getTo().equals(to)) return newPath;
+                queue.add(newPath);
+            }
+        }
+        return null; // 不可达
+    }
+
+    /**
+     * 获取某实体的所有出边关系
+     */
+    public List<OntologyRelation> getOutgoingRelations(String entityName) {
+        return ontology.getRelations().stream()
+            .filter(r -> r.getFrom().equals(entityName))
+            .toList();
+    }
+
+    /**
+     * 按名称查找实体
+     */
+    public OntologyEntity getEntity(String name) {
+        return ontology.getEntities().stream()
+            .filter(e -> e.getName().equals(name))
+            .findFirst()
+            .orElseThrow(() -> new IllegalArgumentException("未知实体: " + name +
+                "，可用实体: " + ontology.getEntities().stream()
+                    .map(OntologyEntity::getName).toList()));
+    }
 }

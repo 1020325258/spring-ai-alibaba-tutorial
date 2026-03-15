@@ -243,6 +243,101 @@ public String ontologyQuery(String entity, String value, String queryScope) {
 
 ## 架构升级历史
 
+### v2.3 - 多目标查询优化 (2026-03-15)
+
+#### 新增功能
+
+**多目标查询**: `queryScope` 支持逗号分隔多个目标实体，只查询用户需要的数据。
+
+```java
+// 只查节点和签约单据，不查 fields、form、config
+ontologyQuery(entity=Order, value=825123110000002753, queryScope=ContractNode,ContractQuotationRelation)
+```
+
+#### 性能提升
+
+| 场景 | 优化前 | 优化后 |
+|------|--------|--------|
+| 用户要"签约单据和节点" | 查询所有关联数据（fields、form、config 等） | 只查询 nodes、signedObjects |
+| 工具耗时 | 36秒+ | 2-3秒 |
+
+#### 其他优化
+
+- **删除废弃代码**: 移除未使用的 `OntologyQueryPlannerTool`
+- **OrderGateway 简化**: Order 作为虚拟实体，只返回 `projectOrderId`，Contract 通过关系展开获取
+- **DirectOutput 跨线程支持**: 使用 `requestId + ConcurrentHashMap` 替代 `ThreadLocal`
+
+---
+
+### v2.2 - 本体论引擎数据驱动化改造 (2026-03-15)
+
+#### 改造目标
+
+**达成目标**: 新增实体只需 YAML + Gateway，`OntologyQueryTool` 和 `OntologyQueryEngine` 零改动。
+
+#### 核心变更
+
+1. **新增 `OntologyQueryEngine` 查询引擎**
+   - 承接所有查询执行逻辑（图遍历、并行执行、层级组装）
+   - 支持 default 展开和 scoped 路径查询
+   - 同层并行查询优化（CompletableFuture）
+
+2. **EntityRegistry 增强**
+   - 新增 `findRelationPath()` - BFS 查找最短关系链
+   - 新增 `getOutgoingRelations()` - 获取实体出边
+   - 新增 `getEntity()` - 按名称查找实体
+
+3. **模型扩展**
+   - `OntologyEntity` 新增 `displayName`、`aliases`、`lookupStrategies` 字段
+   - 新增 `LookupStrategy` 模型，支持多格式查询入口
+
+4. **OntologyQueryTool 精简**
+   - 从 330 行精简至 63 行（约 80% 缩减）
+   - 核心逻辑委托给 `OntologyQueryEngine`
+   - 保留 scope 简写兼容（form/nodes/fields 等）
+
+5. **sre-agent.md 提示词更新**
+   - queryScope 参数改为推荐使用实体名
+   - 支持 `ContractNode`、`ContractForm`、`ContractQuotationRelation` 等
+
+#### 新增实体 SOP（改造后）
+
+```yaml
+# Step 1: YAML 添加实体和关系
+entities:
+  - name: NewEntity
+    displayName: "新实体"
+    lookupStrategies:
+      - field: contractCode
+        pattern: "^C\\d+"
+
+relations:
+  - from: Contract
+    to: NewEntity
+    label: has_new_entities
+    via: { source_field: contractCode, target_field: contractCode }
+```
+
+```java
+// Step 2: 实现 Gateway
+@Component
+public class NewEntityGateway implements EntityDataGateway {
+    @PostConstruct public void init() { registry.register(this); }
+    @Override public String getEntityName() { return "NewEntity"; }
+    @Override public List<Map<String, Object>> queryByField(String field, Object value) { ... }
+}
+```
+
+**无需修改 `OntologyQueryTool` 和 `OntologyQueryEngine`！**
+
+#### 测试验证
+
+- EntityRegistryTest: 10/10 通过
+- OntologyQueryEngineTest: 5/5 通过
+- ContractOntologyIT: 11/11 通过
+
+---
+
 ### v2.1 - 本体论驱动并行查询引擎 (2026-03)
 
 #### 新增功能（v2.1.1）

@@ -91,6 +91,8 @@ class ContractOntologyIT extends BaseSREIT {
         assertAllToolsSuccess();
     }
 
+
+
     // ── 报价单查询：使用 ontologyQuery(entity=BudgetBill) ────────────────────────
 
     @Test
