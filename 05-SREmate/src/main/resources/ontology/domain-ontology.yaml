@@ -3,7 +3,6 @@ entities:
     displayName: "订单"
     aliases: ["项目订单"]
     description: "项目订单，纯数字编号"
-    defaultDepth: 2
     lookupStrategies:
       - field: projectOrderId
         pattern: "^\\d{15,}$"
@@ -15,7 +14,6 @@ entities:
     aliases: ["合同数据", "合同信息"]
     description: "合同实体，C前缀编号"
     table: contract
-    defaultDepth: 2
     lookupStrategies:
       - field: contractCode
         pattern: "^C\\d+"
@@ -32,7 +30,6 @@ entities:
     aliases: ["节点", "流程节点", "合同流程"]
     description: "合同节点/流程节点"
     table: contract_node
-    defaultDepth: 0
     lookupStrategies:
       - field: contractCode
         pattern: "^C\\d+"
@@ -46,7 +43,6 @@ entities:
     aliases: ["合同签约对象", "关联单据", "签约单"]
     description: "合同签约的单据对象，存储合同关联的报价单和S单"
     table: contract_quotation_relation
-    defaultDepth: 0
     lookupStrategies:
       - field: contractCode
         pattern: "^C\\d+"
@@ -61,7 +57,6 @@ entities:
     aliases: ["合同扩展字段", "字段数据"]
     description: "合同字段数据，按contractCode取模分10张表"
     table: contract_field_sharding
-    defaultDepth: 0
     lookupStrategies:
       - field: contractCode
         pattern: "^C\\d+"
@@ -74,7 +69,6 @@ entities:
     displayName: "报价单"
     aliases: ["报价", "预算单"]
     description: "报价单，挂在订单下"
-    defaultDepth: 1
     lookupStrategies:
       - field: projectOrderId
         pattern: "^\\d{15,}$"
@@ -86,7 +80,6 @@ entities:
     displayName: "S单"
     aliases: ["子单", "签约子单"]
     description: "S单，可从报价单或合同两个维度关联"
-    defaultDepth: 0
     lookupStrategies:
       - field: quotationOrderNo
         pattern: ".*"
@@ -99,7 +92,6 @@ entities:
     displayName: "版式"
     aliases: ["版式数据", "form_id", "版式ID"]
     description: "合同版式数据"
-    defaultDepth: 0
     lookupStrategies:
       - field: contractCode
         pattern: "^C\\d+"
@@ -110,7 +102,6 @@ entities:
     displayName: "配置表"
     aliases: ["合同配置", "合同配置表"]
     description: "合同城市公司配置数据"
-    defaultDepth: 0
     lookupStrategies:
       - field: contractCode
         pattern: "^C\\d+"

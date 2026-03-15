@@ -14,6 +14,5 @@ public class OntologyEntity {
     private String description;
     private String table;
     private List<OntologyAttribute> attributes;
-    private int defaultDepth = 2;
     private List<LookupStrategy> lookupStrategies;  // 替换原 lookupField，支持多格式入口
 }
