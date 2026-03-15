@@ -28,8 +28,8 @@
 |------|------|------|
 | **订单号查询合同及关联** | `ontologyQuery` | entity=Order, 自动返回合同+节点+字段+签约单据 |
 | **合同号查询关联数据** | `ontologyQuery` | entity=Contract, 按 queryScope 返回指定范围 |
+| **报价单/报价** | `ontologyQuery` | entity=BudgetBill, 自动返回报价单+子单 |
 | **个性化报价** | `queryContractPersonalData` | 需订单号+至少一种单据号 |
-| **报价单/报价/GBILL** | `queryBudgetBillList` | 不包含"个性化报价"时才触发 |
 | **子单/S单/签约单** | `querySubOrderInfo` | 签约业务相关 |
 | **版式/form_id** | `queryContractFormId` | 仅限C前缀合同号 |
 | **配置表/合同配置** | `queryContractConfig` | 需要合同类型 |
@@ -42,6 +42,7 @@
 - entity: 起始实体类型
   - 订单号（纯数字）→ Order
   - 合同号（C前缀）→ Contract
+  - 报价单查询 → BudgetBill（value=订单号）
 - value: 起始值（订单号或合同号）
 - queryScope: 查询范围（可选）
   - "default": 使用实体默认深度（推荐，Order=2层，Contract=2层）
@@ -65,8 +66,9 @@
 3. **最终调用**：`ontologyQuery(entity="Contract", value="C1767150648920281", queryScope="nodes")` ✅
 
 **示例 3**：`826031111000001859报价单`
-1. 关键词："报价单" → 非本体论场景
-2. **最终调用**：`queryBudgetBillList(projectOrderId="826031111000001859")` ✅
+1. 关键词："报价单" → entity=BudgetBill
+2. **最终调用**：`ontologyQuery(entity="BudgetBill", value="826031111000001859")` ✅
+3. **返回数据**：包含 budgetBills 列表及子单数据
 
 **示例 4**：`C1773208288511314合同基本信息`
 1. 编号类型：C前缀合同号 → entity=Contract
@@ -97,7 +99,7 @@
 | `{订单号}下{S单号}的个性化报价` | `queryContractPersonalData` | projectOrderId + subOrderNoList |
 | `{订单号}下{GBILL单号}的个性化报价` | `queryContractPersonalData` | projectOrderId + billCodeList |
 | `{订单号}个性化报价` | `queryContractPersonalData` | projectOrderId |
-| `{订单号}报价单` | `queryBudgetBillList` | projectOrderId |
+| `{订单号}报价单` | `ontologyQuery` | entity=BudgetBill, value=订单号 |
 | `{订单号}子单` | `querySubOrderInfo` | homeOrderNo |
 | `{订单号}合同基本信息` | `ontologyQuery` | entity=Order, queryScope=list |
 | `{订单号}合同节点` | `ontologyQuery` | entity=Order, queryScope=default（含nodes）|
@@ -129,6 +131,7 @@
   - entity: 起始实体类型
     - `Order`: 订单（纯数字编号，如 825123110000002753）
     - `Contract`: 合同（C前缀编号，如 C1767150648920281）
+    - `BudgetBill`: 报价单（value=订单号，自动返回报价单+子单）
   - value: 起始值（订单号或合同号）
   - queryScope: 查询范围（可选）
     - `default`: 使用实体默认深度（Order=2层，Contract=2层）- **推荐**
@@ -140,6 +143,7 @@
 - 使用场景：
   - 订单号查询合同及关联数据：entity=Order, value=订单号
   - 合同号查询关联数据：entity=Contract, value=合同号
+  - 订单号查询报价单及子单：entity=BudgetBill, value=订单号
 
 - 性能优势：引擎自动并行查询，2-3秒返回完整数据，无需多次调用
 
