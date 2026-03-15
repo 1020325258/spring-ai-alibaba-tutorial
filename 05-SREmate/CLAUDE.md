@@ -120,37 +120,146 @@ ontologyQuery(entity="Order", value="825123110000002753", queryScope="default")
 }
 ```
 
-### 新增实体
+### 新增实体 SOP
 
-1. 在 `domain-ontology.yaml` 添加实体定义：
+> 将新的查询能力接入本体论架构，按以下步骤执行：
+
+#### 第一步：定义实体（YAML）
+
+在 `src/main/resources/ontology/domain-ontology.yaml` 添加：
+
 ```yaml
 entities:
-  - name: NewEntity
-    description: "新实体描述"
-    defaultDepth: 2    # 默认查询深度
+  - name: NewEntity                    # 实体名称（大驼峰）
+    description: "实体描述"             # 用于 LLM 理解
+    table: table_name                  # 数据库表名（可选，HTTP 接口无需）
+    defaultDepth: 1                    # 默认查询深度（0=叶子节点）
     attributes:
-      - name: id
-        type: string
-        description: "主键"
+      - { name: id, type: string, description: "主键" }
+      - { name: relatedField, type: string, description: "关联字段" }
 ```
 
-2. 实现 `EntityDataGateway` 接口：
+#### 第二步：实现 Gateway
+
+在 `domain/ontology/gateway/` 创建 `NewEntityGateway.java`：
+
+**数据库查询方式：**
 ```java
+@Slf4j
 @Component
+@RequiredArgsConstructor
 public class NewEntityGateway implements EntityDataGateway {
+
+    private final JdbcTemplate jdbcTemplate;  // 或 DAO
+    private final EntityGatewayRegistry registry;
+
+    @PostConstruct
+    public void init() { registry.register(this); }
+
     @Override
-    public String getEntityName() {
-        return "NewEntity";
-    }
+    public String getEntityName() { return "NewEntity"; }
 
     @Override
     public List<Map<String, Object>> queryByField(String fieldName, Object value) {
-        // 实现查询逻辑
+        log.debug("[NewEntityGateway] queryByField: {} = {}", fieldName, value);
+        // 实现数据库查询逻辑
+        return jdbcTemplate.queryForList("SELECT * FROM table WHERE field = ?", value);
     }
 }
 ```
 
-3. 在 `OntologyQueryTool` 中添加对应的查询分支（如需）
+**HTTP 接口方式：**
+```java
+@Slf4j
+@Component
+@RequiredArgsConstructor
+public class NewEntityGateway implements EntityDataGateway {
+
+    private final HttpEndpointTool httpEndpointTool;
+    private final ObjectMapper objectMapper;
+    private final EntityGatewayRegistry registry;
+
+    @PostConstruct
+    public void init() { registry.register(this); }
+
+    @Override
+    public String getEntityName() { return "NewEntity"; }
+
+    @Override
+    public List<Map<String, Object>> queryByField(String fieldName, Object value) {
+        log.debug("[NewEntityGateway] queryByField: {} = {}", fieldName, value);
+        try {
+            String json = httpEndpointTool.callPredefinedEndpoint("endpoint-id",
+                    Map.of("paramName", value));
+            return parseAndTransform(json);
+        } catch (Exception e) {
+            log.warn("[NewEntityGateway] 查询失败: {}", e.getMessage());
+            return Collections.emptyList();  // 失败时返回空列表
+        }
+    }
+
+    private List<Map<String, Object>> parseAndTransform(String json) {
+        // 解析 JSON 并转换为 List<Map>
+    }
+}
+```
+
+#### 第三步：更新 OntologyQueryTool
+
+在 `OntologyQueryTool.java` 添加查询分支：
+
+```java
+// 在 executeQuery 方法中添加
+if ("NewEntity".equals(startEntity)) {
+    return executeNewEntityQuery(startValue, result);
+}
+
+// 添加新方法
+private Map<String, Object> executeNewEntityQuery(Object value, Map<String, Object> result) {
+    EntityDataGateway gateway = gatewayRegistry.getGateway("NewEntity");
+    List<Map<String, Object>> data = gateway.queryByField("fieldName", value);
+    if (data.isEmpty()) { return null; }
+    result.put("newEntityData", data);
+    return result;
+}
+```
+
+#### 第四步：更新 LLM 提示词
+
+在 `prompts/sre-agent.md` 更新：
+
+1. **场景表**：添加 `| **新实体关键词** | ontologyQuery | entity=NewEntity |`
+2. **参数说明**：添加 `NewEntity: 新实体描述`
+3. **示例**：添加调用示例
+4. **快速决策表**：添加对应行
+
+#### 第五步：添加集成测试
+
+在 `ContractOntologyIT.java` 添加：
+
+```java
+@Test
+void newEntity_shouldCallOntologyQuery() {
+    ask("xxx的新实体数据");
+    assertToolCalled("ontologyQuery");
+    assertToolNotCalled("queryOldTool");  // 禁止调用旧工具
+    assertAllToolsSuccess();
+}
+```
+
+#### 第六步：运行测试验证
+
+```bash
+export JAVA_HOME=/Library/Java/JavaVirtualMachines/jdk-21.jdk/Contents/Home
+mvn test -Dtest=ContractOntologyIT
+```
+
+#### 第七步：更新文档
+
+- README.md：更新实体列表和使用示例
+- CLAUDE.md：更新实体默认深度表
+
+---
 
 ### 实体默认深度
 
@@ -158,6 +267,7 @@ public class NewEntityGateway implements EntityDataGateway {
 |------|--------------|------|
 | Order | 2 | Order → Contract → Node/Field/SignedObject |
 | Contract | 2 | Contract → Node/Field/SignedObject |
+| BudgetBill | 1 | BudgetBill → SubOrders |
 | ContractNode | 0 | 叶子节点，不再查询关联 |
 | ContractField | 0 | 叶子节点 |
 | ContractQuotationRelation | 0 | 叶子节点 |
