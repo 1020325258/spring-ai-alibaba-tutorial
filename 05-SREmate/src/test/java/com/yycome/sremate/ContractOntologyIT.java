@@ -90,4 +90,15 @@ class ContractOntologyIT extends BaseSREIT {
         assertToolNotCalled("queryContractSignedObjects");
         assertAllToolsSuccess();
     }
+
+    // ── 报价单查询：使用 ontologyQuery(entity=BudgetBill) ────────────────────────
+
+    @Test
+    void budgetBill_shouldCallOntologyQuery() {
+        ask("826031111000001859的报价单");
+        assertToolCalled("ontologyQuery");
+        // 禁止调用旧的工具
+        assertToolNotCalled("queryBudgetBillList");
+        assertAllToolsSuccess();
+    }
 }
