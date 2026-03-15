@@ -310,6 +310,8 @@ mvn test -Dtest=ContractOntologyIT
 | Order | 2 | Order → Contract → Node/Field/SignedObject |
 | Contract | 2 | Contract → Node/Field/SignedObject |
 | BudgetBill | 1 | BudgetBill → SubOrders |
+| ContractForm | 0 | 叶子节点，版式数据 |
+| ContractConfig | 0 | 叶子节点，配置表数据 |
 | ContractNode | 0 | 叶子节点，不再查询关联 |
 | ContractField | 0 | 叶子节点 |
 | ContractQuotationRelation | 0 | 叶子节点 |
