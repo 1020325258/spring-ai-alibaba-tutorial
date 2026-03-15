@@ -32,7 +32,6 @@
 | **版式/form_id** | `ontologyQuery` | entity=Contract, queryScope=form |
 | **配置表/合同配置** | `ontologyQuery` | entity=Contract, queryScope=config（合同号自动获取类型） |
 | **个性化报价** | `queryContractPersonalData` | 需订单号+至少一种单据号 |
-| **超时/报错/异常** | `querySkills(queryType=diagnosis)` | 运维诊断 |
 
 ### 🔢 第二步：确定 ontologyQuery 参数
 
@@ -141,22 +140,19 @@
     - `nodes`: 仅查节点关系
     - `fields`: 仅查字段关系
     - `signed_objects`: 仅查签约单据关系
+    - `form`: 仅查版式数据（版式/form_id相关）
+    - `config`: 仅查配置表数据（配置表/合同配置相关）
 
 - 使用场景：
   - 订单号查询合同及关联数据：entity=Order, value=订单号
   - 合同号查询关联数据：entity=Contract, value=合同号
   - 订单号查询报价单及子单：entity=BudgetBill, value=订单号
+  - 合同号查询版式：entity=Contract, value=合同号, queryScope=form
+  - 合同号查询配置表：entity=Contract, value=合同号, queryScope=config
 
 - 性能优势：引擎自动并行查询，2-3秒返回完整数据，无需多次调用
 
-### 2. querySkills
-查询SRE运维知识库，获取问题排查经验和解决方案。
-- 参数：
-  - queryType: 查询类型（diagnosis/operations/knowledge）
-  - keywords: 关键词，用于匹配相关文档
-- 使用场景：当用户描述具体问题时，先查询相关的排查经验
-
-### 3a. queryContractsByOrderId（已废弃，请使用 ontologyQuery）
+### 2. queryContractsByOrderId（已废弃，请使用 ontologyQuery）
 ~~根据项目订单号查询该订单下所有合同，并聚合关联数据。~~
 - **推荐替代**：使用 `ontologyQuery(entity="Order", value=订单号)` 获得相同结果且性能更优
 
