@@ -91,8 +91,14 @@ public class OntologyQueryEngine {
         OntologyEntity entity = entityRegistry.getEntity(entityName);
         LookupStrategy strategy = matchStrategy(entity, value);
 
+        // 起始节点查询
+        log.info("▶ 起始节点 {} | key={} | value={}", entityName, strategy.getField(), value);
+        long startTime = System.currentTimeMillis();
+
         List<Map<String, Object>> records =
             gatewayRegistry.getGateway(entityName).queryByField(strategy.getField(), value);
+
+        log.info("  ↳ 返回 {} 条记录, 耗时 {}ms", records.size(), System.currentTimeMillis() - startTime);
 
         if (records.isEmpty()) return null;
 
@@ -111,6 +117,8 @@ public class OntologyQueryEngine {
                 }
                 paths.add(path);
             }
+            // 打印路径规划日志
+            logPathPlan(entityName, paths);
             attachMultiPathResults(records, paths);
         }
 
@@ -119,6 +127,29 @@ public class OntologyQueryEngine {
         result.put("queryValue", value);
         result.put("records", records);
         return result;
+    }
+
+    /**
+     * 打印路径规划日志
+     */
+    private void logPathPlan(String startEntity, List<List<OntologyRelation>> paths) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("路径规划: ").append(startEntity);
+
+        for (List<OntologyRelation> path : paths) {
+            sb.append(" → ");
+            for (int i = 0; i < path.size(); i++) {
+                OntologyRelation rel = path.get(i);
+                if (i == 0) sb.append(" -[");
+                else sb.append(" -[");
+                sb.append(rel.getVia().get("source_field"))
+                  .append("→")
+                  .append(rel.getVia().get("target_field"))
+                  .append("]-> ")
+                  .append(rel.getTo());
+            }
+        }
+        log.info(sb.toString());
     }
 
     /**
@@ -186,10 +217,20 @@ public class OntologyQueryEngine {
                     // 如果已有该 key，跳过（避免重复查询）
                     if (record.containsKey(resultKey)) continue;
 
+                    long nodeStartTime = System.currentTimeMillis();
+
                     // 传递父记录给 Gateway，支持从父记录获取额外参数
                     List<Map<String, Object>> children =
                         gatewayRegistry.getGateway(rel.getTo())
                             .queryByFieldWithContext(rel.getVia().get("target_field"), childValue, record);
+
+                    // 节点遍历日志
+                    log.info("  ├─ 节点 {} | key={} | value={} | 返回 {} 条 | 耗时 {}ms",
+                        rel.getTo(),
+                        rel.getVia().get("target_field"),
+                        childValue,
+                        children.size(),
+                        System.currentTimeMillis() - nodeStartTime);
 
                     // 递归展开下一层
                     attachLayer(children, hopRelations, hop + 1);
