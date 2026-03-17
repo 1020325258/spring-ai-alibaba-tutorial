@@ -196,13 +196,17 @@ cd 05-SREmate && mvn spring-boot:run
 ├── src/main/
 │   ├── java/com/yycome/sremate/
 │   │   ├── trigger/agent/   # @Tool 工具类
-│   │   │   └── OntologyQueryTool.java  # 统一查询入口
+│   │   │   ├── OntologyQueryTool.java  # 统一查询入口
+│   │   │   └── PersonalQuoteTool.java  # 个性化报价查询
 │   │   ├── domain/ontology/ # 本体论领域（核心）
 │   │   │   ├── model/       # 本体模型
 │   │   │   ├── service/     # 实体注册中心
 │   │   │   ├── engine/      # 查询引擎
 │   │   │   └── gateway/     # 实体数据网关
-│   │   ├── infrastructure/  # 基础设施（注解、模板）
+│   │   ├── infrastructure/  # 基础设施
+│   │   │   ├── annotation/  # 注解（@DataQueryTool）
+│   │   │   ├── client/      # HTTP 客户端（HttpEndpointClient）
+│   │   │   └── service/     # 基础设施服务
 │   │   ├── config/          # Spring 配置
 │   │   └── aspect/          # AOP 切面
 │   └── resources/
@@ -254,6 +258,49 @@ public String ontologyQuery(String entity, String value, String queryScope) {
 - 集成测试也支持此机制，测试结果更准确
 
 ## 架构升级历史
+
+### v2.5 - 基础设施层重构 (2026-03-17)
+
+#### 重构目标
+
+将 HTTP 调用能力从 Agent 工具层下沉到基础设施层，实现关注点分离。
+
+#### 核心变更
+
+1. **新建 `HttpEndpointClient`**（`infrastructure/client/`）
+   - 纯 HTTP 调用基础设施，供 Gateway 和 Tool 内部调用
+   - 提供 `callPredefinedEndpointRaw()` 和 `callPredefinedEndpointFiltered()` 方法
+   - 无 `@Tool` 注解，不暴露给 Agent
+
+2. **删除 `HttpEndpointTool`**（原 `trigger/agent/`）
+   - HTTP 调用属于基础设施，不应作为 Agent 工具暴露
+   - 移除 `AgentConfiguration` 中的工具注册
+
+3. **更新所有 Gateway 类**
+   - `BudgetBillGateway`、`ContractFormGateway`、`SubOrderGateway` 改用 `HttpEndpointClient`
+   - `PersonalQuoteTool`、`ContractFormGatewayImpl` 同步更新
+
+4. **清理相关测试**
+   - 删除 `HttpEndpointToolIT.java`
+   - 移除 `IntentRecognitionIT` 中 `listAvailableEndpoints` 相关测试
+
+#### 分层架构
+
+```
+trigger/agent/          ← Agent 工具层（LLM 可调用）
+    ├── OntologyQueryTool
+    └── PersonalQuoteTool
+
+infrastructure/client/  ← 基础设施层（内部调用）
+    └── HttpEndpointClient
+
+domain/ontology/gateway/ ← 数据网关层
+    ├── BudgetBillGateway
+    ├── ContractFormGateway
+    └── SubOrderGateway
+```
+
+---
 
 ### v2.4 - QueryScope 枚举类 (2026-03-16)
 

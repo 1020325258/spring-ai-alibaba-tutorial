@@ -169,8 +169,7 @@ src/main/java/.../
   trigger/agent/      # @Tool 工具类（按业务领域拆分）
     ├── OntologyQueryTool.java   # 本体论统一查询入口（推荐）
     ├── ContractQueryTool.java   # 合同查询（旧工具，逐步废弃）
-    ├── PersonalQuoteTool.java   # 个性化报价查询
-    └── HttpEndpointTool.java    # HTTP 接口调用
+    └── PersonalQuoteTool.java   # 个性化报价查询
   domain/ontology/    # 本体论领域（核心）
     ├── model/        # 本体模型（OntologyEntity、OntologyRelation）
     ├── service/      # 实体注册中心
@@ -178,6 +177,7 @@ src/main/java/.../
     └── gateway/      # 实体数据网关实现
   infrastructure/
     ├── annotation/    # 注解（@DataQueryTool）
+    ├── client/        # HTTP 客户端（HttpEndpointClient）
     └── service/       # 基础设施服务（ToolExecutionTemplate、ToolResult）
   config/              # Spring 配置（AgentConfiguration、DataSourceConfiguration）
   aspect/              # AOP 切面（ObservabilityAspect）
@@ -329,7 +329,7 @@ public class NewEntityGateway implements EntityDataGateway {
 @RequiredArgsConstructor
 public class NewEntityGateway implements EntityDataGateway {
 
-    private final HttpEndpointTool httpEndpointTool;
+    private final HttpEndpointClient httpEndpointClient;
     private final ObjectMapper objectMapper;
     private final EntityGatewayRegistry registry;
 
@@ -343,7 +343,7 @@ public class NewEntityGateway implements EntityDataGateway {
     public List<Map<String, Object>> queryByField(String fieldName, Object value) {
         log.debug("[NewEntityGateway] queryByField: {} = {}", fieldName, value);
         try {
-            String json = httpEndpointTool.callPredefinedEndpoint("endpoint-id",
+            String json = httpEndpointClient.callPredefinedEndpointRaw("endpoint-id",
                     Map.of("paramName", value));
             return parseAndTransform(json);
         } catch (Exception e) {
@@ -487,7 +487,7 @@ urlTemplate: "http://utopia-nrs-sales-project.${env}.ttb.test.ke.com/api/..."
 @RequiredArgsConstructor
 public class XxxTool {
 
-    private final HttpEndpointTool httpEndpointTool;
+    private final HttpEndpointClient httpEndpointClient;
 
     @Tool(description = """
             【xxx查询】用户提到"xxx"时使用。
@@ -497,7 +497,7 @@ public class XxxTool {
     @DataQueryTool  // 标记为数据查询工具，结果直接输出
     public String queryXxxList(String projectOrderId) {
         return ToolExecutionTemplate.execute("queryXxxList", () ->
-            httpEndpointTool.callPredefinedEndpoint("your-endpoint-id",
+            httpEndpointClient.callPredefinedEndpointFiltered("your-endpoint-id",
                 Map.of("projectOrderId", projectOrderId))
         );
     }
@@ -632,14 +632,14 @@ ToolResult.notFound("合同", "C123")  // 资源未找到
 
 ## 工具类职责划分
 
-| 工具类 | 职责 | @DataQueryTool | 状态 |
-|--------|------|----------------|------|
-| `OntologyQueryTool` | 本体论统一查询入口 | ✅ 有 | **推荐使用** |
-| `ContractQueryTool` | 合同数据查询 | ✅ 有 | 逐步废弃 |
-| `PersonalQuoteTool` | 个性化报价查询 | ✅ 有 | - |
-| `HttpEndpointTool` | HTTP 接口调用 | ❌ 无（内部工具） | - |
+| 组件 | 位置 | 职责 | @DataQueryTool |
+|------|------|------|----------------|
+| `OntologyQueryTool` | trigger/agent | 本体论统一查询入口 | ✅ 有 |
+| `ContractQueryTool` | trigger/agent | 合同数据查询 | ✅ 有（逐步废弃） |
+| `PersonalQuoteTool` | trigger/agent | 个性化报价查询 | ✅ 有 |
+| `HttpEndpointClient` | infrastructure/client | HTTP 接口调用基础设施 | ❌ 无 |
 
-**说明**：`HttpEndpointTool.callPredefinedEndpoint` 不添加 `@DataQueryTool`，因为它是被 Gateway 内部调用的工具，结果应由外层的 `ontologyQuery` 捕获。
+**说明**：`HttpEndpointClient` 是基础设施组件，不作为 Agent 工具暴露，仅供 Gateway 和 Tool 内部调用。
 
 ---
 
