@@ -1,5 +1,10 @@
 server:
   port: 0
+
+# 本体可视化页面固定端口（ontology.html 始终可通过此端口访问）
+ontology:
+  web:
+    port: 8089
   servlet:
     encoding:
       charset: UTF-8
