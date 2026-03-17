@@ -1,5 +1,7 @@
 package com.yycome.sremate.domain.ontology.gateway;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.yycome.sremate.domain.ontology.engine.EntityDataGateway;
 import com.yycome.sremate.domain.ontology.engine.EntityGatewayRegistry;
 import com.yycome.sremate.trigger.agent.HttpEndpointTool;
@@ -21,6 +23,7 @@ import java.util.*;
 public class ContractFormGateway implements EntityDataGateway {
 
     private final HttpEndpointTool httpEndpointTool;
+    private final ObjectMapper objectMapper;
     private final EntityGatewayRegistry registry;
 
     @PostConstruct
@@ -48,12 +51,25 @@ public class ContractFormGateway implements EntityDataGateway {
         }
 
         try {
-            String formData = httpEndpointTool.callPredefinedEndpoint("contract-form-data",
+            String rawJson = httpEndpointTool.callPredefinedEndpointRaw("contract-form-data",
                     Map.of("instanceId", instanceId));
+
+            if (rawJson == null) {
+                log.warn("[ContractFormGateway] 接口无响应 instanceId={}", instanceId);
+                return Collections.emptyList();
+            }
+
+            // 解析 data 字段
+            JsonNode root = objectMapper.readTree(rawJson);
+            JsonNode data = root.path("data");
 
             Map<String, Object> result = new LinkedHashMap<>();
             result.put("instanceId", instanceId);
-            result.put("formData", formData);
+            if (!data.isNull() && !data.isMissingNode()) {
+                result.put("formData", objectMapper.convertValue(data, Map.class));
+            } else {
+                result.put("formData", null);
+            }
             return List.of(result);
         } catch (Exception e) {
             log.warn("[ContractFormGateway] 查询版式失败 instanceId={}: {}", instanceId, e.getMessage());
