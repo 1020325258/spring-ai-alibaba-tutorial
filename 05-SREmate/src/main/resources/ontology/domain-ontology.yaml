@@ -97,7 +97,8 @@ entities:
       - field: instanceId
         pattern: ".*"
     attributes:
-      - { name: instanceId, type: string, description: "协议平台实例 ID" }
+      - { name: instanceId,   type: string, description: "协议平台实例 ID" }
+      - { name: formData,     type: object, description: "版式表单数据对象，包含 formId（版式模板ID）、cformData（表单字段内容）、cn（合同编号）、creator（创建人）、application（应用标识）等字段" }
 
   - name: ContractConfig
     displayName: "配置表"
