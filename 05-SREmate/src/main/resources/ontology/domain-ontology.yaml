@@ -92,12 +92,12 @@ entities:
   - name: ContractForm
     displayName: "版式"
     aliases: ["版式数据", "form_id", "版式ID"]
-    description: "合同版式数据"
+    description: "合同版式数据，通过合同的 platformInstanceId 关联"
     lookupStrategies:
-      - field: contractCode
-        pattern: "^C\\d+"
+      - field: instanceId
+        pattern: ".*"
     attributes:
-      - { name: contractCode, type: string }
+      - { name: instanceId, type: string, description: "协议平台实例 ID" }
 
   - name: ContractConfig
     displayName: "配置表"
@@ -145,7 +145,7 @@ relations:
     to: ContractForm
     label: has_form
     domain: contract
-    via: { source_field: contractCode, target_field: contractCode }
+    via: { source_field: platformInstanceId, target_field: instanceId }
 
   - from: Contract
     to: ContractConfig
