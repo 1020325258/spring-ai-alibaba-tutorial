@@ -2,11 +2,61 @@
 
 注意：
 1. 开发完进行测试，保证功能正常实现。
-2. **每次代码变更后必须运行全部集成测试**，确保已有功能不被破坏：
+2. **每次代码变更后必须运行全部测试**，确保已有功能不被破坏：
    ```bash
+   ./run-integration-tests.sh
+   # 或直接运行
    export JAVA_HOME=/Library/Java/JavaVirtualMachines/jdk-21.jdk/Contents/Home
-   mvn test -Dtest=ContractOntologyIT
+   mvn test
    ```
+
+---
+
+## 测试清单
+
+| 测试类 | 测试数 | 用途 |
+|--------|--------|------|
+| QueryScopeTest | 7 | QueryScope 枚举解析 |
+| EntityRegistryTest | 10 | 实体注册中心路径查找 |
+| OntologyQueryEngineTest | 9 | 本体论查询引擎核心逻辑 |
+| ToolExecutionTemplateTest | 3 | 工具执行模板 |
+| ToolResultTest | 4 | 统一结果类 |
+| ObservabilityAspectAnnotationTest | 2 | AOP 注解测试 |
+| **总计** | **35** | - |
+
+运行全量测试：
+```bash
+./run-integration-tests.sh
+```
+
+---
+
+## QueryScope 枚举类（v2.4 新增）
+
+### 定义
+
+```java
+public enum QueryScope {
+    DEFAULT("default", "默认展开"),
+    LIST("list", "仅返回起始实体"),
+    CONTRACT("Contract", "展开到合同实体"),
+    CONTRACT_NODE("ContractNode", "展开到合同节点"),
+    // ... 更多实体
+}
+```
+
+### 使用方式
+
+```java
+// 字符串版本（向后兼容）
+Map<String, Object> result = engine.query("Order", "825123110000002753", "Contract");
+
+// 枚举版本（类型安全）
+Map<String, Object> result = engine.query("Order", "825123110000002753", QueryScope.CONTRACT);
+
+// 解析字符串
+QueryScope scope = QueryScope.fromString("ContractNode");  // -> CONTRACT_NODE
+```
 
 ---
 

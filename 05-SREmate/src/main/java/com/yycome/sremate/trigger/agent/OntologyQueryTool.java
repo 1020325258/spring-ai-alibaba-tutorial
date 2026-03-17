@@ -2,6 +2,7 @@ package com.yycome.sremate.trigger.agent;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.yycome.sremate.domain.ontology.engine.OntologyQueryEngine;
+import com.yycome.sremate.domain.ontology.model.QueryScope;
 import com.yycome.sremate.infrastructure.annotation.DataQueryTool;
 import com.yycome.sremate.infrastructure.service.ToolExecutionTemplate;
 import com.yycome.sremate.infrastructure.service.ToolResult;
@@ -10,9 +11,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.stereotype.Component;
 
-import java.util.Arrays;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 /**
  * 本体论驱动的统一查询工具（薄层）
@@ -25,16 +24,6 @@ public class OntologyQueryTool {
 
     private final OntologyQueryEngine queryEngine;
     private final ObjectMapper objectMapper;
-
-    // scope 简写 -> 目标实体名映射（兼容旧调用方式）
-    private static final Map<String, String> SCOPE_ALIAS = Map.of(
-        "nodes", "ContractNode",
-        "fields", "ContractField",
-        "signed_objects", "ContractQuotationRelation",
-        "budget_bills", "BudgetBill",
-        "form", "ContractForm",
-        "config", "ContractConfig"
-    );
 
     @Tool(description = """
         【本体论智能查询】根据起始实体和值，查询实体数据及关联数据。
@@ -65,10 +54,7 @@ public class OntologyQueryTool {
         return ToolExecutionTemplate.execute("ontologyQuery", () -> {
             log.info("[OntologyQueryTool] 查询: entity={}, value={}, scope={}", entity, value, queryScope);
 
-            // 映射 scope 简写到目标实体名（支持多目标）
-            String resolvedScope = resolveScope(queryScope);
-
-            Map<String, Object> result = queryEngine.query(entity, value, resolvedScope);
+            Map<String, Object> result = queryEngine.query(entity, value, queryScope);
 
             if (result == null) {
                 return ToolResult.notFound(entity, value);
@@ -76,20 +62,5 @@ public class OntologyQueryTool {
 
             return objectMapper.writeValueAsString(result);
         });
-    }
-
-    /**
-     * 解析 queryScope，支持简写、实体名和多目标
-     */
-    private String resolveScope(String queryScope) {
-        if (queryScope == null || "default".equals(queryScope) || "list".equals(queryScope)) {
-            return queryScope;
-        }
-
-        // 支持多目标：按逗号分隔，分别映射
-        return Arrays.stream(queryScope.split(","))
-                .map(String::trim)
-                .map(s -> SCOPE_ALIAS.getOrDefault(s, s))
-                .collect(Collectors.joining(","));
     }
 }

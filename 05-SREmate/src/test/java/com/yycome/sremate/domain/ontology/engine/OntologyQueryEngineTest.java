@@ -77,7 +77,7 @@ class OntologyQueryEngineTest {
         when(contractGateway.queryByField("contractCode", "C1767173898135504"))
             .thenReturn(List.of()); // 返回空列表，期望返回 null
 
-        Map<String, Object> result = engine.query("Contract", "C1767173898135504", null);
+        Map<String, Object> result = engine.query("Contract", "C1767173898135504", (String) null);
         assertThat(result).isNull();
     }
 
@@ -85,7 +85,7 @@ class OntologyQueryEngineTest {
     void matchStrategy_noMatch_shouldThrow() {
         OntologyEntity entity = makeEntity("Contract", "contractCode", "^C\\d+");
         when(entityRegistry.getEntity("Contract")).thenReturn(entity);
-        assertThatThrownBy(() -> engine.query("Contract", "INVALID_FORMAT", null))
+        assertThatThrownBy(() -> engine.query("Contract", "INVALID_FORMAT", (String) null))
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessageContaining("无法识别的 value 格式");
     }
@@ -101,7 +101,7 @@ class OntologyQueryEngineTest {
         when(contractGateway.queryByField("contractCode", "C123"))
             .thenReturn(List.of(mutableMap("contractCode", "C123", "type", 8)));
 
-        Map<String, Object> result = engine.query("Contract", "C123", null);
+        Map<String, Object> result = engine.query("Contract", "C123", (String) null);
 
         assertThat(result).isNotNull();
         @SuppressWarnings("unchecked")
@@ -141,7 +141,7 @@ class OntologyQueryEngineTest {
         when(orderGateway.queryByField("projectOrderId", "825123110000002753"))
             .thenReturn(List.of(mutableMap("projectOrderId", "825123110000002753")));
 
-        Map<String, Object> result = engine.query("Order", "825123110000002753", null);
+        Map<String, Object> result = engine.query("Order", "825123110000002753", (String) null);
 
         assertThat(result).isNotNull();
         @SuppressWarnings("unchecked")

@@ -3,6 +3,7 @@ package com.yycome.sremate.aspect;
 import com.yycome.sremate.infrastructure.annotation.DataQueryTool;
 import com.yycome.sremate.infrastructure.service.DirectOutputHolder;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -26,6 +27,11 @@ class ObservabilityAspectAnnotationTest {
     @Autowired
     private TestTool testTool;
 
+    @BeforeEach
+    void setUp() {
+        directOutputHolder.startRequest();
+    }
+
     @AfterEach
     void cleanup() {
         directOutputHolder.clear();
@@ -36,7 +42,7 @@ class ObservabilityAspectAnnotationTest {
         testTool.queryWithDataQueryAnnotation();
 
         assertThat(directOutputHolder.hasOutput()).isTrue();
-        assertThat(directOutputHolder.getAndClear()).isEqualTo("{\"result\":\"ok\"}");
+        assertThat(directOutputHolder.getAndClearAggregated()).isEqualTo("{\"result\":\"ok\"}");
     }
 
     @Test

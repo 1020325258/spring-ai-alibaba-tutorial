@@ -3,6 +3,7 @@ package com.yycome.sremate.domain.ontology.engine;
 import com.yycome.sremate.domain.ontology.model.LookupStrategy;
 import com.yycome.sremate.domain.ontology.model.OntologyEntity;
 import com.yycome.sremate.domain.ontology.model.OntologyRelation;
+import com.yycome.sremate.domain.ontology.model.QueryScope;
 import com.yycome.sremate.domain.ontology.service.EntityRegistry;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -28,7 +29,7 @@ public class OntologyQueryEngine {
     private final ExecutorService executor = Executors.newFixedThreadPool(10);
 
     /**
-     * 对外唯一入口
+     * 对外唯一入口（字符串版本）
      *
      * @param entityName  起始实体名（Order / Contract / BudgetBill）
      * @param value       标识值（订单号 / 合同号等）
@@ -39,6 +40,54 @@ public class OntologyQueryEngine {
      * @return 层级结构的查询结果，起始实体无数据时返回 null
      */
     public Map<String, Object> query(String entityName, String value, String queryScope) {
+        QueryScope scope = QueryScope.fromString(queryScope);
+        if (scope != null) {
+            return query(entityName, value, scope);
+        }
+        // 未匹配到枚举，可能是自定义实体名或逗号分隔的多目标
+        return queryWithScopeString(entityName, value, queryScope);
+    }
+
+    /**
+     * 对外唯一入口（枚举版本）
+     *
+     * @param entityName  起始实体名（Order / Contract / BudgetBill）
+     * @param value       标识值（订单号 / 合同号等）
+     * @param queryScope  查询范围枚举
+     * @return 层级结构的查询结果，起始实体无数据时返回 null
+     */
+    public Map<String, Object> query(String entityName, String value, QueryScope queryScope) {
+        if (queryScope == QueryScope.LIST || queryScope == QueryScope.DEFAULT) {
+            // 仅返回起始实体
+            return queryListOnly(entityName, value);
+        }
+        String targetEntity = queryScope.getTargetEntity();
+        return queryWithScopeString(entityName, value, targetEntity);
+    }
+
+    /**
+     * 仅查询起始实体，不展开关联
+     */
+    private Map<String, Object> queryListOnly(String entityName, String value) {
+        OntologyEntity entity = entityRegistry.getEntity(entityName);
+        LookupStrategy strategy = matchStrategy(entity, value);
+
+        List<Map<String, Object>> records =
+            gatewayRegistry.getGateway(entityName).queryByField(strategy.getField(), value);
+
+        if (records.isEmpty()) return null;
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("queryEntity", entityName);
+        result.put("queryValue", value);
+        result.put("records", records);
+        return result;
+    }
+
+    /**
+     * 使用字符串 scope 进行查询（支持多目标）
+     */
+    private Map<String, Object> queryWithScopeString(String entityName, String value, String queryScope) {
         OntologyEntity entity = entityRegistry.getEntity(entityName);
         LookupStrategy strategy = matchStrategy(entity, value);
 

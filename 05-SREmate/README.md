@@ -255,6 +255,43 @@ public String ontologyQuery(String entity, String value, String queryScope) {
 
 ## 架构升级历史
 
+### v2.4 - QueryScope 枚举类 (2026-03-16)
+
+#### 新增功能
+
+**QueryScope 枚举类**: 为 `queryScope` 参数提供类型安全的枚举支持。
+
+```java
+public enum QueryScope {
+    DEFAULT("default", "默认展开"),
+    LIST("list", "仅返回起始实体"),
+    CONTRACT("Contract", "展开到合同实体"),
+    CONTRACT_NODE("ContractNode", "展开到合同节点"),
+    CONTRACT_QUOTATION_RELATION("ContractQuotationRelation", "展开到签约单据"),
+    // ... 更多实体
+}
+```
+
+#### API 增强
+
+**OntologyQueryEngine** 新增枚举版本 `query()` 方法：
+
+```java
+// 字符串版本（向后兼容）
+Map<String, Object> query(String entity, String value, String queryScope);
+
+// 枚举版本（类型安全）
+Map<String, Object> query(String entity, String value, QueryScope queryScope);
+```
+
+#### 测试覆盖
+
+- QueryScopeTest: 7/7 通过
+- OntologyQueryEngineTest: 9/9 通过
+- 全量测试: 35/35 通过
+
+---
+
 ### v2.3 - 多目标查询优化 (2026-03-15)
 
 #### 新增功能
