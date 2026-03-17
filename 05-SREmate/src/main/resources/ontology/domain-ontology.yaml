@@ -20,11 +20,13 @@ entities:
       - field: projectOrderId
         pattern: "^\\d{15,}$"
     attributes:
-      - { name: contractCode,   type: string, description: "合同编号，C前缀+数字" }
-      - { name: contractType,   type: enum,   description: "合同类型" }
-      - { name: status,         type: string, description: "合同状态" }
-      - { name: projectOrderId, type: string, description: "所属订单号" }
+      - { name: contractCode,       type: string, description: "合同编号，C前缀+数字" }
+      - { name: type,               type: enum,   description: "合同类型" }
+      - { name: status,             type: string, description: "合同状态" }
+      - { name: amount,             type: number, description: "合同金额" }
+      - { name: projectOrderId,     type: string, description: "所属订单号" }
       - { name: platformInstanceId, type: string, description: "协议平台实例 ID" }
+      - { name: ctime,              type: string, description: "创建时间" }
 
   - name: ContractNode
     displayName: "合同节点"
@@ -49,9 +51,12 @@ entities:
         pattern: "^C\\d+"
     attributes:
       - { name: contractCode, type: string }
-      - { name: bill_code,    type: string, description: "签约单据编号" }
-      - { name: bind_type,    type: string }
-      - { name: status,       type: string }
+      - { name: billCode,     type: string, description: "签约单据编号" }
+      - { name: companyCode,  type: string, description: "公司编码" }
+      - { name: bindType,     type: string, description: "绑定类型" }
+      - { name: status,       type: string, description: "状态" }
+      - { name: ctime,        type: string, description: "创建时间" }
+      - { name: mtime,        type: string, description: "修改时间" }
 
   - name: ContractField
     displayName: "合同字段"
@@ -108,7 +113,16 @@ entities:
       - field: contractCode
         pattern: "^C\\d+"
     attributes:
-      - { name: contractCode, type: string }
+      - { name: contractCode,          type: string, description: "合同编号" }
+      - { name: projectOrderId,        type: string, description: "所属订单号" }
+      - { name: contractConfigId,      type: string, description: "配置快照ID" }
+      - { name: version,               type: number, description: "配置版本号" }
+      - { name: businessType,          type: string, description: "业务类型" }
+      - { name: gbCode,                type: string, description: "区域编码" }
+      - { name: companyCode,           type: string, description: "公司编码" }
+      - { name: type,                  type: enum,   description: "合同类型" }
+      - { name: typeName,              type: string, description: "合同类型名称" }
+      - { name: cityCompanyInfo,       type: array,  description: "城市公司配置列表，包含 formId、formKey 等版式配置字段" }
 
 relations:
   - from: Order

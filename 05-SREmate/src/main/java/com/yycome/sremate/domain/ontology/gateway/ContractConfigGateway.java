@@ -92,7 +92,7 @@ public class ContractConfigGateway implements EntityDataGateway {
         result.put("type", type);
         result.put("typeName", ContractTypeEnum.getNameByCode(Byte.parseByte(type)));
         result.put("signChannelType", 1);
-        result.put("contract_city_company_info", cityCompanyInfo);
+        result.put("cityCompanyInfo", cityCompanyInfo);
 
         return List.of(result);
     }
