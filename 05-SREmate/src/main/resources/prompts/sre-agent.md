@@ -24,12 +24,20 @@
 
 ### 📊 第一步：识别起始实体
 
+**⛔ 关键规则：根据编号格式判断 entity，这是强制性的！**
+
 | 编号格式 | entity | 示例 |
 |--------|-------|------|
 | 纯数字（订单号） | Order | 825123110000002753 |
 | C开头（合同号） | Contract | C1767150648920281 |
 
+**⚠️ 错误示例（绝对禁止）**：
+- ❌ 输入 "C1767173898135504的合同基本信息"，entity 错误地设为 Order
+- ✅ 正确：输入 "C1767173898135504的合同基本信息"，entity 必须是 Contract（因为编号以 C 开头）
+
 ### 🔢 第二步：确定目标实体（queryScope）
+
+**⛔ 关键规则：根据用户意图判断 queryScope，这是强制性的！**
 
 用户想查什么数据，就传对应实体名：
 
@@ -42,8 +50,15 @@
 | 查字段 | ContractField |
 | 查版式 | ContractForm |
 | 查配置表 | ContractConfig |
+| 查报价单 | BudgetBill |
 | 查S单/子单（引擎自动走 Order→BudgetBill→SubOrder 路径） | SubOrder |
 | 查多个目标 | ContractNode,ContractQuotationRelation（逗号分隔） |
+
+**⚠️ 错误示例（绝对禁止）**：
+- ❌ 用户问 "825123110000002753下的合同"，queryScope 错误地设为 BudgetBill
+- ✅ 正确：用户问 "825123110000002753下的合同"，queryScope 必须是 Contract（因为用户想查合同）
+- ❌ 用户问 "826031111000001859的S单"，queryScope 错误地设为 BudgetBill
+- ✅ 正确：用户问 "826031111000001859的S单"，queryScope 必须是 SubOrder
 
 ### ✅ 决策示例
 

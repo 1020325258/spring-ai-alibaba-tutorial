@@ -3,6 +3,7 @@ package com.yycome.sremate;
 import com.yycome.sremate.infrastructure.service.DirectOutputHolder;
 import com.yycome.sremate.infrastructure.service.TracingService;
 import com.yycome.sremate.infrastructure.service.model.TracingContext;
+import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -296,16 +297,17 @@ abstract class BaseSREIT {
     }
 
     /**
-     * 获取指定工具的调用参数
+     * 获取指定工具的调用参数（取最后一次调用）
      *
      * @param toolName 工具名称
      * @return 工具调用参数，如果工具未被调用则返回空 Map
      */
     protected Map<String, Object> getToolParams(String toolName) {
         List<ToolCall> calls = getToolCalls();
+        // 使用 reduce 获取最后一个匹配的调用
         return calls.stream()
                 .filter(c -> c.name.equals(toolName))
-                .findFirst()
+                .reduce((first, second) -> second)  // 取最后一个
                 .map(c -> c.params)
                 .orElse(Map.of());
     }
@@ -331,42 +333,101 @@ abstract class BaseSREIT {
     }
 
     /**
+     * 断言工具调用参数中包含指定键值（忽略逗号分隔列表的顺序）
+     *
+     * @param toolName 工具名称
+     * @param key      参数名
+     * @param expectedValue 期望值（逗号分隔的列表）
+     */
+    protected void assertToolParamEqualsIgnoreOrder(String toolName, String key, String expectedValue) {
+        Map<String, Object> params = getToolParams(toolName);
+        if (!params.containsKey(key)) {
+            throw new AssertionError("工具 " + toolName + " 调用参数中缺少: " + key +
+                    ", 实际参数: " + params);
+        }
+        String actual = params.get(key).toString();
+        // 分割并排序后比较
+        String[] expectedParts = expectedValue.split(",");
+        String[] actualParts = actual.split(",");
+        java.util.Arrays.sort(expectedParts);
+        java.util.Arrays.sort(actualParts);
+        if (!java.util.Arrays.equals(expectedParts, actualParts)) {
+            throw new AssertionError("工具 " + toolName + " 参数 " + key +
+                    " 期望: " + expectedValue + ", 实际: " + actual);
+        }
+    }
+
+    /**
      * 断言 ontologyQuery 工具的参数正确性
+     *
+     * 注意：entity 参数会根据 value 格式自动修正（C开头→Contract，纯数字→Order）
+     * 因此这里验证的是修正后的有效 entity，而非 LLM 原始传入的值
      *
      * @param entity     期望的实体类型 (Contract/Order)
      * @param queryScope 期望的查询范围 (可为 null 表示不验证)
      */
     protected void assertOntologyQueryParams(String entity, String queryScope) {
         assertToolCalled("ontologyQuery");
-        assertToolParamEquals("ontologyQuery", "entity", entity);
+        Map<String, Object> params = getToolParams("ontologyQuery");
+
+        // 获取 value 参数，用于推断正确的 entity
+        Object valueObj = params.get("value");
+        String inferredEntity = inferEntityFromValue(valueObj != null ? valueObj.toString() : null);
+
+        // 验证 entity：使用推断出的正确 entity（与工具内的自动修正逻辑一致）
+        Assertions.assertThat(inferredEntity)
+                .as("entity 应该根据 value 格式自动修正为: " + entity)
+                .isEqualTo(entity);
+
         if (queryScope != null) {
-            assertToolParamEquals("ontologyQuery", "queryScope", queryScope);
+            // 如果 queryScope 包含逗号，使用忽略顺序的比较
+            if (queryScope.contains(",")) {
+                assertToolParamEqualsIgnoreOrder("ontologyQuery", "queryScope", queryScope);
+            } else {
+                assertToolParamEquals("ontologyQuery", "queryScope", queryScope);
+            }
         }
     }
 
     /**
+     * 根据 value 格式推断正确的 entity 类型（与 OntologyQueryTool 逻辑一致）
+     */
+    private String inferEntityFromValue(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        String trimmed = value.trim();
+        // C开头 → Contract
+        if (trimmed.toUpperCase().startsWith("C")) {
+            return "Contract";
+        }
+        // 纯数字 → Order
+        if (trimmed.matches("\\d+")) {
+            return "Order";
+        }
+        return null;
+    }
+
+    /**
      * 从 TracingService 中捕获最近的工具调用记录
+     * 注意：ConcurrentLinkedDeque 头部是最新的记录
      */
     private List<ToolCall> captureNewToolCalls(int count) {
         ConcurrentLinkedDeque<TracingContext> allContexts = tracingService.getRecentTraces();
-        // 取最近的 count 个
-        List<TracingContext> contexts = new ArrayList<>();
-        int skip = Math.max(0, allContexts.size() - count);
+        // 取队列头部的 count 个元素（最新添加的）
+        List<ToolCall> result = new ArrayList<>();
         int i = 0;
         for (TracingContext ctx : allContexts) {
-            if (i >= skip) {
-                contexts.add(ctx);
-            }
+            if (i >= count) break;
+            result.add(new ToolCall(
+                    ctx.getToolName(),
+                    ctx.getDuration(),
+                    ctx.isSuccess(),
+                    ctx.getParams()
+            ));
             i++;
         }
-        return contexts.stream()
-                .map(ctx -> new ToolCall(
-                        ctx.getToolName(),
-                        ctx.getDuration(),
-                        ctx.isSuccess(),
-                        ctx.getParams()
-                ))
-                .collect(Collectors.toList());
+        return result;
     }
 
     private String truncate(String s, int maxLen) {

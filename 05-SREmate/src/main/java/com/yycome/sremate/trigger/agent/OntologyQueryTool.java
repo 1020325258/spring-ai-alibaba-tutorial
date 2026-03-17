@@ -42,6 +42,8 @@ public class OntologyQueryTool {
           - "ContractField": 展开到字段数据
           - "ContractForm": 展开到版式数据
           - "ContractConfig": 展开到配置表数据
+          - "BudgetBill": 展开到报价单数据
+          - "SubOrder": 展开到S单数据
           - 多个目标（逗号分隔）: "ContractNode,ContractQuotationRelation"
 
         示例：
@@ -52,17 +54,49 @@ public class OntologyQueryTool {
         """)
     @DataQueryTool
     public String ontologyQuery(String entity, String value, String queryScope) {
-        return ToolExecutionTemplate.execute("ontologyQuery", () -> {
-            log.info("[OntologyQueryTool] 查询: entity={}, value={}, scope={}", entity, value, queryScope);
+        // 自动修正 entity：根据 value 格式推断正确的 entity
+        String correctedEntity = inferEntityFromValue(value, entity);
+        if (!correctedEntity.equals(entity)) {
+            log.info("[OntologyQueryTool] 自动修正 entity: {} -> {}", entity, correctedEntity);
+        }
+        final String finalEntity = correctedEntity;
 
-            Map<String, Object> result = queryEngine.query(entity, value, queryScope);
+        return ToolExecutionTemplate.execute("ontologyQuery", () -> {
+            log.info("[OntologyQueryTool] 查询: entity={}, value={}, scope={}", finalEntity, value, queryScope);
+
+            Map<String, Object> result = queryEngine.query(finalEntity, value, queryScope);
 
             if (result == null) {
-                return ToolResult.notFound(entity, value);
+                return ToolResult.notFound(finalEntity, value);
             }
 
             return objectMapper.writeValueAsString(result);
         });
+    }
+
+    /**
+     * 根据 value 格式自动推断正确的 entity 类型
+     * 纯数字 → Order，C开头 → Contract
+     */
+    private String inferEntityFromValue(String value, String providedEntity) {
+        if (value == null || value.isBlank()) {
+            return providedEntity;
+        }
+
+        String trimmedValue = value.trim();
+
+        // C开头 → Contract
+        if (trimmedValue.toUpperCase().startsWith("C")) {
+            return "Contract";
+        }
+
+        // 纯数字 → Order
+        if (trimmedValue.matches("\\d+")) {
+            return "Order";
+        }
+
+        // 无法推断，返回原值
+        return providedEntity;
     }
 
     @Tool(description = """
