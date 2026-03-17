@@ -34,4 +34,18 @@ public interface EntityDataGateway {
             .flatMap(v -> queryByField(fieldName, v).stream())
             .toList();
     }
+
+    /**
+     * 根据字段查询实体数据（带父记录上下文）
+     * 用于需要从父记录获取额外参数的场景（如 BudgetBill → SubOrder 需要 homeOrderNo + quotationOrderNo）
+     *
+     * @param fieldName 字段名
+     * @param value 字段值
+     * @param parentRecord 父记录（包含上游实体的完整数据）
+     * @return 实体数据列表
+     */
+    default List<Map<String, Object>> queryByFieldWithContext(String fieldName, Object value, Map<String, Object> parentRecord) {
+        // 默认实现：忽略 parentRecord，调用原方法
+        return queryByField(fieldName, value);
+    }
 }

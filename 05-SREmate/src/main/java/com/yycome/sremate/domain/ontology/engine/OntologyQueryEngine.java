@@ -186,9 +186,10 @@ public class OntologyQueryEngine {
                     // 如果已有该 key，跳过（避免重复查询）
                     if (record.containsKey(resultKey)) continue;
 
+                    // 传递父记录给 Gateway，支持从父记录获取额外参数
                     List<Map<String, Object>> children =
                         gatewayRegistry.getGateway(rel.getTo())
-                            .queryByField(rel.getVia().get("target_field"), childValue);
+                            .queryByFieldWithContext(rel.getVia().get("target_field"), childValue, record);
 
                     // 递归展开下一层
                     attachLayer(children, hopRelations, hop + 1);

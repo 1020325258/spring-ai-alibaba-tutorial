@@ -85,7 +85,7 @@ entities:
   - name: SubOrder
     displayName: "S单"
     aliases: ["子单", "签约子单", "S单信息"]
-    description: "S单，挂在报价单下，通过 quotationOrderNo（报价单号）查询"
+    description: "S单，从报价单拆分而来，需要 homeOrderNo + quotationOrderNo 双参数查询"
     lookupStrategies:
       - field: quotationOrderNo
         pattern: ".*"

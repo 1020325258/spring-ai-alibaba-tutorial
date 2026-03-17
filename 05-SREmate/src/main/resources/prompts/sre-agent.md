@@ -42,7 +42,7 @@
 | 查字段 | ContractField |
 | 查版式 | ContractForm |
 | 查配置表 | ContractConfig |
-| 查S单/子单（需先查报价单） | SubOrder |
+| 查S单/子单（引擎自动走 Order→BudgetBill→SubOrder 路径） | SubOrder |
 | 查多个目标 | ContractNode,ContractQuotationRelation（逗号分隔） |
 
 ### ✅ 决策示例
@@ -64,7 +64,7 @@
 
 **示例 3b**：`826031111000001859的S单`
 1. 编号格式：纯数字 → entity=Order
-2. 目标：S单（需先查报价单，引擎自动走 Order→BudgetBill→SubOrder 两跳路径） → queryScope=SubOrder
+2. 目标：S单 → queryScope=SubOrder（引擎自动走 Order→BudgetBill→SubOrder 路径，传递 homeOrderNo + quotationOrderNo）
 3. **最终调用**：`ontologyQuery(entity="Order", value="826031111000001859", queryScope="SubOrder")` ✅
 
 **示例 4**：`C1773208288511314合同基本信息`

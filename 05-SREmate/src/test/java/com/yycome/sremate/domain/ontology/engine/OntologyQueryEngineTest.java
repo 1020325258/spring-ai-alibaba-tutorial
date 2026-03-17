@@ -167,7 +167,7 @@ class OntologyQueryEngineTest {
         when(gatewayRegistry.getGateway("ContractNode")).thenReturn(nodeGateway);
         when(contractGateway.queryByField("contractCode", "C123"))
             .thenReturn(List.of(mutableMap("contractCode", "C123", "type", 8)));
-        when(nodeGateway.queryByField("contractCode", "C123"))
+        when(nodeGateway.queryByFieldWithContext(eq("contractCode"), eq("C123"), any()))
             .thenReturn(List.of(mutableMap("nodeType", 1, "fireTime", "2024-01-01")));
 
         Map<String, Object> result = engine.query("Contract", "C123", "ContractNode");
@@ -207,17 +207,17 @@ class OntologyQueryEngineTest {
                 mutableMap("projectOrderId", "825123110000002753", "orderType", 2)
             ));
 
-        // Contract 查询返回包含 contractCode 的记录
-        when(contractGatewayForOrder.queryByField("projectOrderId", "825123110000002753"))
+        // Contract 查询返回包含 contractCode 的记录（使用 queryByFieldWithContext）
+        when(contractGatewayForOrder.queryByFieldWithContext(eq("projectOrderId"), eq("825123110000002753"), any()))
             .thenReturn(List.of(
                 mutableMap("contractCode", "C1", "type", 8),
                 mutableMap("contractCode", "C2", "type", 3)
             ));
 
-        // SignedObjects 查询
-        when(signedObjectsGateway.queryByField("contractCode", "C1"))
+        // SignedObjects 查询（使用 queryByFieldWithContext）
+        when(signedObjectsGateway.queryByFieldWithContext(eq("contractCode"), eq("C1"), any()))
             .thenReturn(List.of(mutableMap("billCode", "GBILL001")));
-        when(signedObjectsGateway.queryByField("contractCode", "C2"))
+        when(signedObjectsGateway.queryByFieldWithContext(eq("contractCode"), eq("C2"), any()))
             .thenReturn(List.of(mutableMap("billCode", "GBILL002")));
 
         Map<String, Object> result = engine.query("Order", "825123110000002753",
@@ -261,9 +261,9 @@ class OntologyQueryEngineTest {
         when(gatewayRegistry.getGateway("ContractField")).thenReturn(fieldGateway);
         when(contractGateway.queryByField("contractCode", "C123"))
             .thenReturn(List.of(mutableMap("contractCode", "C123", "type", 8)));
-        when(nodeGateway.queryByField("contractCode", "C123"))
+        when(nodeGateway.queryByFieldWithContext(eq("contractCode"), eq("C123"), any()))
             .thenReturn(List.of(mutableMap("nodeType", 1)));
-        when(fieldGateway.queryByField("contractCode", "C123"))
+        when(fieldGateway.queryByFieldWithContext(eq("contractCode"), eq("C123"), any()))
             .thenReturn(List.of(mutableMap("field_key", "key1")));
 
         Map<String, Object> result = engine.query("Contract", "C123",

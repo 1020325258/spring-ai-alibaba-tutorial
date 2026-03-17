@@ -15,7 +15,7 @@ import java.util.*;
 /**
  * SubOrder（S单）实体的数据网关
  * 通过 BudgetBill → SubOrder 关系按需查询，仅在用户主动询问S单时触发。
- * 引擎从 BudgetBill 记录的 billCode 字段传入，作为 quotationOrderNo 参数查询。
+ * 需要从父记录（BudgetBill）获取 homeOrderNo 和 quotationOrderNo 两个参数。
  */
 @Slf4j
 @Component
@@ -38,24 +38,42 @@ public class SubOrderGateway implements EntityDataGateway {
 
     @Override
     public List<Map<String, Object>> queryByField(String fieldName, Object value) {
-        log.debug("[SubOrderGateway] queryByField: {} = {}", fieldName, value);
+        // 无父记录上下文时，无法查询（homeOrderNo 是必填参数）
+        log.warn("[SubOrderGateway] 缺少父记录上下文，无法查询S单");
+        return Collections.emptyList();
+    }
 
-        String quotationOrderNo = String.valueOf(value);
+    @Override
+    public List<Map<String, Object>> queryByFieldWithContext(String fieldName, Object value, Map<String, Object> parentRecord) {
+        log.debug("[SubOrderGateway] queryByFieldWithContext: {} = {}, parentRecord keys: {}",
+                fieldName, value, parentRecord != null ? parentRecord.keySet() : "null");
+
+        // 从父记录（BudgetBill）获取参数
+        String quotationOrderNo = String.valueOf(value);  // billCode -> quotationOrderNo
+        String homeOrderNo = parentRecord != null
+                ? String.valueOf(parentRecord.getOrDefault("projectOrderId", ""))
+                : "";
+
+        if (homeOrderNo.isEmpty() || "null".equals(homeOrderNo)) {
+            log.warn("[SubOrderGateway] 父记录缺少 projectOrderId，无法查询S单");
+            return Collections.emptyList();
+        }
 
         try {
             String rawJson = httpEndpointTool.callPredefinedEndpointRaw("sub-order-info",
-                    Map.of("homeOrderNo", "",
+                    Map.of("homeOrderNo", homeOrderNo,
                            "quotationOrderNo", quotationOrderNo,
                            "projectChangeNo", ""));
 
             if (rawJson == null) {
-                log.warn("[SubOrderGateway] 接口无响应 quotationOrderNo={}", quotationOrderNo);
+                log.warn("[SubOrderGateway] 接口无响应 homeOrderNo={}, quotationOrderNo={}", homeOrderNo, quotationOrderNo);
                 return Collections.emptyList();
             }
 
             return parseSubOrders(rawJson);
         } catch (Exception e) {
-            log.warn("[SubOrderGateway] 查询S单失败 quotationOrderNo={}: {}", quotationOrderNo, e.getMessage());
+            log.warn("[SubOrderGateway] 查询S单失败 homeOrderNo={}, quotationOrderNo={}: {}",
+                    homeOrderNo, quotationOrderNo, e.getMessage());
             return Collections.emptyList();
         }
     }
