@@ -61,15 +61,13 @@ entities:
   - name: ContractField
     displayName: "合同字段"
     aliases: ["合同扩展字段", "字段数据"]
-    description: "合同字段数据，按contractCode取模分10张表"
+    description: "合同字段数据，按contractCode取模分10张表，返回动态字段 map"
     table: contract_field_sharding
     lookupStrategies:
       - field: contractCode
         pattern: "^C\\d+"
     attributes:
       - { name: contractCode, type: string }
-      - { name: field_key,    type: string }
-      - { name: field_value,  type: string }
 
   - name: BudgetBill
     displayName: "报价单"
@@ -171,7 +169,7 @@ relations:
 
   - from: BudgetBill
     to: SubOrder
-    label: splits_into
+    label: has_sub_orders
     domain: quote
     description: "报价单拆分形成S单"
     via: { source_field: billCode, target_field: quotationOrderNo }

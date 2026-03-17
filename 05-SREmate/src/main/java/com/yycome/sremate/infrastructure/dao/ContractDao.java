@@ -102,7 +102,6 @@ public class ContractDao {
         rows.forEach(f -> fieldMap.put(
                 String.valueOf(f.get("field_key")),
                 f.get("field_value")));
-        fieldMap.put("_shardTable", shardTable);
         return fieldMap;
     }
 
