@@ -44,12 +44,10 @@ class OntologyQueryEngineTest {
         return e;
     }
 
-    private OntologyRelation makeRelation(String from, String to, String label,
-                                           String srcField, String tgtField) {
+    private OntologyRelation makeRelation(String from, String to, String srcField, String tgtField) {
         OntologyRelation r = new OntologyRelation();
         r.setFrom(from);
         r.setTo(to);
-        r.setLabel(label);
         r.setVia(Map.of("source_field", srcField, "target_field", tgtField));
         return r;
     }
@@ -156,8 +154,7 @@ class OntologyQueryEngineTest {
     @Test
     void query_scoped_singleHop_shouldBuildHierarchy() {
         OntologyEntity contractEntity = makeEntity("Contract", "contractCode", "^C\\d+");
-        OntologyRelation hasNodes = makeRelation("Contract", "ContractNode",
-                                                  "has_nodes", "contractCode", "contractCode");
+        OntologyRelation hasNodes = makeRelation("Contract", "ContractNode", "contractCode", "contractCode");
 
         when(entityRegistry.getEntity("Contract")).thenReturn(contractEntity);
         when(entityRegistry.findRelationPath("Contract", "ContractNode"))
@@ -176,17 +173,17 @@ class OntologyQueryEngineTest {
         @SuppressWarnings("unchecked")
         List<Map<String, Object>> contracts = (List<Map<String, Object>>) result.get("records");
         assertThat(contracts).hasSize(1);
-        // scoped 查询应该展开关联
-        assertThat(contracts.get(0)).containsKey("nodes");
+        // scoped 查询应该展开关联，key 为实体名复数形式
+        assertThat(contracts.get(0)).containsKey("contractNodes");
     }
 
     @Test
     void query_scoped_twoHops_shouldBuildHierarchy() {
         OntologyEntity orderEntity = makeEntity("Order", "projectOrderId", "^\\d{15,}$");
         OntologyRelation hasContracts = makeRelation("Order", "Contract",
-                                                      "has_contracts", "projectOrderId", "projectOrderId");
+                                                      "projectOrderId", "projectOrderId");
         OntologyRelation hasSignedObjects = makeRelation("Contract", "ContractQuotationRelation",
-                                                          "has_signed_objects", "contractCode", "contractCode");
+                                                          "contractCode", "contractCode");
 
         when(entityRegistry.getEntity("Order")).thenReturn(orderEntity);
         when(entityRegistry.findRelationPath("Order", "ContractQuotationRelation"))
@@ -231,11 +228,11 @@ class OntologyQueryEngineTest {
         assertThat(orders.get(0)).containsKey("contracts");
         assertThat(orders.get(1)).containsKey("contracts");
 
-        // contracts 子记录中应该有 signedObjects
+        // contracts 子记录中应该有 contractQuotationRelations
         @SuppressWarnings("unchecked")
         List<Map<String, Object>> contracts0 = (List<Map<String, Object>>) orders.get(0).get("contracts");
         assertThat(contracts0).isNotEmpty();
-        assertThat(contracts0.get(0)).containsKey("signedObjects");
+        assertThat(contracts0.get(0)).containsKey("contractQuotationRelations");
     }
 
     // ── 多目标查询测试 ─────────────────────────────────────
@@ -244,9 +241,9 @@ class OntologyQueryEngineTest {
     void query_multiTarget_shouldExpandMultiplePaths() {
         OntologyEntity contractEntity = makeEntity("Contract", "contractCode", "^C\\d+");
         OntologyRelation hasNodes = makeRelation("Contract", "ContractNode",
-                                                  "has_nodes", "contractCode", "contractCode");
+                                                  "contractCode", "contractCode");
         OntologyRelation hasFields = makeRelation("Contract", "ContractField",
-                                                   "has_fields", "contractCode", "contractCode");
+                                                   "contractCode", "contractCode");
 
         when(entityRegistry.getEntity("Contract")).thenReturn(contractEntity);
         when(entityRegistry.findRelationPath("Contract", "ContractNode"))
@@ -273,9 +270,9 @@ class OntologyQueryEngineTest {
         @SuppressWarnings("unchecked")
         List<Map<String, Object>> contracts = (List<Map<String, Object>>) result.get("records");
         assertThat(contracts).hasSize(1);
-        // 两个目标都应该展开
-        assertThat(contracts.get(0)).containsKey("nodes");
-        assertThat(contracts.get(0)).containsKey("fields");
+        // 两个目标都应该展开，key 为实体名复数形式
+        assertThat(contracts.get(0)).containsKey("contractNodes");
+        assertThat(contracts.get(0)).containsKey("contractFields");
     }
 
     // ── 错误处理测试 ────────────────────────────────────

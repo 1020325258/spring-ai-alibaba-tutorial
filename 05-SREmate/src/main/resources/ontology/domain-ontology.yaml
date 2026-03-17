@@ -126,50 +126,42 @@ entities:
 relations:
   - from: Order
     to: Contract
-    label: has_contracts
     domain: contract
     via: { source_field: projectOrderId, target_field: projectOrderId }
 
   - from: Order
     to: BudgetBill
-    label: has_budget_bills
     domain: quote
     via: { source_field: projectOrderId, target_field: projectOrderId }
 
   - from: Contract
     to: ContractNode
-    label: has_nodes
     domain: contract
     via: { source_field: contractCode, target_field: contractCode }
 
   - from: Contract
     to: ContractQuotationRelation
-    label: has_signed_objects
     domain: contract
     description: "合同签约的单据对象"
     via: { source_field: contractCode, target_field: contractCode }
 
   - from: Contract
     to: ContractField
-    label: has_fields
     domain: contract
     via: { source_field: contractCode, target_field: contractCode }
 
   - from: Contract
     to: ContractForm
-    label: has_form
     domain: contract
     via: { source_field: platformInstanceId, target_field: instanceId }
 
   - from: Contract
     to: ContractConfig
-    label: has_config
     domain: contract
     via: { source_field: contractCode, target_field: contractCode }
 
   - from: BudgetBill
     to: SubOrder
-    label: has_sub_orders
     domain: quote
     description: "报价单拆分形成S单"
     via: { source_field: billCode, target_field: quotationOrderNo }

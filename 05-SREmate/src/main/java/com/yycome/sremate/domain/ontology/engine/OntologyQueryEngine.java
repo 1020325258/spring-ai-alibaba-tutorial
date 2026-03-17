@@ -129,7 +129,7 @@ public class OntologyQueryEngine {
         if (hop >= path.size()) return;
 
         OntologyRelation rel = path.get(hop);
-        String resultKey = deriveKey(rel.getLabel());
+        String resultKey = deriveKeyFromEntity(rel.getTo());
 
         List<CompletableFuture<Void>> futures = records.stream()
             .map(record -> CompletableFuture.runAsync(() -> {
@@ -181,7 +181,7 @@ public class OntologyQueryEngine {
                     Object childValue = record.get(rel.getVia().get("source_field"));
                     if (childValue == null) continue;
 
-                    String resultKey = deriveKey(rel.getLabel());
+                    String resultKey = deriveKeyFromEntity(rel.getTo());
 
                     // 如果已有该 key，跳过（避免重复查询）
                     if (record.containsKey(resultKey)) continue;
@@ -220,19 +220,14 @@ public class OntologyQueryEngine {
     }
 
     /**
-     * 从 relation label 推导结果 key
-     * has_signed_objects -> signedObjects
-     * splits_into -> subOrders（特殊处理：to 实体名小驼峰 + s）
+     * 从目标实体名推导结果 key
+     * ContractNode -> contractNodes（首字母小写 + 复数）
+     * SubOrder -> subOrders
      */
-    private String deriveKey(String label) {
-        String stripped = label.startsWith("has_") ? label.substring(4) : label;
-        // snake_case -> camelCase
-        String[] parts = stripped.split("_");
-        StringBuilder sb = new StringBuilder(parts[0]);
-        for (int i = 1; i < parts.length; i++) {
-            sb.append(Character.toUpperCase(parts[i].charAt(0)));
-            sb.append(parts[i].substring(1));
-        }
-        return sb.toString();
+    private String deriveKeyFromEntity(String entityName) {
+        // 首字母小写
+        String camelCase = Character.toLowerCase(entityName.charAt(0)) + entityName.substring(1);
+        // 加复数
+        return camelCase + "s";
     }
 }
