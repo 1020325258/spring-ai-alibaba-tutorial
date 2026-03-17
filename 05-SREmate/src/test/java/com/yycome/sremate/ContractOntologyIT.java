@@ -67,7 +67,7 @@ class ContractOntologyIT extends BaseSREIT {
 
     @Test
     void contractForm_shouldCallOntologyQuery() {
-        ask("C1767173898135504的版式");
+        ask("C1773303150687211的版式");
         assertToolCalled("ontologyQuery");
         assertAllToolsSuccess();
     }
