@@ -54,11 +54,20 @@ class ContractOntologyIT extends BaseSREIT {
         assertAllToolsSuccess();
     }
 
-    // ── 报价单查询：使用 ontologyQuery(entity=BudgetBill) ────────────────────────
+    // ── 报价单查询：使用 ontologyQuery(entity=Order, queryScope=BudgetBill) ────────────────────────
 
     @Test
     void budgetBill_shouldCallOntologyQuery() {
         ask("826031111000001859的报价单");
+        assertToolCalled("ontologyQuery");
+        assertAllToolsSuccess();
+    }
+
+    // ── S单查询：使用 ontologyQuery(entity=Order, queryScope=SubOrder) ────────────────────────
+
+    @Test
+    void subOrder_shouldCallOntologyQuery() {
+        ask("826031111000001859的S单");
         assertToolCalled("ontologyQuery");
         assertAllToolsSuccess();
     }

@@ -84,15 +84,16 @@ entities:
 
   - name: SubOrder
     displayName: "S单"
-    aliases: ["子单", "签约子单"]
-    description: "S单，可从报价单或合同两个维度关联"
+    aliases: ["子单", "签约子单", "S单信息"]
+    description: "S单，挂在报价单下，通过 quotationOrderNo（报价单号）查询"
     lookupStrategies:
       - field: quotationOrderNo
         pattern: ".*"
     attributes:
-      - { name: orderNo,          type: string }
-      - { name: quotationOrderNo, type: string }
-      - { name: contractCode,     type: string }
+      - { name: orderNo,         type: string, description: "S单编号" }
+      - { name: projectChangeNo, type: string, description: "变更单号" }
+      - { name: mdmCode,         type: string, description: "MDM编码" }
+      - { name: dueAmount,       type: string, description: "应付金额" }
 
   - name: ContractForm
     displayName: "版式"

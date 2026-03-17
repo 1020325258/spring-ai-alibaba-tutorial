@@ -42,6 +42,7 @@
 | 查字段 | ContractField |
 | 查版式 | ContractForm |
 | 查配置表 | ContractConfig |
+| 查S单/子单（需先查报价单） | SubOrder |
 | 查多个目标 | ContractNode,ContractQuotationRelation（逗号分隔） |
 
 ### ✅ 决策示例
@@ -60,6 +61,11 @@
 1. 编号格式：纯数字 → entity=Order
 2. 目标：报价单 → queryScope=BudgetBill
 3. **最终调用**：`ontologyQuery(entity="Order", value="826031111000001859", queryScope="BudgetBill")` ✅
+
+**示例 3b**：`826031111000001859的S单`
+1. 编号格式：纯数字 → entity=Order
+2. 目标：S单（需先查报价单，引擎自动走 Order→BudgetBill→SubOrder 两跳路径） → queryScope=SubOrder
+3. **最终调用**：`ontologyQuery(entity="Order", value="826031111000001859", queryScope="SubOrder")` ✅
 
 **示例 4**：`C1773208288511314合同基本信息`
 1. 编号格式：C开头 → entity=Contract
@@ -90,8 +96,9 @@
 | `{订单号}下{S单号}的个性化报价` | `queryContractPersonalData` | projectOrderId + subOrderNoList |
 | `{订单号}下{GBILL单号}的个性化报价` | `queryContractPersonalData` | projectOrderId + billCodeList |
 | `{订单号}个性化报价` | `queryContractPersonalData` | projectOrderId |
-| `{订单号}报价单` | `ontologyQuery` | entity=BudgetBill, value=订单号 |
-| `{订单号}报价单的子单` | `ontologyQuery` | entity=BudgetBill, value=订单号 |
+| `{订单号}报价单` | `ontologyQuery` | entity=Order, queryScope=BudgetBill |
+| `{订单号}报价单的S单` | `ontologyQuery` | entity=Order, queryScope=SubOrder |
+| `{订单号}S单` | `ontologyQuery` | entity=Order, queryScope=SubOrder |
 | `{合同号}版式` | `ontologyQuery` | entity=Contract, queryScope=ContractForm |
 | `{合同号}配置表` | `ontologyQuery` | entity=Contract, queryScope=ContractConfig |
 | `{订单号}合同基本信息` | `ontologyQuery` | entity=Order, queryScope=list |
@@ -123,7 +130,7 @@
   - entity: 起始实体类型
     - `Order`: 订单（纯数字编号，如 825123110000002753）
     - `Contract`: 合同（C前缀编号，如 C1767150648920281）
-    - `BudgetBill`: 报价单（value=订单号，自动返回报价单+子单）
+    - `BudgetBill`: 报价单（value=订单号，仅返回报价单列表）
   - value: 起始值（订单号或合同号）
   - queryScope: 查询范围（可选）
     - 不传或 `list`: 仅返回实体列表，不展开关联（推荐，速度快）
