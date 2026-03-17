@@ -1,6 +1,7 @@
 package com.yycome.sremate.trigger.agent;
 
 import com.yycome.sremate.infrastructure.annotation.DataQueryTool;
+import com.yycome.sremate.infrastructure.client.HttpEndpointClient;
 import com.yycome.sremate.infrastructure.service.ToolExecutionTemplate;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -19,7 +20,7 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class PersonalQuoteTool {
 
-    private final HttpEndpointTool httpEndpointTool;
+    private final HttpEndpointClient httpEndpointClient;
 
     /**
      * 根据订单号和单据号查询个性化报价数据
@@ -66,7 +67,7 @@ public class PersonalQuoteTool {
             params.put("subOrderNoList",  subOrderNoList  != null ? subOrderNoList  : "");
             params.put("billCodeList",    billCodeList    != null ? billCodeList    : "");
             params.put("changeOrderId",   changeOrderId   != null ? changeOrderId   : "");
-            return httpEndpointTool.callPredefinedEndpoint("contract-personal-data", params);
+            return httpEndpointClient.callPredefinedEndpointFiltered("contract-personal-data", params);
         });
     }
 

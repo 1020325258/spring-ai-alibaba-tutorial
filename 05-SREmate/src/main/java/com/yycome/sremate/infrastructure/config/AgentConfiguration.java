@@ -1,7 +1,6 @@
 package com.yycome.sremate.infrastructure.config;
 
 import com.yycome.sremate.domain.ontology.service.EntityRegistry;
-import com.yycome.sremate.trigger.agent.HttpEndpointTool;
 import com.yycome.sremate.trigger.agent.KnowledgeQueryTool;
 import com.yycome.sremate.trigger.agent.OntologyQueryTool;
 import com.yycome.sremate.trigger.agent.PersonalQuoteTool;
@@ -50,12 +49,10 @@ public class AgentConfiguration {
     public ToolCallbackProvider sreTools(
             OntologyQueryTool ontologyQueryTool,
             PersonalQuoteTool personalQuoteTool,
-            HttpEndpointTool httpEndpointTool,
             @Autowired(required = false) KnowledgeQueryTool knowledgeQueryTool) {
         List<Object> tools = new ArrayList<>();
         tools.add(ontologyQueryTool);
         tools.add(personalQuoteTool);
-        tools.add(httpEndpointTool);
         if (knowledgeQueryTool != null) {
             tools.add(knowledgeQueryTool);
         }

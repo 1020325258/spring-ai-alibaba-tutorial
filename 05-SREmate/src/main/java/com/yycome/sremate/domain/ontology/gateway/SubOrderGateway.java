@@ -4,7 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.yycome.sremate.domain.ontology.engine.EntityDataGateway;
 import com.yycome.sremate.domain.ontology.engine.EntityGatewayRegistry;
-import com.yycome.sremate.trigger.agent.HttpEndpointTool;
+import com.yycome.sremate.infrastructure.client.HttpEndpointClient;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -22,7 +22,7 @@ import java.util.*;
 @RequiredArgsConstructor
 public class SubOrderGateway implements EntityDataGateway {
 
-    private final HttpEndpointTool httpEndpointTool;
+    private final HttpEndpointClient httpEndpointClient;
     private final ObjectMapper objectMapper;
     private final EntityGatewayRegistry registry;
 
@@ -60,7 +60,7 @@ public class SubOrderGateway implements EntityDataGateway {
         }
 
         try {
-            String rawJson = httpEndpointTool.callPredefinedEndpointRaw("sub-order-info",
+            String rawJson = httpEndpointClient.callPredefinedEndpointRaw("sub-order-info",
                     Map.of("homeOrderNo", homeOrderNo,
                            "quotationOrderNo", quotationOrderNo,
                            "projectChangeNo", ""));

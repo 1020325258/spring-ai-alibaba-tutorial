@@ -126,7 +126,7 @@ entities:
 relations:
   - from: Order
     to: Contract
-    domain: contract
+    domain: Order
     via: { source_field: projectOrderId, target_field: projectOrderId }
 
   - from: Order

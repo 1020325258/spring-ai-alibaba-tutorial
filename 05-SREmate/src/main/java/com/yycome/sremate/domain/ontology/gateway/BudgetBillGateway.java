@@ -4,7 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.yycome.sremate.domain.ontology.engine.EntityDataGateway;
 import com.yycome.sremate.domain.ontology.engine.EntityGatewayRegistry;
-import com.yycome.sremate.trigger.agent.HttpEndpointTool;
+import com.yycome.sremate.infrastructure.client.HttpEndpointClient;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -22,7 +22,7 @@ import java.util.*;
 @RequiredArgsConstructor
 public class BudgetBillGateway implements EntityDataGateway {
 
-    private final HttpEndpointTool httpEndpointTool;
+    private final HttpEndpointClient httpEndpointClient;
     private final ObjectMapper objectMapper;
     private final EntityGatewayRegistry registry;
 
@@ -47,7 +47,7 @@ public class BudgetBillGateway implements EntityDataGateway {
         String projectOrderId = String.valueOf(value);
 
         try {
-            String billListJson = httpEndpointTool.callPredefinedEndpoint("budget-bill-list",
+            String billListJson = httpEndpointClient.callPredefinedEndpointRaw("budget-bill-list",
                     Map.of("projectOrderId", projectOrderId));
 
             if (billListJson != null && billListJson.contains("\"error\"")) {

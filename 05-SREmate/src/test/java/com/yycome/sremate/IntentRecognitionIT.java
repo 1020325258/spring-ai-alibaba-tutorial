@@ -92,28 +92,4 @@ class IntentRecognitionIT extends BaseSREIT {
         }
     }
 
-    // ===== 接口查询测试 =====
-
-    @Nested
-    @DisplayName("接口查询")
-    class EndpointTests {
-
-        @Test
-        @DisplayName("列出所有接口应使用listAvailableEndpoints")
-        void listEndpoints_shouldUseListTool() {
-            ask("有哪些可用的预定义接口");
-
-            assertToolCalled("listAvailableEndpoints");
-            assertAllToolsSuccess();
-        }
-
-        @Test
-        @DisplayName("按分类列出接口应使用listAvailableEndpoints")
-        void listEndpoints_byCategory_shouldUseListTool() {
-            ask("查看 contract 分类的接口");
-
-            assertToolCalled("listAvailableEndpoints");
-            assertAllToolsSuccess();
-        }
-    }
 }
