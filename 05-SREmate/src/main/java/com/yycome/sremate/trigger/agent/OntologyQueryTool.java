@@ -11,6 +11,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.stereotype.Component;
 
+import java.util.HashMap;
 import java.util.Map;
 
 /**
@@ -58,6 +59,48 @@ public class OntologyQueryTool {
 
             if (result == null) {
                 return ToolResult.notFound(entity, value);
+            }
+
+            return objectMapper.writeValueAsString(result);
+        });
+    }
+
+    @Tool(description = """
+        【个性化报价查询】用户提到"个性化报价"时使用。
+
+        触发条件：包含关键词"个性化报价"
+
+        参数：
+        - projectOrderId：纯数字订单号（必填）
+        - subOrderNoList：S单号列表，逗号分隔（可选，如 S15260312120004471）
+        - billCodeList：报价单号列表，逗号分隔（可选，如 GBILL260312104241050001）
+        - changeOrderId：变更单号（可选，格式与订单号类似）
+
+        约束：subOrderNoList、billCodeList、changeOrderId 至少填一个
+
+        示例：
+        - "826031210000003581下S15260312120004471的个性化报价"
+          → projectOrderId=826031210000003581, subOrderNoList=S15260312120004471
+        - "826031210000003581的GBILL260312104241050001个性化报价"
+          → projectOrderId=826031210000003581, billCodeList=GBILL260312104241050001""")
+    @DataQueryTool
+    public String queryPersonalQuote(String projectOrderId,
+                                     String subOrderNoList,
+                                     String changeOrderId,
+                                     String billCodeList) {
+        return ToolExecutionTemplate.execute("queryPersonalQuote", () -> {
+            log.info("[OntologyQueryTool] 个性化报价查询: projectOrderId={}, subOrderNoList={}, billCodeList={}, changeOrderId={}",
+                    projectOrderId, subOrderNoList, billCodeList, changeOrderId);
+
+            Map<String, String> extraParams = new HashMap<>();
+            extraParams.put("subOrderNoList", subOrderNoList != null ? subOrderNoList : "");
+            extraParams.put("billCodeList", billCodeList != null ? billCodeList : "");
+            extraParams.put("changeOrderId", changeOrderId != null ? changeOrderId : "");
+
+            Map<String, Object> result = queryEngine.query("Order", projectOrderId, "PersonalQuote", extraParams);
+
+            if (result == null) {
+                return ToolResult.notFound("PersonalQuote", projectOrderId);
             }
 
             return objectMapper.writeValueAsString(result);

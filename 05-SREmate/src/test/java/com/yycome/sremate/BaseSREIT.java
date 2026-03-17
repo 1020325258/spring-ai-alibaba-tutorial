@@ -23,6 +23,7 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -295,6 +296,55 @@ abstract class BaseSREIT {
     }
 
     /**
+     * 获取指定工具的调用参数
+     *
+     * @param toolName 工具名称
+     * @return 工具调用参数，如果工具未被调用则返回空 Map
+     */
+    protected Map<String, Object> getToolParams(String toolName) {
+        List<ToolCall> calls = getToolCalls();
+        return calls.stream()
+                .filter(c -> c.name.equals(toolName))
+                .findFirst()
+                .map(c -> c.params)
+                .orElse(Map.of());
+    }
+
+    /**
+     * 断言工具调用参数中包含指定键值
+     *
+     * @param toolName 工具名称
+     * @param key      参数名
+     * @param value    期望值
+     */
+    protected void assertToolParamEquals(String toolName, String key, Object value) {
+        Map<String, Object> params = getToolParams(toolName);
+        if (!params.containsKey(key)) {
+            throw new AssertionError("工具 " + toolName + " 调用参数中缺少: " + key +
+                    ", 实际参数: " + params);
+        }
+        Object actual = params.get(key);
+        if (!value.equals(actual)) {
+            throw new AssertionError("工具 " + toolName + " 参数 " + key +
+                    " 期望: " + value + ", 实际: " + actual);
+        }
+    }
+
+    /**
+     * 断言 ontologyQuery 工具的参数正确性
+     *
+     * @param entity     期望的实体类型 (Contract/Order)
+     * @param queryScope 期望的查询范围 (可为 null 表示不验证)
+     */
+    protected void assertOntologyQueryParams(String entity, String queryScope) {
+        assertToolCalled("ontologyQuery");
+        assertToolParamEquals("ontologyQuery", "entity", entity);
+        if (queryScope != null) {
+            assertToolParamEquals("ontologyQuery", "queryScope", queryScope);
+        }
+    }
+
+    /**
      * 从 TracingService 中捕获最近的工具调用记录
      */
     private List<ToolCall> captureNewToolCalls(int count) {
@@ -313,7 +363,8 @@ abstract class BaseSREIT {
                 .map(ctx -> new ToolCall(
                         ctx.getToolName(),
                         ctx.getDuration(),
-                        ctx.isSuccess()
+                        ctx.isSuccess(),
+                        ctx.getParams()
                 ))
                 .collect(Collectors.toList());
     }
@@ -345,11 +396,13 @@ abstract class BaseSREIT {
         String name;
         long durationMs;
         boolean success;
+        Map<String, Object> params;
 
-        ToolCall(String name, long durationMs, boolean success) {
+        ToolCall(String name, long durationMs, boolean success, Map<String, Object> params) {
             this.name = name;
             this.durationMs = durationMs;
             this.success = success;
+            this.params = params != null ? params : Map.of();
         }
     }
 }

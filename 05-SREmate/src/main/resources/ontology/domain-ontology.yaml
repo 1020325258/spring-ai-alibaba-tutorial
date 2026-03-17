@@ -80,6 +80,19 @@ entities:
       - { name: billCode,       type: string, description: "报价单编号" }
       - { name: projectOrderId, type: string, description: "所属订单号" }
 
+  - name: PersonalQuote
+    displayName: "个性化报价"
+    aliases: ["个性化报价数据"]
+    description: "个性化报价数据，需要额外参数（S单号/报价单号/变更单号）"
+    lookupStrategies:
+      - field: projectOrderId
+        pattern: "^\\d{15,}$"
+    attributes:
+      - { name: projectOrderId,   type: string, description: "订单号" }
+      - { name: subOrderNoList,   type: string, description: "S单号列表，逗号分隔" }
+      - { name: billCodeList,     type: string, description: "报价单号列表，逗号分隔" }
+      - { name: changeOrderId,    type: string, description: "变更单号" }
+
   - name: SubOrder
     displayName: "S单"
     aliases: ["子单", "签约子单", "S单信息"]
@@ -132,6 +145,12 @@ relations:
   - from: Order
     to: BudgetBill
     domain: quote
+    via: { source_field: projectOrderId, target_field: projectOrderId }
+
+  - from: Order
+    to: PersonalQuote
+    domain: quote
+    description: "个性化报价数据，需要额外参数"
     via: { source_field: projectOrderId, target_field: projectOrderId }
 
   - from: Contract

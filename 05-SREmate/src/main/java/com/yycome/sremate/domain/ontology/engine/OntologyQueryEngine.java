@@ -40,12 +40,25 @@ public class OntologyQueryEngine {
      * @return 层级结构的查询结果，起始实体无数据时返回 null
      */
     public Map<String, Object> query(String entityName, String value, String queryScope) {
+        return query(entityName, value, queryScope, null);
+    }
+
+    /**
+     * 对外唯一入口（带额外参数版本）
+     *
+     * @param entityName   起始实体名
+     * @param value        标识值
+     * @param queryScope   目标实体名
+     * @param extraParams  额外参数（如 PersonalQuote 的 subOrderNoList/billCodeList/changeOrderId）
+     * @return 层级结构的查询结果
+     */
+    public Map<String, Object> query(String entityName, String value, String queryScope, Map<String, String> extraParams) {
         QueryScope scope = QueryScope.fromString(queryScope);
         if (scope != null) {
-            return query(entityName, value, scope);
+            return query(entityName, value, scope, extraParams);
         }
         // 未匹配到枚举，可能是自定义实体名或逗号分隔的多目标
-        return queryWithScopeString(entityName, value, queryScope);
+        return queryWithScopeString(entityName, value, queryScope, extraParams);
     }
 
     /**
@@ -57,12 +70,19 @@ public class OntologyQueryEngine {
      * @return 层级结构的查询结果，起始实体无数据时返回 null
      */
     public Map<String, Object> query(String entityName, String value, QueryScope queryScope) {
+        return query(entityName, value, queryScope, null);
+    }
+
+    /**
+     * 对外唯一入口（枚举版本，带额外参数）
+     */
+    public Map<String, Object> query(String entityName, String value, QueryScope queryScope, Map<String, String> extraParams) {
         if (queryScope == QueryScope.LIST || queryScope == QueryScope.DEFAULT) {
             // 仅返回起始实体
             return queryListOnly(entityName, value);
         }
         String targetEntity = queryScope.getTargetEntity();
-        return queryWithScopeString(entityName, value, targetEntity);
+        return queryWithScopeString(entityName, value, targetEntity, extraParams);
     }
 
     /**
@@ -88,6 +108,13 @@ public class OntologyQueryEngine {
      * 使用字符串 scope 进行查询（支持多目标）
      */
     private Map<String, Object> queryWithScopeString(String entityName, String value, String queryScope) {
+        return queryWithScopeString(entityName, value, queryScope, null);
+    }
+
+    /**
+     * 使用字符串 scope 进行查询（支持多目标和额外参数）
+     */
+    private Map<String, Object> queryWithScopeString(String entityName, String value, String queryScope, Map<String, String> extraParams) {
         OntologyEntity entity = entityRegistry.getEntity(entityName);
         LookupStrategy strategy = matchStrategy(entity, value);
 
@@ -119,7 +146,7 @@ public class OntologyQueryEngine {
             }
             // 打印路径规划日志
             logPathPlan(entityName, paths);
-            attachMultiPathResults(records, paths);
+            attachMultiPathResults(records, paths, extraParams);
         }
 
         Map<String, Object> result = new LinkedHashMap<>();
@@ -180,9 +207,12 @@ public class OntologyQueryEngine {
     /**
      * 多目标路径展开
      * 对每条记录，展开所有目标路径，合并相同层级的查询结果
+     *
+     * @param extraParams 额外参数（用于首层关系查询，如 PersonalQuote）
      */
     private void attachMultiPathResults(List<Map<String, Object>> records,
-                                         List<List<OntologyRelation>> paths) {
+                                         List<List<OntologyRelation>> paths,
+                                         Map<String, String> extraParams) {
         // 按层级分组：hop -> 关系列表（去重）
         Map<Integer, Set<OntologyRelation>> hopRelations = new LinkedHashMap<>();
         for (List<OntologyRelation> path : paths) {
@@ -191,8 +221,8 @@ public class OntologyQueryEngine {
             }
         }
 
-        // 逐层展开
-        attachLayer(records, hopRelations, 0);
+        // 逐层展开（首层传递额外参数）
+        attachLayer(records, hopRelations, 0, extraParams);
     }
 
     /**
@@ -200,7 +230,8 @@ public class OntologyQueryEngine {
      */
     private void attachLayer(List<Map<String, Object>> records,
                               Map<Integer, Set<OntologyRelation>> hopRelations,
-                              int hop) {
+                              int hop,
+                              Map<String, String> extraParams) {
         if (!hopRelations.containsKey(hop)) return;
 
         Set<OntologyRelation> relsAtHop = hopRelations.get(hop);
@@ -219,10 +250,16 @@ public class OntologyQueryEngine {
 
                     long nodeStartTime = System.currentTimeMillis();
 
-                    // 传递父记录给 Gateway，支持从父记录获取额外参数
-                    List<Map<String, Object>> children =
-                        gatewayRegistry.getGateway(rel.getTo())
+                    // 首层且存在额外参数时，使用 queryWithExtraParams（如 PersonalQuote）
+                    // 其他情况使用 queryByFieldWithContext
+                    List<Map<String, Object>> children;
+                    if (hop == 0 && extraParams != null && !extraParams.isEmpty()) {
+                        children = gatewayRegistry.getGateway(rel.getTo())
+                            .queryWithExtraParams(rel.getVia().get("target_field"), childValue, extraParams);
+                    } else {
+                        children = gatewayRegistry.getGateway(rel.getTo())
                             .queryByFieldWithContext(rel.getVia().get("target_field"), childValue, record);
+                    }
 
                     // 节点遍历日志
                     log.info("  ├─ 节点 {} | key={} | value={} | 返回 {} 条 | 耗时 {}ms",
@@ -232,8 +269,8 @@ public class OntologyQueryEngine {
                         children.size(),
                         System.currentTimeMillis() - nodeStartTime);
 
-                    // 递归展开下一层
-                    attachLayer(children, hopRelations, hop + 1);
+                    // 递归展开下一层（额外参数仅用于首层）
+                    attachLayer(children, hopRelations, hop + 1, null);
 
                     record.put(resultKey, children);
                 }

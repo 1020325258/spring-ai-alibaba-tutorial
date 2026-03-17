@@ -48,4 +48,18 @@ public interface EntityDataGateway {
         // 默认实现：忽略 parentRecord，调用原方法
         return queryByField(fieldName, value);
     }
+
+    /**
+     * 根据字段查询实体数据（带额外参数）
+     * 用于需要用户指定额外参数的场景（如 PersonalQuote 需要 subOrderNoList/billCodeList/changeOrderId）
+     *
+     * @param fieldName 字段名
+     * @param value 字段值
+     * @param extraParams 额外参数（key-value 形式）
+     * @return 实体数据列表
+     */
+    default List<Map<String, Object>> queryWithExtraParams(String fieldName, Object value, Map<String, String> extraParams) {
+        // 默认实现：忽略 extraParams，调用原方法
+        return queryByField(fieldName, value);
+    }
 }

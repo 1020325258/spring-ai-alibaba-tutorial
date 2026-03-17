@@ -93,9 +93,9 @@
 
 | 输入 | 工具 | 参数 |
 |------|------|------|
-| `{订单号}下{S单号}的个性化报价` | `queryContractPersonalData` | projectOrderId + subOrderNoList |
-| `{订单号}下{GBILL单号}的个性化报价` | `queryContractPersonalData` | projectOrderId + billCodeList |
-| `{订单号}个性化报价` | `queryContractPersonalData` | projectOrderId |
+| `{订单号}下{S单号}的个性化报价` | `queryPersonalQuote` | projectOrderId + subOrderNoList |
+| `{订单号}下{GBILL单号}的个性化报价` | `queryPersonalQuote` | projectOrderId + billCodeList |
+| `{订单号}个性化报价` | `queryPersonalQuote` | projectOrderId |
 | `{订单号}报价单` | `ontologyQuery` | entity=Order, queryScope=BudgetBill |
 | `{订单号}报价单的S单` | `ontologyQuery` | entity=Order, queryScope=SubOrder |
 | `{订单号}S单` | `ontologyQuery` | entity=Order, queryScope=SubOrder |
@@ -151,7 +151,7 @@
 
 - 性能优势：引擎自动并行查询，2-3秒返回完整数据，无需多次调用
 
-### 2. queryContractPersonalData
+### 2. queryPersonalQuote
 根据项目订单号及单据号查询对应单据的个性化报价数据。
 - 参数：
   - projectOrderId：纯数字订单号（必填）

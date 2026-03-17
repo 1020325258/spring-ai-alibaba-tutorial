@@ -3,7 +3,8 @@ package com.yycome.sremate;
 import org.junit.jupiter.api.Test;
 
 /**
- * 个性化报价查询工具集成测试
+ * 个性化报价查询集成测试
+ * 通过 OntologyQueryTool.queryPersonalQuote 方法实现
  */
 class PersonalQuoteToolIT extends BaseSREIT {
 
@@ -12,18 +13,18 @@ class PersonalQuoteToolIT extends BaseSREIT {
     private static final String BILL_CODE = "GBILL260312104241050001";
 
     @Test
-    void personalQuoteKeyword_withSubOrder_shouldCallQueryContractPersonalData() {
+    void personalQuoteKeyword_withSubOrder_shouldCallQueryPersonalQuote() {
         ask(ORDER_ID + "下" + SUB_ORDER_NO + "的个性化报价");
 
-        assertToolCalled("queryContractPersonalData");
+        assertToolCalled("queryPersonalQuote");
         assertAllToolsSuccess();
     }
 
     @Test
-    void personalQuoteKeyword_withBillCode_shouldCallQueryContractPersonalData() {
+    void personalQuoteKeyword_withBillCode_shouldCallQueryPersonalQuote() {
         ask(ORDER_ID + "下" + BILL_CODE + "的个性化报价");
 
-        assertToolCalled("queryContractPersonalData");
+        assertToolCalled("queryPersonalQuote");
         assertAllToolsSuccess();
     }
 
@@ -32,7 +33,7 @@ class PersonalQuoteToolIT extends BaseSREIT {
         ask(ORDER_ID + "下" + SUB_ORDER_NO + "的个性化报价");
 
         assertToolNotCalled("queryBudgetBillList");
-        assertToolCalled("queryContractPersonalData");
+        assertToolCalled("queryPersonalQuote");
         assertAllToolsSuccess();
     }
 }
