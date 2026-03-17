@@ -24,6 +24,7 @@ entities:
       - { name: contractType,   type: enum,   description: "合同类型" }
       - { name: status,         type: string, description: "合同状态" }
       - { name: projectOrderId, type: string, description: "所属订单号" }
+      - { name: platformInstanceId, type: string, description: "协议平台实例 ID" }
 
   - name: ContractNode
     displayName: "合同节点"
@@ -159,8 +160,4 @@ relations:
     description: "报价单拆分形成S单"
     via: { source_field: billCode, target_field: quotationOrderNo }
 
-  - from: ContractQuotationRelation
-    to: SubOrder
-    label: references_sub_order
-    domain: contract
-    via: { source_field: bill_code, target_field: orderNo }
+

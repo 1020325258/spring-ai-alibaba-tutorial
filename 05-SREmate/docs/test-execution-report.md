@@ -1,6 +1,6 @@
 # SREmate 集成测试执行报告
 
-> 最后更新: 2026-03-16 00:01:30
+> 最后更新: 2026-03-17 21:25:07
 
 > 运行命令: `./05-SREmate/scripts/run-integration-tests.sh`
 
@@ -8,13 +8,14 @@
 
 ## ContractOntologyIT
 
-### ✅ orderContract_signedObjectsAndNodes_shouldCallOntologyQuery
+### ✅ contractForm_shouldCallOntologyQuery
 
-- **输入:** 825123110000002753合同签约单据和节点
-- **输出:** {"queryEntity":"Order","queryValue":"825123110000002753","records":[{"projectOrderId":"825123110000002753","contracts":[{"contractCode":"C1767150648920281","type":3,"status":8,"platformInstanceId":0,"amount":413580.67,"ctime":"2025-12-31 11:10:48","signedObjects":[],"nodes":[{"nodeType":7,"fireTime"...
-- **耗时:** 2572ms
+- **输入:** C1767173898135504的版式
+- **输出:** {"queryEntity":"Contract","queryValue":"C1767173898135504","records":[{"contractCode":"C1767173898135504","type":8,"status":8,"amount":200.00,"platformInstanceId":0,"projectOrderId":"825123117000001474","ctime":"2025-12-31 17:38:20","form":[{"contractCode":"C1767173898135504","platformInstanceId":0,...
+- **耗时:** 2018ms
 - **工具调用:**
-  - `ontologyQuery` ✓ 489ms
+  - `ontologyQuery` ✓ 472ms
+  - `callPredefinedEndpoint` ✓ 87ms
 
 ---
 

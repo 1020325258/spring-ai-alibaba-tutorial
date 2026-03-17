@@ -92,8 +92,8 @@
 | `{订单号}个性化报价` | `queryContractPersonalData` | projectOrderId |
 | `{订单号}报价单` | `ontologyQuery` | entity=BudgetBill, value=订单号 |
 | `{订单号}报价单的子单` | `ontologyQuery` | entity=BudgetBill, value=订单号 |
-| `{合同号}版式` | `ontologyQuery` | entity=Contract, queryScope=form |
-| `{合同号}配置表` | `ontologyQuery` | entity=Contract, queryScope=config |
+| `{合同号}版式` | `ontologyQuery` | entity=Contract, queryScope=ContractForm |
+| `{合同号}配置表` | `ontologyQuery` | entity=Contract, queryScope=ContractConfig |
 | `{订单号}合同基本信息` | `ontologyQuery` | entity=Order, queryScope=list |
 | `{订单号}合同节点` | `ontologyQuery` | entity=Order, queryScope=default（含nodes）|
 | `{订单号}签约单据` | `ontologyQuery` | entity=Order, queryScope=default（含signedObjects）|
@@ -109,8 +109,8 @@
 | `{合同号}签约单据` | `ontologyQuery` | entity=Contract, queryScope=ContractQuotationRelation |
 | `{合同号}合同字段` | `ontologyQuery` | entity=Contract, queryScope=ContractField |
 | `{合同号}合同数据` | `ontologyQuery` | entity=Contract, queryScope=default（全部关联）|
-| `{合同号}版式` | `ontologyQuery` | entity=Contract, queryScope=form |
-| `{合同号}配置表` | `ontologyQuery` | entity=Contract, queryScope=config |
+| `{合同号}版式` | `ontologyQuery` | entity=Contract, queryScope=ContractForm |
+| `{合同号}配置表` | `ontologyQuery` | entity=Contract, queryScope=ContractConfig |
 
 ---
 
@@ -139,8 +139,8 @@
   - 订单号查询合同及关联数据：entity=Order, value=订单号
   - 合同号查询关联数据：entity=Contract, value=合同号
   - 订单号查询报价单及子单：entity=BudgetBill, value=订单号
-  - 合同号查询版式：entity=Contract, value=合同号, queryScope=form
-  - 合同号查询配置表：entity=Contract, value=合同号, queryScope=config
+  - 合同号查询版式：entity=Contract, value=合同号, queryScope=ContractForm（注意：必须传完整实体名 ContractForm，不能传 form）
+  - 合同号查询配置表：entity=Contract, value=合同号, queryScope=ContractConfig（注意：必须传完整实体名 ContractConfig，不能传 config）
 
 - 性能优势：引擎自动并行查询，2-3秒返回完整数据，无需多次调用
 

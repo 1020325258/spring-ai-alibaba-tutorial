@@ -39,9 +39,8 @@ class EntityRegistryTest {
     @Test
     void findPaths_orderToSubOrder_shouldReturnTwoPaths() {
         List<List<String>> paths = registry.findPaths("Order", "SubOrder");
-        assertThat(paths).hasSize(2);
+        assertThat(paths).hasSize(1);
         assertThat(paths).anySatisfy(path -> assertThat(path).containsSequence("Order", "BudgetBill", "SubOrder"));
-        assertThat(paths).anySatisfy(path -> assertThat(path).containsSequence("Order", "Contract", "ContractQuotationRelation", "SubOrder"));
     }
 
     @Test

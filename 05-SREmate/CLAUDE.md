@@ -3,6 +3,7 @@
 注意：
 1. 开发完进行测试，保证功能正常实现。
 2. **每次代码变更后必须运行全部测试**，确保已有功能不被破坏：
+   - **特别注意**：修改 Java 代码逻辑时，必须同步检查 `sre-agent.md` 提示词是否与代码保持一致（见下方反思记录）。
    ```bash
    ./run-integration-tests.sh
    # 或直接运行
@@ -639,6 +640,27 @@ ToolResult.notFound("合同", "C123")  // 资源未找到
 | `HttpEndpointTool` | HTTP 接口调用 | ❌ 无（内部工具） | - |
 
 **说明**：`HttpEndpointTool.callPredefinedEndpoint` 不添加 `@DataQueryTool`，因为它是被 Gateway 内部调用的工具，结果应由外层的 `ontologyQuery` 捕获。
+
+---
+
+## ⚠️ 反思记录：代码与提示词同步问题
+
+### 问题复盘（2026-03-17）
+
+**现象**：`ContractOntologyIT#contractForm_shouldCallOntologyQuery` 测试失败。
+LLM 传递 `queryScope=form`，但代码已删除 `SCOPE_ALIAS` 简写映射，导致 `找不到路径: Contract -> form`。
+
+**根本原因**：删除 `OntologyQueryTool` 中的 `SCOPE_ALIAS`（`form→ContractForm`、`config→ContractConfig` 等简写）时，**只更新了 Java 代码，未同步更新 `sre-agent.md` 提示词**。提示词的决策表和示例中仍然写着 `queryScope=form`、`queryScope=config`，导致 LLM 按旧格式调用工具。
+
+**教训与规范**：
+
+> **凡是修改工具参数的合法取值范围（增删枚举值、删除简写别名、重命名参数），必须同步检查并更新 `sre-agent.md`。**
+
+具体检查清单：
+1. 删除/新增 `SCOPE_ALIAS` 或类似映射 → 更新提示词决策表中对应的 `queryScope` 值
+2. 新增 `@Tool` 方法 → 在提示词的"可用工具"和"快速决策表"中补充
+3. 修改工具参数名或含义 → 更新提示词中的参数说明和示例
+4. 修改完提示词后 → **必须运行 `ContractOntologyIT` 集成测试验证 LLM 行为**
 
 ---
 
