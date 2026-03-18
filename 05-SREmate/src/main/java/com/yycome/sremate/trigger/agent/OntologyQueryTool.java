@@ -2,6 +2,7 @@ package com.yycome.sremate.trigger.agent;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.yycome.sremate.domain.ontology.engine.OntologyQueryEngine;
+import com.yycome.sremate.domain.ontology.model.QueryScope;
 import com.yycome.sremate.infrastructure.annotation.DataQueryTool;
 import com.yycome.sremate.infrastructure.service.ToolExecutionTemplate;
 import com.yycome.sremate.infrastructure.service.ToolResult;
@@ -10,9 +11,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.stereotype.Component;
 
-import java.util.Arrays;
+import java.util.HashMap;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 /**
  * 本体论驱动的统一查询工具（薄层）
@@ -25,16 +25,6 @@ public class OntologyQueryTool {
 
     private final OntologyQueryEngine queryEngine;
     private final ObjectMapper objectMapper;
-
-    // scope 简写 -> 目标实体名映射（兼容旧调用方式）
-    private static final Map<String, String> SCOPE_ALIAS = Map.of(
-        "nodes", "ContractNode",
-        "fields", "ContractField",
-        "signed_objects", "ContractQuotationRelation",
-        "budget_bills", "BudgetBill",
-        "form", "ContractForm",
-        "config", "ContractConfig"
-    );
 
     @Tool(description = """
         【本体论智能查询】根据起始实体和值，查询实体数据及关联数据。
@@ -52,6 +42,8 @@ public class OntologyQueryTool {
           - "ContractField": 展开到字段数据
           - "ContractForm": 展开到版式数据
           - "ContractConfig": 展开到配置表数据
+          - "BudgetBill": 展开到报价单数据
+          - "SubOrder": 展开到S单数据
           - 多个目标（逗号分隔）: "ContractNode,ContractQuotationRelation"
 
         示例：
@@ -62,16 +54,20 @@ public class OntologyQueryTool {
         """)
     @DataQueryTool
     public String ontologyQuery(String entity, String value, String queryScope) {
+        // 自动修正 entity：根据 value 格式推断正确的 entity
+        String correctedEntity = inferEntityFromValue(value, entity);
+        if (!correctedEntity.equals(entity)) {
+            log.info("[OntologyQueryTool] 自动修正 entity: {} -> {}", entity, correctedEntity);
+        }
+        final String finalEntity = correctedEntity;
+
         return ToolExecutionTemplate.execute("ontologyQuery", () -> {
-            log.info("[OntologyQueryTool] 查询: entity={}, value={}, scope={}", entity, value, queryScope);
+            log.info("[OntologyQueryTool] 查询: entity={}, value={}, scope={}", finalEntity, value, queryScope);
 
-            // 映射 scope 简写到目标实体名（支持多目标）
-            String resolvedScope = resolveScope(queryScope);
-
-            Map<String, Object> result = queryEngine.query(entity, value, resolvedScope);
+            Map<String, Object> result = queryEngine.query(finalEntity, value, queryScope);
 
             if (result == null) {
-                return ToolResult.notFound(entity, value);
+                return ToolResult.notFound(finalEntity, value);
             }
 
             return objectMapper.writeValueAsString(result);
@@ -79,17 +75,69 @@ public class OntologyQueryTool {
     }
 
     /**
-     * 解析 queryScope，支持简写、实体名和多目标
+     * 根据 value 格式自动推断正确的 entity 类型
+     * 纯数字 → Order，C开头 → Contract
      */
-    private String resolveScope(String queryScope) {
-        if (queryScope == null || "default".equals(queryScope) || "list".equals(queryScope)) {
-            return queryScope;
+    private String inferEntityFromValue(String value, String providedEntity) {
+        if (value == null || value.isBlank()) {
+            return providedEntity;
         }
 
-        // 支持多目标：按逗号分隔，分别映射
-        return Arrays.stream(queryScope.split(","))
-                .map(String::trim)
-                .map(s -> SCOPE_ALIAS.getOrDefault(s, s))
-                .collect(Collectors.joining(","));
+        String trimmedValue = value.trim();
+
+        // C开头 → Contract
+        if (trimmedValue.toUpperCase().startsWith("C")) {
+            return "Contract";
+        }
+
+        // 纯数字 → Order
+        if (trimmedValue.matches("\\d+")) {
+            return "Order";
+        }
+
+        // 无法推断，返回原值
+        return providedEntity;
+    }
+
+    @Tool(description = """
+        【个性化报价查询】用户提到"个性化报价"时使用。
+
+        触发条件：包含关键词"个性化报价"
+
+        参数：
+        - projectOrderId：纯数字订单号（必填）
+        - subOrderNoList：S单号列表，逗号分隔（可选，如 S15260312120004471）
+        - billCodeList：报价单号列表，逗号分隔（可选，如 GBILL260312104241050001）
+        - changeOrderId：变更单号（可选，格式与订单号类似）
+
+        约束：subOrderNoList、billCodeList、changeOrderId 至少填一个
+
+        示例：
+        - "826031210000003581下S15260312120004471的个性化报价"
+          → projectOrderId=826031210000003581, subOrderNoList=S15260312120004471
+        - "826031210000003581的GBILL260312104241050001个性化报价"
+          → projectOrderId=826031210000003581, billCodeList=GBILL260312104241050001""")
+    @DataQueryTool
+    public String queryPersonalQuote(String projectOrderId,
+                                     String subOrderNoList,
+                                     String changeOrderId,
+                                     String billCodeList) {
+        return ToolExecutionTemplate.execute("queryPersonalQuote", () -> {
+            log.info("[OntologyQueryTool] 个性化报价查询: projectOrderId={}, subOrderNoList={}, billCodeList={}, changeOrderId={}",
+                    projectOrderId, subOrderNoList, billCodeList, changeOrderId);
+
+            Map<String, String> extraParams = new HashMap<>();
+            extraParams.put("subOrderNoList", subOrderNoList != null ? subOrderNoList : "");
+            extraParams.put("billCodeList", billCodeList != null ? billCodeList : "");
+            extraParams.put("changeOrderId", changeOrderId != null ? changeOrderId : "");
+
+            Map<String, Object> result = queryEngine.query("Order", projectOrderId, "PersonalQuote", extraParams);
+
+            if (result == null) {
+                return ToolResult.notFound("PersonalQuote", projectOrderId);
+            }
+
+            return objectMapper.writeValueAsString(result);
+        });
     }
 }

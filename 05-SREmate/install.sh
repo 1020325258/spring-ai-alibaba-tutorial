@@ -22,6 +22,7 @@ mvn clean package -DskipTests
 if [ $? -ne 0 ]; then
     echo "构建失败，请检查错误信息"
     exit 1
+fi
 JAR_PATH="$(pwd)/target/SREmate-1.0-SNAPSHOT.jar"
 INSTALL_DIR="$HOME/bin"
 mkdir -p "$INSTALL_DIR"

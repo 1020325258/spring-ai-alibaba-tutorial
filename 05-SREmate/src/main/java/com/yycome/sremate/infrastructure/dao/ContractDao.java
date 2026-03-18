@@ -102,7 +102,6 @@ public class ContractDao {
         rows.forEach(f -> fieldMap.put(
                 String.valueOf(f.get("field_key")),
                 f.get("field_value")));
-        fieldMap.put("_shardTable", shardTable);
         return fieldMap;
     }
 
@@ -115,11 +114,16 @@ public class ContractDao {
                 "FROM contract_quotation_relation " +
                 "WHERE contract_code = ? AND del_status = 0",
                 contractCode);
-        // 格式化时间字段
+        // 格式化时间字段，列名映射为驼峰
         return rows.stream().map(row -> {
-            Map<String, Object> result = new LinkedHashMap<>(row);
-            result.put("ctime", DateTimeUtil.format(row.get("ctime")));
-            result.put("mtime", DateTimeUtil.format(row.get("mtime")));
+            Map<String, Object> result = new LinkedHashMap<>();
+            result.put("contractCode", row.get("contract_code"));
+            result.put("billCode",     row.get("bill_code"));
+            result.put("companyCode",  row.get("company_code"));
+            result.put("bindType",     row.get("bind_type"));
+            result.put("status",       row.get("status"));
+            result.put("ctime",        DateTimeUtil.format(row.get("ctime")));
+            result.put("mtime",        DateTimeUtil.format(row.get("mtime")));
             return result;
         }).toList();
     }

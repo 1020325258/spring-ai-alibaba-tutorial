@@ -2,11 +2,62 @@
 
 注意：
 1. 开发完进行测试，保证功能正常实现。
-2. **每次代码变更后必须运行全部集成测试**，确保已有功能不被破坏：
+2. **每次代码变更后必须运行全部测试**，确保已有功能不被破坏：
+   - **特别注意**：修改 Java 代码逻辑时，必须同步检查 `sre-agent.md` 提示词是否与代码保持一致（见下方反思记录）。
    ```bash
+   ./run-integration-tests.sh
+   # 或直接运行
    export JAVA_HOME=/Library/Java/JavaVirtualMachines/jdk-21.jdk/Contents/Home
-   mvn test -Dtest=ContractOntologyIT
+   mvn test
    ```
+
+---
+
+## 测试清单
+
+| 测试类 | 测试数 | 用途 |
+|--------|--------|------|
+| QueryScopeTest | 7 | QueryScope 枚举解析 |
+| EntityRegistryTest | 10 | 实体注册中心路径查找 |
+| OntologyQueryEngineTest | 9 | 本体论查询引擎核心逻辑 |
+| ToolExecutionTemplateTest | 3 | 工具执行模板 |
+| ToolResultTest | 4 | 统一结果类 |
+| ObservabilityAspectAnnotationTest | 2 | AOP 注解测试 |
+| **总计** | **35** | - |
+
+运行全量测试：
+```bash
+./run-integration-tests.sh
+```
+
+---
+
+## QueryScope 枚举类（v2.4 新增）
+
+### 定义
+
+```java
+public enum QueryScope {
+    DEFAULT("default", "默认展开"),
+    LIST("list", "仅返回起始实体"),
+    CONTRACT("Contract", "展开到合同实体"),
+    CONTRACT_NODE("ContractNode", "展开到合同节点"),
+    // ... 更多实体
+}
+```
+
+### 使用方式
+
+```java
+// 字符串版本（向后兼容）
+Map<String, Object> result = engine.query("Order", "825123110000002753", "Contract");
+
+// 枚举版本（类型安全）
+Map<String, Object> result = engine.query("Order", "825123110000002753", QueryScope.CONTRACT);
+
+// 解析字符串
+QueryScope scope = QueryScope.fromString("ContractNode");  // -> CONTRACT_NODE
+```
 
 ---
 
@@ -118,8 +169,7 @@ src/main/java/.../
   trigger/agent/      # @Tool 工具类（按业务领域拆分）
     ├── OntologyQueryTool.java   # 本体论统一查询入口（推荐）
     ├── ContractQueryTool.java   # 合同查询（旧工具，逐步废弃）
-    ├── PersonalQuoteTool.java   # 个性化报价查询
-    └── HttpEndpointTool.java    # HTTP 接口调用
+    └── PersonalQuoteTool.java   # 个性化报价查询
   domain/ontology/    # 本体论领域（核心）
     ├── model/        # 本体模型（OntologyEntity、OntologyRelation）
     ├── service/      # 实体注册中心
@@ -127,6 +177,7 @@ src/main/java/.../
     └── gateway/      # 实体数据网关实现
   infrastructure/
     ├── annotation/    # 注解（@DataQueryTool）
+    ├── client/        # HTTP 客户端（HttpEndpointClient）
     └── service/       # 基础设施服务（ToolExecutionTemplate、ToolResult）
   config/              # Spring 配置（AgentConfiguration、DataSourceConfiguration）
   aspect/              # AOP 切面（ObservabilityAspect）
@@ -278,7 +329,7 @@ public class NewEntityGateway implements EntityDataGateway {
 @RequiredArgsConstructor
 public class NewEntityGateway implements EntityDataGateway {
 
-    private final HttpEndpointTool httpEndpointTool;
+    private final HttpEndpointClient httpEndpointClient;
     private final ObjectMapper objectMapper;
     private final EntityGatewayRegistry registry;
 
@@ -292,7 +343,7 @@ public class NewEntityGateway implements EntityDataGateway {
     public List<Map<String, Object>> queryByField(String fieldName, Object value) {
         log.debug("[NewEntityGateway] queryByField: {} = {}", fieldName, value);
         try {
-            String json = httpEndpointTool.callPredefinedEndpoint("endpoint-id",
+            String json = httpEndpointClient.callPredefinedEndpointRaw("endpoint-id",
                     Map.of("paramName", value));
             return parseAndTransform(json);
         } catch (Exception e) {
@@ -436,7 +487,7 @@ urlTemplate: "http://utopia-nrs-sales-project.${env}.ttb.test.ke.com/api/..."
 @RequiredArgsConstructor
 public class XxxTool {
 
-    private final HttpEndpointTool httpEndpointTool;
+    private final HttpEndpointClient httpEndpointClient;
 
     @Tool(description = """
             【xxx查询】用户提到"xxx"时使用。
@@ -446,7 +497,7 @@ public class XxxTool {
     @DataQueryTool  // 标记为数据查询工具，结果直接输出
     public String queryXxxList(String projectOrderId) {
         return ToolExecutionTemplate.execute("queryXxxList", () ->
-            httpEndpointTool.callPredefinedEndpoint("your-endpoint-id",
+            httpEndpointClient.callPredefinedEndpointFiltered("your-endpoint-id",
                 Map.of("projectOrderId", projectOrderId))
         );
     }
@@ -581,14 +632,35 @@ ToolResult.notFound("合同", "C123")  // 资源未找到
 
 ## 工具类职责划分
 
-| 工具类 | 职责 | @DataQueryTool | 状态 |
-|--------|------|----------------|------|
-| `OntologyQueryTool` | 本体论统一查询入口 | ✅ 有 | **推荐使用** |
-| `ContractQueryTool` | 合同数据查询 | ✅ 有 | 逐步废弃 |
-| `PersonalQuoteTool` | 个性化报价查询 | ✅ 有 | - |
-| `HttpEndpointTool` | HTTP 接口调用 | ❌ 无（内部工具） | - |
+| 组件 | 位置 | 职责 | @DataQueryTool |
+|------|------|------|----------------|
+| `OntologyQueryTool` | trigger/agent | 本体论统一查询入口 | ✅ 有 |
+| `ContractQueryTool` | trigger/agent | 合同数据查询 | ✅ 有（逐步废弃） |
+| `PersonalQuoteTool` | trigger/agent | 个性化报价查询 | ✅ 有 |
+| `HttpEndpointClient` | infrastructure/client | HTTP 接口调用基础设施 | ❌ 无 |
 
-**说明**：`HttpEndpointTool.callPredefinedEndpoint` 不添加 `@DataQueryTool`，因为它是被 Gateway 内部调用的工具，结果应由外层的 `ontologyQuery` 捕获。
+**说明**：`HttpEndpointClient` 是基础设施组件，不作为 Agent 工具暴露，仅供 Gateway 和 Tool 内部调用。
+
+---
+
+## ⚠️ 反思记录：代码与提示词同步问题
+
+### 问题复盘（2026-03-17）
+
+**现象**：`ContractOntologyIT#contractForm_shouldCallOntologyQuery` 测试失败。
+LLM 传递 `queryScope=form`，但代码已删除 `SCOPE_ALIAS` 简写映射，导致 `找不到路径: Contract -> form`。
+
+**根本原因**：删除 `OntologyQueryTool` 中的 `SCOPE_ALIAS`（`form→ContractForm`、`config→ContractConfig` 等简写）时，**只更新了 Java 代码，未同步更新 `sre-agent.md` 提示词**。提示词的决策表和示例中仍然写着 `queryScope=form`、`queryScope=config`，导致 LLM 按旧格式调用工具。
+
+**教训与规范**：
+
+> **凡是修改工具参数的合法取值范围（增删枚举值、删除简写别名、重命名参数），必须同步检查并更新 `sre-agent.md`。**
+
+具体检查清单：
+1. 删除/新增 `SCOPE_ALIAS` 或类似映射 → 更新提示词决策表中对应的 `queryScope` 值
+2. 新增 `@Tool` 方法 → 在提示词的"可用工具"和"快速决策表"中补充
+3. 修改工具参数名或含义 → 更新提示词中的参数说明和示例
+4. 修改完提示词后 → **必须运行 `ContractOntologyIT` 集成测试验证 LLM 行为**
 
 ---
 

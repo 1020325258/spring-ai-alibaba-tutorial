@@ -106,7 +106,7 @@ public class EntityRegistry {
                 : "";
             String desc = rel.getDescription() != null ? "（" + rel.getDescription() + "）" : "";
             sb.append(String.format("- %s -[%s]-> %s  via: %s  [%s域]%s\n",
-                rel.getFrom(), rel.getLabel(), rel.getTo(), via, rel.getDomain(), desc));
+                rel.getFrom(), Character.toLowerCase(rel.getTo().charAt(0)) + rel.getTo().substring(1) + "s", rel.getTo(), via, rel.getDomain(), desc));
         }
         return sb.toString();
     }

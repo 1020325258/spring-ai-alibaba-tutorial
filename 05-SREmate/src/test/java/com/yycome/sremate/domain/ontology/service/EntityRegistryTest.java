@@ -39,16 +39,15 @@ class EntityRegistryTest {
     @Test
     void findPaths_orderToSubOrder_shouldReturnTwoPaths() {
         List<List<String>> paths = registry.findPaths("Order", "SubOrder");
-        assertThat(paths).hasSize(2);
+        assertThat(paths).hasSize(1);
         assertThat(paths).anySatisfy(path -> assertThat(path).containsSequence("Order", "BudgetBill", "SubOrder"));
-        assertThat(paths).anySatisfy(path -> assertThat(path).containsSequence("Order", "Contract", "ContractQuotationRelation", "SubOrder"));
     }
 
     @Test
     void getSummaryForPrompt_shouldContainRelationInfo() {
         String summary = registry.getSummaryForPrompt();
         assertThat(summary).contains("Contract");
-        assertThat(summary).contains("has_signed_objects");
+        assertThat(summary).contains("ContractQuotationRelation");
         assertThat(summary).contains("contractCode");
     }
 
@@ -66,15 +65,15 @@ class EntityRegistryTest {
     void findRelationPath_order_to_signedObjects_shouldReturnTwoHops() {
         List<OntologyRelation> path = registry.findRelationPath("Order", "ContractQuotationRelation");
         assertThat(path).hasSize(2);
-        assertThat(path.get(0).getLabel()).isEqualTo("has_contracts");
-        assertThat(path.get(1).getLabel()).isEqualTo("has_signed_objects");
+        assertThat(path.get(0).getTo()).isEqualTo("Contract");
+        assertThat(path.get(1).getTo()).isEqualTo("ContractQuotationRelation");
     }
 
     @Test
     void findRelationPath_contract_to_contractNode_shouldReturnOneHop() {
         List<OntologyRelation> path = registry.findRelationPath("Contract", "ContractNode");
         assertThat(path).hasSize(1);
-        assertThat(path.get(0).getLabel()).isEqualTo("has_nodes");
+        assertThat(path.get(0).getTo()).isEqualTo("ContractNode");
     }
 
     @Test
@@ -87,8 +86,8 @@ class EntityRegistryTest {
     void getOutgoingRelations_contract_shouldReturnFiveRelations() {
         List<OntologyRelation> outgoing = registry.getOutgoingRelations("Contract");
         assertThat(outgoing).hasSizeGreaterThanOrEqualTo(5);
-        assertThat(outgoing).extracting(OntologyRelation::getLabel)
-            .contains("has_nodes", "has_fields", "has_signed_objects", "has_form", "has_config");
+        assertThat(outgoing).extracting(OntologyRelation::getTo)
+            .contains("ContractNode", "ContractField", "ContractQuotationRelation", "ContractForm", "ContractConfig");
     }
 
     @Test

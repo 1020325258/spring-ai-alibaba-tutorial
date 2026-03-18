@@ -1,10 +1,8 @@
 package com.yycome.sremate.infrastructure.config;
 
 import com.yycome.sremate.domain.ontology.service.EntityRegistry;
-import com.yycome.sremate.trigger.agent.HttpEndpointTool;
 import com.yycome.sremate.trigger.agent.KnowledgeQueryTool;
 import com.yycome.sremate.trigger.agent.OntologyQueryTool;
-import com.yycome.sremate.trigger.agent.PersonalQuoteTool;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.tool.ToolCallbackProvider;
 import org.springframework.ai.tool.method.MethodToolCallbackProvider;
@@ -49,13 +47,9 @@ public class AgentConfiguration {
     @Bean
     public ToolCallbackProvider sreTools(
             OntologyQueryTool ontologyQueryTool,
-            PersonalQuoteTool personalQuoteTool,
-            HttpEndpointTool httpEndpointTool,
             @Autowired(required = false) KnowledgeQueryTool knowledgeQueryTool) {
         List<Object> tools = new ArrayList<>();
         tools.add(ontologyQueryTool);
-        tools.add(personalQuoteTool);
-        tools.add(httpEndpointTool);
         if (knowledgeQueryTool != null) {
             tools.add(knowledgeQueryTool);
         }

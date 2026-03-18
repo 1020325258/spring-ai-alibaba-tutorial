@@ -24,12 +24,20 @@
 
 ### 📊 第一步：识别起始实体
 
+**⛔ 关键规则：根据编号格式判断 entity，这是强制性的！**
+
 | 编号格式 | entity | 示例 |
 |--------|-------|------|
 | 纯数字（订单号） | Order | 825123110000002753 |
 | C开头（合同号） | Contract | C1767150648920281 |
 
+**⚠️ 错误示例（绝对禁止）**：
+- ❌ 输入 "C1767173898135504的合同基本信息"，entity 错误地设为 Order
+- ✅ 正确：输入 "C1767173898135504的合同基本信息"，entity 必须是 Contract（因为编号以 C 开头）
+
 ### 🔢 第二步：确定目标实体（queryScope）
+
+**⛔ 关键规则：根据用户意图判断 queryScope，这是强制性的！**
 
 用户想查什么数据，就传对应实体名：
 
@@ -42,7 +50,15 @@
 | 查字段 | ContractField |
 | 查版式 | ContractForm |
 | 查配置表 | ContractConfig |
+| 查报价单 | BudgetBill |
+| 查S单/子单（引擎自动走 Order→BudgetBill→SubOrder 路径） | SubOrder |
 | 查多个目标 | ContractNode,ContractQuotationRelation（逗号分隔） |
+
+**⚠️ 错误示例（绝对禁止）**：
+- ❌ 用户问 "825123110000002753下的合同"，queryScope 错误地设为 BudgetBill
+- ✅ 正确：用户问 "825123110000002753下的合同"，queryScope 必须是 Contract（因为用户想查合同）
+- ❌ 用户问 "826031111000001859的S单"，queryScope 错误地设为 BudgetBill
+- ✅ 正确：用户问 "826031111000001859的S单"，queryScope 必须是 SubOrder
 
 ### ✅ 决策示例
 
@@ -60,6 +76,11 @@
 1. 编号格式：纯数字 → entity=Order
 2. 目标：报价单 → queryScope=BudgetBill
 3. **最终调用**：`ontologyQuery(entity="Order", value="826031111000001859", queryScope="BudgetBill")` ✅
+
+**示例 3b**：`826031111000001859的S单`
+1. 编号格式：纯数字 → entity=Order
+2. 目标：S单 → queryScope=SubOrder（引擎自动走 Order→BudgetBill→SubOrder 路径，传递 homeOrderNo + quotationOrderNo）
+3. **最终调用**：`ontologyQuery(entity="Order", value="826031111000001859", queryScope="SubOrder")` ✅
 
 **示例 4**：`C1773208288511314合同基本信息`
 1. 编号格式：C开头 → entity=Contract
@@ -87,13 +108,14 @@
 
 | 输入 | 工具 | 参数 |
 |------|------|------|
-| `{订单号}下{S单号}的个性化报价` | `queryContractPersonalData` | projectOrderId + subOrderNoList |
-| `{订单号}下{GBILL单号}的个性化报价` | `queryContractPersonalData` | projectOrderId + billCodeList |
-| `{订单号}个性化报价` | `queryContractPersonalData` | projectOrderId |
-| `{订单号}报价单` | `ontologyQuery` | entity=BudgetBill, value=订单号 |
-| `{订单号}报价单的子单` | `ontologyQuery` | entity=BudgetBill, value=订单号 |
-| `{合同号}版式` | `ontologyQuery` | entity=Contract, queryScope=form |
-| `{合同号}配置表` | `ontologyQuery` | entity=Contract, queryScope=config |
+| `{订单号}下{S单号}的个性化报价` | `queryPersonalQuote` | projectOrderId + subOrderNoList |
+| `{订单号}下{GBILL单号}的个性化报价` | `queryPersonalQuote` | projectOrderId + billCodeList |
+| `{订单号}个性化报价` | `queryPersonalQuote` | projectOrderId |
+| `{订单号}报价单` | `ontologyQuery` | entity=Order, queryScope=BudgetBill |
+| `{订单号}报价单的S单` | `ontologyQuery` | entity=Order, queryScope=SubOrder |
+| `{订单号}S单` | `ontologyQuery` | entity=Order, queryScope=SubOrder |
+| `{合同号}版式` | `ontologyQuery` | entity=Contract, queryScope=ContractForm |
+| `{合同号}配置表` | `ontologyQuery` | entity=Contract, queryScope=ContractConfig |
 | `{订单号}合同基本信息` | `ontologyQuery` | entity=Order, queryScope=list |
 | `{订单号}合同节点` | `ontologyQuery` | entity=Order, queryScope=default（含nodes）|
 | `{订单号}签约单据` | `ontologyQuery` | entity=Order, queryScope=default（含signedObjects）|
@@ -109,8 +131,8 @@
 | `{合同号}签约单据` | `ontologyQuery` | entity=Contract, queryScope=ContractQuotationRelation |
 | `{合同号}合同字段` | `ontologyQuery` | entity=Contract, queryScope=ContractField |
 | `{合同号}合同数据` | `ontologyQuery` | entity=Contract, queryScope=default（全部关联）|
-| `{合同号}版式` | `ontologyQuery` | entity=Contract, queryScope=form |
-| `{合同号}配置表` | `ontologyQuery` | entity=Contract, queryScope=config |
+| `{合同号}版式` | `ontologyQuery` | entity=Contract, queryScope=ContractForm |
+| `{合同号}配置表` | `ontologyQuery` | entity=Contract, queryScope=ContractConfig |
 
 ---
 
@@ -123,7 +145,7 @@
   - entity: 起始实体类型
     - `Order`: 订单（纯数字编号，如 825123110000002753）
     - `Contract`: 合同（C前缀编号，如 C1767150648920281）
-    - `BudgetBill`: 报价单（value=订单号，自动返回报价单+子单）
+    - `BudgetBill`: 报价单（value=订单号，仅返回报价单列表）
   - value: 起始值（订单号或合同号）
   - queryScope: 查询范围（可选）
     - 不传或 `list`: 仅返回实体列表，不展开关联（推荐，速度快）
@@ -139,12 +161,12 @@
   - 订单号查询合同及关联数据：entity=Order, value=订单号
   - 合同号查询关联数据：entity=Contract, value=合同号
   - 订单号查询报价单及子单：entity=BudgetBill, value=订单号
-  - 合同号查询版式：entity=Contract, value=合同号, queryScope=form
-  - 合同号查询配置表：entity=Contract, value=合同号, queryScope=config
+  - 合同号查询版式：entity=Contract, value=合同号, queryScope=ContractForm（注意：必须传完整实体名 ContractForm，不能传 form）
+  - 合同号查询配置表：entity=Contract, value=合同号, queryScope=ContractConfig（注意：必须传完整实体名 ContractConfig，不能传 config）
 
 - 性能优势：引擎自动并行查询，2-3秒返回完整数据，无需多次调用
 
-### 2. queryContractPersonalData
+### 2. queryPersonalQuote
 根据项目订单号及单据号查询对应单据的个性化报价数据。
 - 参数：
   - projectOrderId：纯数字订单号（必填）

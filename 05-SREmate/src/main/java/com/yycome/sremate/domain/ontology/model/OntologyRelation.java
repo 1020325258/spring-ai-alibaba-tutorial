@@ -10,7 +10,6 @@ import java.util.Map;
 public class OntologyRelation {
     private String from;
     private String to;
-    private String label;
     private String domain;        // "contract" | "quote"
     private String description;
     private Map<String, String> via;   // {source_field, target_field}
