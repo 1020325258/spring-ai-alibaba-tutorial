@@ -25,20 +25,22 @@ Gateway SHALL 实现 `queryByField(fieldName, value)` 方法，接受 YAML 中 `
 ---
 
 ### Requirement: queryByFieldWithContext 上下文查询
-部分 Gateway SHALL 实现 `queryByFieldWithContext(fieldName, value, parentRecord)` 方法，允许从父记录中取额外参数（如 SubOrder 需要父记录的 `billCode`）。
+部分 Gateway SHALL 实现 `queryByFieldWithContext(fieldName, value, parentRecord)` 方法，允许从父记录中取额外参数（如 SubOrder 需要父记录的 `billCode`，PersonalQuote 需要父记录的 `billCode` 和 `bindType`）。
 
 #### Scenario: SubOrder 双参数查询
 - **WHEN** 引擎查询 SubOrder，父记录为 BudgetBill（含 billCode）
 - **THEN** Gateway 使用 `quotationOrderNo`（来自关系配置）+ `homeOrderNo`（来自父记录 billCode）双参数查询
 
----
+#### Scenario: PersonalQuote 从签约单据提取参数
+- **WHEN** 引擎查询 PersonalQuote，父记录为 ContractQuotationRelation（含 billCode 和 bindType）
+- **THEN** Gateway 根据 bindType 值将 billCode 映射到正确的参数：
+  - bindType=1 → billCodeList
+  - bindType=2 → subOrderNoList
+  - bindType=3 → changeOrderId
 
-### Requirement: queryWithExtraParams 额外参数查询
-部分 Gateway SHALL 实现 `queryWithExtraParams(fieldName, value, extraParams)` 方法，用于首层关系需要用户传入额外参数的场景（如 PersonalQuote）。
-
-#### Scenario: PersonalQuote 额外参数
-- **WHEN** LLM 调用时传入 `extraParams={"subOrderNoList": "...", "billCodeList": "..."}`
-- **THEN** Gateway 将额外参数合并到 HTTP 请求体中
+#### Scenario: PersonalQuote 无效 bindType
+- **WHEN** 引擎查询 PersonalQuote，父记录的 bindType 不在 1/2/3 范围
+- **THEN** Gateway 返回空列表并记录 warn 日志
 
 ---
 
@@ -70,3 +72,29 @@ Gateway SHALL 实现 `queryByField(fieldName, value)` 方法，接受 YAML 中 `
 #### Scenario: 分库分表 Gateway 正确路由
 - **WHEN** 实体对应的表按字段取模分片（如 `contract_field_sharding_0` 至 `_9`）
 - **THEN** Gateway 从字段值中提取数字部分，`% 10` 得到分片索引，拼接完整表名后查询
+
+---
+
+### Requirement: ContractInstance 实体定义
+ContractForm SHALL 重命名为 ContractInstance，别名扩展以支持用户多种表达方式。
+
+#### Scenario: 实体重命名
+- **WHEN** 查询 ContractInstance 实体
+- **THEN** 系统返回原 ContractForm 对应的版式数据
+
+#### Scenario: 别名匹配
+- **WHEN** 用户输入包含关键词 "实例"、"实例信息"、"版式"、"instanceId" 等
+- **THEN** LLM 能通过别名匹配到 ContractInstance 实体
+
+---
+
+### Requirement: Gateway 重命名
+ContractFormGateway SHALL 重命名为 ContractInstanceGateway，保持相同的查询逻辑。
+
+#### Scenario: Gateway 自注册
+- **WHEN** 应用启动
+- **THEN** ContractInstanceGateway 通过 `registry.register(this)` 注册为 "ContractInstance"
+
+#### Scenario: 查询逻辑不变
+- **WHEN** 调用 `contractInstanceGateway.queryByField("instanceId", "101835395")`
+- **THEN** 返回与原 ContractFormGateway 相同的版式数据

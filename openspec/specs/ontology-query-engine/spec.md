@@ -70,3 +70,46 @@
 #### Scenario: 路径不存在
 - **WHEN** `queryScope` 指定的目标实体在 YAML 关系图中与起始实体无路径
 - **THEN** 抛出异常，提示检查 `domain-ontology.yaml`
+
+---
+
+### Requirement: 实体参数校验
+OntologyQueryTool SHALL 仅校验 entity 参数的合法性，不再根据 value 格式推断 entity。LLM 的判断 SHALL 被信任。
+
+#### Scenario: 校验 entity 合法性
+- **WHEN** LLM 传入 entity 参数
+- **THEN** 校验该 entity 在 EntityRegistry 中存在，不存在则返回错误
+
+#### Scenario: 信任 LLM 判断不覆盖
+- **WHEN** LLM 传入 entity=ContractInstance，value="101835395"（纯数字）
+- **THEN** 直接使用 LLM 判断的 entity，不被代码推断为 Order
+
+#### Scenario: 纯数字 instanceId 正确识别
+- **WHEN** 用户输入 "101835395的实例信息"
+- **THEN** LLM 识别 entity=ContractInstance，value="101835395"，查询成功
+
+---
+
+### Requirement: 支持任意实体作为查询入口
+用户 SHALL 能够直接查询任意在 YAML 中定义了 lookupStrategies 的实体，不限于 Order 或 Contract。
+
+#### Scenario: 直接查询 ContractInstance
+- **WHEN** 用户输入 "查 instanceId=101835395 的实例"
+- **THEN** LLM 识别 entity=ContractInstance，正确返回版式数据
+
+#### Scenario: 直接查询 ContractNode
+- **WHEN** 用户输入 "查合同号 C1767150648920281 的节点"
+- **THEN** LLM 识别 entity=Contract, queryScope=ContractNode
+
+---
+
+### Requirement: 多跳路径查询支持
+系统 SHALL 支持三跳及以上的路径查询，每跳自动使用 `queryByFieldWithContext` 从父记录提取上下文参数。
+
+#### Scenario: 三跳路径查询 PersonalQuote
+- **WHEN** 查询路径为 Order → Contract → ContractQuotationRelation → PersonalQuote
+- **THEN** 引擎在第三跳调用 PersonalQuoteGateway.queryByFieldWithContext，传入 ContractQuotationRelation 记录作为 parentRecord
+
+#### Scenario: 多跳路径中每跳独立处理
+- **WHEN** 路径有多跳，每跳的 Gateway 需要从父记录提取不同参数
+- **THEN** 每跳的 `queryByFieldWithContext` 实现独立决定从 parentRecord 提取哪些字段
