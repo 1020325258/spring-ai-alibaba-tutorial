@@ -290,4 +290,64 @@ class OntologyQueryEngineTest {
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessageContaining("找不到路径");
     }
+
+    // ── PersonalQuote 三跳查询测试 ────────────────────────────────────
+
+    @Test
+    void query_personalQuote_threeHops_shouldBuildHierarchy() {
+        // 路径: Order → Contract → ContractQuotationRelation → PersonalQuote
+        OntologyEntity orderEntity = makeEntity("Order", "projectOrderId", "^\\d{15,}$");
+        OntologyRelation orderToContract = makeRelation("Order", "Contract", "projectOrderId", "projectOrderId");
+        OntologyRelation contractToQuotation = makeRelation("Contract", "ContractQuotationRelation", "contractCode", "contractCode");
+        OntologyRelation quotationToPersonalQuote = makeRelation("ContractQuotationRelation", "PersonalQuote", "billCode", "projectOrderId");
+
+        when(entityRegistry.getEntity("Order")).thenReturn(orderEntity);
+        when(entityRegistry.findRelationPath("Order", "PersonalQuote"))
+            .thenReturn(List.of(orderToContract, contractToQuotation, quotationToPersonalQuote));
+
+        EntityDataGateway orderGateway = mock(EntityDataGateway.class);
+        EntityDataGateway contractGatewayForOrder = mock(EntityDataGateway.class);
+        EntityDataGateway quotationGateway = mock(EntityDataGateway.class);
+        EntityDataGateway personalQuoteGateway = mock(EntityDataGateway.class);
+
+        when(gatewayRegistry.getGateway("Order")).thenReturn(orderGateway);
+        when(gatewayRegistry.getGateway("Contract")).thenReturn(contractGatewayForOrder);
+        when(gatewayRegistry.getGateway("ContractQuotationRelation")).thenReturn(quotationGateway);
+        when(gatewayRegistry.getGateway("PersonalQuote")).thenReturn(personalQuoteGateway);
+
+        // Order 查询
+        when(orderGateway.queryByField("projectOrderId", "826031018000004758"))
+            .thenReturn(List.of(mutableMap("projectOrderId", "826031018000004758")));
+
+        // Contract 查询
+        when(contractGatewayForOrder.queryByFieldWithContext(eq("projectOrderId"), eq("826031018000004758"), any()))
+            .thenReturn(List.of(mutableMap("contractCode", "C1767150648920281", "projectOrderId", "826031018000004758")));
+
+        // ContractQuotationRelation 查询
+        when(quotationGateway.queryByFieldWithContext(eq("contractCode"), eq("C1767150648920281"), any()))
+            .thenReturn(List.of(mutableMap("contractCode", "C1767150648920281", "billCode", "GBILL001", "bindType", "1")));
+
+        // PersonalQuote 查询（三跳）
+        when(personalQuoteGateway.queryByFieldWithContext(eq("projectOrderId"), eq("GBILL001"), any()))
+            .thenReturn(List.of(mutableMap("projectOrderId", "826031018000004758", "billCodeList", "GBILL001", "_rawData", "{}")));
+
+        Map<String, Object> result = engine.query("Order", "826031018000004758", "PersonalQuote");
+
+        assertThat(result).isNotNull();
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> orders = (List<Map<String, Object>>) result.get("records");
+        assertThat(orders).hasSize(1);
+
+        // 验证三跳层级结构: Order → contracts → contractQuotationRelations → personalQuotes
+        assertThat(orders.get(0)).containsKey("contracts");
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> contracts = (List<Map<String, Object>>) orders.get(0).get("contracts");
+        assertThat(contracts).isNotEmpty();
+        assertThat(contracts.get(0)).containsKey("contractQuotationRelations");
+
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> quotations = (List<Map<String, Object>>) contracts.get(0).get("contractQuotationRelations");
+        assertThat(quotations).isNotEmpty();
+        assertThat(quotations.get(0)).containsKey("personalQuotes");
+    }
 }

@@ -52,6 +52,7 @@
 | 查配置表 | ContractConfig |
 | 查报价单 | BudgetBill |
 | 查S单/子单（引擎自动走 Order→BudgetBill→SubOrder 路径） | SubOrder |
+| 查个性化报价（引擎自动走 Order→Contract→ContractQuotationRelation→PersonalQuote 路径） | PersonalQuote |
 | 查多个目标 | ContractNode,ContractQuotationRelation（逗号分隔） |
 
 **⚠️ 错误示例（绝对禁止）**：
@@ -92,6 +93,12 @@
 2. 目标：签约单据和节点 → queryScope=ContractNode,ContractQuotationRelation
 3. **最终调用**：`ontologyQuery(entity="Order", value="825123110000002753", queryScope="ContractNode,ContractQuotationRelation")` ✅
 
+**示例 6**：`826031018000004758的个性化报价`
+1. 编号格式：纯数字 → entity=Order
+2. 目标：个性化报价 → queryScope=PersonalQuote
+3. 路径：Order → Contract → ContractQuotationRelation → PersonalQuote（引擎自动从签约单据提取参数）
+4. **最终调用**：`ontologyQuery(entity="Order", value="826031018000004758", queryScope="PersonalQuote")` ✅
+
 ---
 
 ### ⛔ 禁止行为
@@ -108,9 +115,7 @@
 
 | 输入 | 工具 | 参数 |
 |------|------|------|
-| `{订单号}下{S单号}的个性化报价` | `queryPersonalQuote` | projectOrderId + subOrderNoList |
-| `{订单号}下{GBILL单号}的个性化报价` | `queryPersonalQuote` | projectOrderId + billCodeList |
-| `{订单号}个性化报价` | `queryPersonalQuote` | projectOrderId |
+| `{订单号}个性化报价` | `ontologyQuery` | entity=Order, queryScope=PersonalQuote（三跳路径自动查询） |
 | `{订单号}报价单` | `ontologyQuery` | entity=Order, queryScope=BudgetBill |
 | `{订单号}报价单的S单` | `ontologyQuery` | entity=Order, queryScope=SubOrder |
 | `{订单号}S单` | `ontologyQuery` | entity=Order, queryScope=SubOrder |
@@ -167,14 +172,10 @@
 - 性能优势：引擎自动并行查询，2-3秒返回完整数据，无需多次调用
 
 ### 2. queryPersonalQuote
-根据项目订单号及单据号查询对应单据的个性化报价数据。
-- 参数：
-  - projectOrderId：纯数字订单号（必填）
-  - subOrderNoList：S单号列表，逗号分隔（可选，S前缀）
-  - billCodeList：报价单号列表，逗号分隔（可选，GBILL前缀）
-  - changeOrderId：变更单号（可选，格式与订单号类似）
-- 约束：后三个参数至少填一个，否则询问用户
-- 使用场景：用户询问"xxx的个性化报价"时使用
+**已废弃**：个性化报价现在通过 `ontologyQuery` 的三跳路径自动查询。
+- 三跳路径：Order → Contract → ContractQuotationRelation → PersonalQuote
+- 引擎自动从签约单据提取 billCode 和 bindType，映射到正确的查询参数
+- 使用方式：`ontologyQuery(entity="Order", value="{订单号}", queryScope="PersonalQuote")`
 
 ### 3. callPredefinedEndpoint
 调用预定义的接口，用于获取系统状态、诊断信息或业务数据。

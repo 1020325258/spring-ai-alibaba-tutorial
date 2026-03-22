@@ -399,6 +399,20 @@
                     if (r.domain && !entityDomain[r.to])   entityDomain[r.to]   = r.domain;
                 });
 
+                // 手动指定实体层级（确保同层节点正确显示）
+                const entityLevel = {
+                    'Order': 0,
+                    'Contract': 1,
+                    'BudgetBill': 1,
+                    'ContractNode': 2,
+                    'ContractQuotationRelation': 2,
+                    'ContractField': 2,
+                    'ContractForm': 2,
+                    'ContractConfig': 2,
+                    'SubOrder': 2,
+                    'PersonalQuote': 3
+                };
+
                 // 构建节点
                 const nodes = entities.map(e => {
                     const domainKey = entityDomain[e.name] || 'default';
@@ -407,6 +421,7 @@
                     return {
                         id: e.name,
                         label: label,
+                        level: entityLevel[e.name] !== undefined ? entityLevel[e.name] : 0,
                         shape: 'ellipse',
                         color: {
                             background: color.bg,
@@ -457,9 +472,10 @@
                             hierarchical: {
                                 direction: 'UD',
                                 sortMethod: 'directed',
-                                levelSeparation: 160,
-                                nodeSpacing: 180,
-                                treeSpacing: 200
+                                shakeTowards: 'roots',
+                                levelSeparation: 140,
+                                nodeSpacing: 160,
+                                treeSpacing: 180
                             }
                         },
                         physics: { enabled: false },
