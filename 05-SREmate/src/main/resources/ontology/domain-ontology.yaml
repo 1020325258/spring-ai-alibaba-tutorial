@@ -83,7 +83,7 @@ entities:
   - name: PersonalQuote
     displayName: "个性化报价"
     aliases: ["个性化报价数据"]
-    description: "个性化报价数据，需要额外参数（S单号/报价单号/变更单号）"
+    description: "个性化报价数据，通过签约单据(ContractQuotationRelation)的billCode和bindType查询，bindType=1映射到billCodeList，bindType=2映射到subOrderNoList，bindType=3映射到changeOrderId"
     lookupStrategies:
       - field: projectOrderId
         pattern: "^\\d{15,}$"
@@ -147,12 +147,6 @@ relations:
     domain: quote
     via: { source_field: projectOrderId, target_field: projectOrderId }
 
-  - from: Order
-    to: PersonalQuote
-    domain: quote
-    description: "个性化报价数据，需要额外参数"
-    via: { source_field: projectOrderId, target_field: projectOrderId }
-
   - from: Contract
     to: ContractNode
     domain: contract
@@ -184,5 +178,11 @@ relations:
     domain: quote
     description: "报价单拆分形成S单"
     via: { source_field: billCode, target_field: quotationOrderNo }
+
+  - from: ContractQuotationRelation
+    to: PersonalQuote
+    domain: quote
+    description: "签约单据关联个性化报价，通过billCode和bindType查询"
+    via: { source_field: billCode, target_field: projectOrderId }
 
 
