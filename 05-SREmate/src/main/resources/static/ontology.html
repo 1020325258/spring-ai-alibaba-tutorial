@@ -289,10 +289,26 @@
             color: var(--text-muted);
         }
         .legend-dot {
-            width: 12px;
-            height: 12px;
+            width: 14px;
+            height: 14px;
             border-radius: 50%;
             flex-shrink: 0;
+            border: 2px solid;
+        }
+        .legend-dot.contract {
+            background: #4FC3F7;
+            border-color: #0288D1;
+            box-shadow: 0 0 6px rgba(79, 195, 247, 0.4);
+        }
+        .legend-dot.quote {
+            background: #FFB74D;
+            border-color: #EF6C00;
+            box-shadow: 0 0 6px rgba(255, 183, 77, 0.4);
+        }
+        .legend-dot.default {
+            background: #A5D6A7;
+            border-color: #388E3C;
+            box-shadow: 0 0 6px rgba(165, 214, 167, 0.4);
         }
     </style>
 </head>
@@ -351,15 +367,15 @@
                 <div class="legend-title">领域图例</div>
                 <div class="legend-items">
                     <div class="legend-item">
-                        <div class="legend-dot" style="background:var(--accent-blue);"></div>
+                        <div class="legend-dot contract"></div>
                         <span>签约领域 (contract)</span>
                     </div>
                     <div class="legend-item">
-                        <div class="legend-dot" style="background:var(--accent-orange);"></div>
+                        <div class="legend-dot quote"></div>
                         <span>报价领域 (quote)</span>
                     </div>
                     <div class="legend-item">
-                        <div class="legend-dot" style="background:var(--accent-green);"></div>
+                        <div class="legend-dot default"></div>
                         <span>通用实体</span>
                     </div>
                 </div>
@@ -369,14 +385,68 @@
 
     <script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
     <script>
+        // ── 配色方案 ────────────────────────────────────────
         const DOMAIN_COLOR = {
-            contract: { bg: '#4FC3F7', border: '#29B6F6', hover: '#81D4FA' },
-            quote:    { bg: '#FFB74D', border: '#FFA726', hover: '#FFCC80' },
-            default:  { bg: '#A5D6A7', border: '#81C784', hover: '#C8E6C9' }
+            contract: {
+                bg: '#4FC3F7',
+                border: '#0288D1',
+                hover: '#81D4FA',
+                glow: 'rgba(79, 195, 247, 0.4)'
+            },
+            quote: {
+                bg: '#FFB74D',
+                border: '#EF6C00',
+                hover: '#FFCC80',
+                glow: 'rgba(255, 183, 77, 0.4)'
+            },
+            default: {
+                bg: '#A5D6A7',
+                border: '#388E3C',
+                hover: '#C8E6C9',
+                glow: 'rgba(165, 214, 167, 0.4)'
+            }
         };
 
         let network = null;
         let physicsEnabled = false;
+
+        // ── 层级自适应计算（BFS） ────────────────────────────
+        function calculateEntityLevels(entities, relations) {
+            const levels = {};
+            const adjacencyList = {};
+
+            // 构建邻接表
+            relations.forEach(r => {
+                if (!adjacencyList[r.from]) adjacencyList[r.from] = [];
+                adjacencyList[r.from].push(r.to);
+            });
+
+            // BFS 从 Order 出发
+            const queue = [{ name: 'Order', level: 0 }];
+            const visited = new Set(['Order']);
+
+            while (queue.length > 0) {
+                const { name, level } = queue.shift();
+                levels[name] = level;
+
+                const neighbors = adjacencyList[name] || [];
+                neighbors.forEach(neighbor => {
+                    if (!visited.has(neighbor)) {
+                        visited.add(neighbor);
+                        queue.push({ name: neighbor, level: level + 1 });
+                    }
+                });
+            }
+
+            // 未访问到的实体（无入边）放在 Level 0
+            entities.forEach(e => {
+                if (levels[e.name] === undefined) {
+                    levels[e.name] = 0;
+                }
+            });
+
+            return levels;
+        }
 
         fetch('/api/ontology')
             .then(r => r.json())
@@ -399,67 +469,83 @@
                     if (r.domain && !entityDomain[r.to])   entityDomain[r.to]   = r.domain;
                 });
 
-                // 手动指定实体层级（确保同层节点正确显示）
-                const entityLevel = {
-                    'Order': 0,
-                    'Contract': 1,
-                    'BudgetBill': 1,
-                    'ContractNode': 2,
-                    'ContractQuotationRelation': 2,
-                    'ContractField': 2,
-                    'ContractForm': 2,
-                    'ContractConfig': 2,
-                    'SubOrder': 2,
-                    'PersonalQuote': 3
-                };
+                // 自适应计算层级
+                const entityLevel = calculateEntityLevels(entities, relations);
 
                 // 构建节点
                 const nodes = entities.map(e => {
                     const domainKey = entityDomain[e.name] || 'default';
                     const color = DOMAIN_COLOR[domainKey] || DOMAIN_COLOR.default;
+                    const level = entityLevel[e.name] || 0;
                     const label = e.name + (e.displayName ? '\n' + e.displayName : '');
+
+                    // Level 0 使用圆角矩形，其他使用椭圆
+                    const shape = level === 0 ? 'box' : 'ellipse';
+                    // Level 0 节点稍大
+                    const widthConstraint = level === 0
+                        ? { minimum: 110, maximum: 150 }
+                        : { minimum: 100, maximum: 140 };
+
                     return {
                         id: e.name,
                         label: label,
-                        level: entityLevel[e.name] !== undefined ? entityLevel[e.name] : 0,
-                        shape: 'ellipse',
+                        level: level,
+                        shape: shape,
                         color: {
                             background: color.bg,
                             border: color.border,
-                            highlight: { background: color.hover, border: color.border },
-                            hover:      { background: color.hover, border: color.border }
+                            highlight: { background: color.hover, border: color.border, borderWidth: 4 },
+                            hover:      { background: color.hover, border: color.border, borderWidth: 4 }
                         },
                         font: {
                             size: 13,
                             color: '#1e1e2e',
                             face: '-apple-system, BlinkMacSystemFont, sans-serif',
-                            bold: { size: 14, color: '#1e1e2e' },
+                            bold: { size: 15, color: '#0a0a12' },
                             multi: true
                         },
-                        widthConstraint: { minimum: 100, maximum: 140 },
+                        widthConstraint: widthConstraint,
                         borderWidth: 2,
-                        borderWidthSelected: 3,
-                        shadow: { enabled: true, color: color.bg + '55', size: 12, x: 0, y: 3 }
+                        borderWidthSelected: 4,
+                        shadow: {
+                            enabled: true,
+                            color: color.glow,
+                            size: 15,
+                            x: 0,
+                            y: 4
+                        },
+                        margin: level === 0 ? 12 : 10
                     };
                 });
 
                 // 构建边
                 const edges = relations.map((r, i) => {
-                    const domainKey = r.domain || 'default';
-                    const color = DOMAIN_COLOR[domainKey] || DOMAIN_COLOR.default;
+                    const targetDomainKey = entityDomain[r.to] || 'default';
+                    const targetColor = DOMAIN_COLOR[targetDomainKey] || DOMAIN_COLOR.default;
                     const viaStr = r.via ? r.via.source_field : '';
                     return {
                         id: i,
                         from: r.from,
                         to: r.to,
                         label: viaStr,
-                        arrows: { to: { enabled: true, scaleFactor: 0.7 } },
-                        color: { color: '#5a5a8a', highlight: color.bg, hover: color.bg },
-                        font: { size: 10, color: '#9090c0', align: 'middle', background: '#252538' },
+                        arrows: { to: { enabled: true, scaleFactor: 0.9 } },
+                        color: {
+                            color: '#5a5a8a',
+                            highlight: targetColor.border,
+                            hover: targetColor.border,
+                            inherit: false
+                        },
+                        font: {
+                            size: 10,
+                            color: '#b0b0d0',
+                            align: 'middle',
+                            background: '#2a2a3e',
+                            strokeWidth: 0
+                        },
                         smooth: { type: 'curvedCW', roundness: 0.15 },
                         width: 1.5,
-                        selectionWidth: 2.5,
-                        hoverWidth: 2
+                        selectionWidth: 3,
+                        hoverWidth: 3
                     };
                 });
 
@@ -473,9 +559,9 @@
                                 direction: 'UD',
                                 sortMethod: 'directed',
                                 shakeTowards: 'roots',
-                                levelSeparation: 140,
-                                nodeSpacing: 160,
-                                treeSpacing: 180
+                                levelSeparation: 150,
+                                nodeSpacing: 170,
+                                treeSpacing: 200
                             }
                         },
                         physics: { enabled: false },
@@ -486,7 +572,7 @@
                             keyboard: true
                         },
                         nodes: { margin: 10 },
-                        edges: { selectionWidth: 2.5 }
+                        edges: { selectionWidth: 3 }
                     }
                 );
 
@@ -531,7 +617,7 @@
             // 实体头部
             html += '<div class="entity-header">';
             html += `<div class="entity-name-row">
-                        <div class="entity-dot" style="background:${color.bg}"></div>
+                        <div class="entity-dot" style="background:${color.bg};box-shadow:0 0 6px ${color.glow}"></div>
                         <span class="entity-name">${entity.name}</span>
                      </div>`;
             if (entity.displayName) {
