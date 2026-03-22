@@ -1,5 +1,6 @@
 package com.yycome.sremate.domain.ontology.gateway;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.yycome.sremate.domain.ontology.engine.EntityDataGateway;
 import com.yycome.sremate.domain.ontology.engine.EntityGatewayRegistry;
 import com.yycome.sremate.infrastructure.client.HttpEndpointClient;
@@ -27,6 +28,7 @@ public class PersonalQuoteGateway implements EntityDataGateway {
     private final HttpEndpointClient httpEndpointClient;
     private final EntityGatewayRegistry registry;
     private final ContractDao contractDao;
+    private final ObjectMapper objectMapper;
 
     @PostConstruct
     public void init() {
@@ -196,16 +198,68 @@ public class PersonalQuoteGateway implements EntityDataGateway {
         }
     }
 
+    @SuppressWarnings("unchecked")
     private List<Map<String, Object>> parsePersonalQuote(String json, String projectOrderId,
                                                           Map<String, String> extraParams) {
         List<Map<String, Object>> result = new ArrayList<>();
-        Map<String, Object> record = new LinkedHashMap<>();
-        record.put("projectOrderId", projectOrderId);
-        record.put("subOrderNoList", extraParams.getOrDefault("subOrderNoList", ""));
-        record.put("billCodeList", extraParams.getOrDefault("billCodeList", ""));
-        record.put("changeOrderId", extraParams.getOrDefault("changeOrderId", ""));
-        record.put("_rawData", json);
-        result.add(record);
+
+        try {
+            Map<String, Object> response = objectMapper.readValue(json, Map.class);
+
+            // 检查响应状态
+            Integer code = (Integer) response.get("code");
+            if (code == null || code != 2000) {
+                log.warn("[PersonalQuoteGateway] 接口返回非成功状态: code={}, message={}",
+                        code, response.get("message"));
+                return result;
+            }
+
+            // 提取 data.personalContractDataList
+            Map<String, Object> data = (Map<String, Object>) response.get("data");
+            if (data == null) {
+                log.warn("[PersonalQuoteGateway] 响应缺少 data 字段");
+                return result;
+            }
+
+            List<Map<String, Object>> personalContractDataList =
+                    (List<Map<String, Object>>) data.get("personalContractDataList");
+
+            if (personalContractDataList == null || personalContractDataList.isEmpty()) {
+                log.debug("[PersonalQuoteGateway] 无个性化报价数据");
+                return result;
+            }
+
+            // 转换每条报价数据
+            for (Map<String, Object> quoteData : personalContractDataList) {
+                Map<String, Object> record = new LinkedHashMap<>();
+                record.put("projectOrderId", projectOrderId);
+                record.put("billCode", quoteData.get("billCode"));
+                record.put("personalContractPrice", quoteData.get("personalContractPrice"));
+                record.put("organizationCode", quoteData.get("organizationCode"));
+                record.put("organizationName", quoteData.get("organizationName"));
+                record.put("createTime", quoteData.get("createTime"));
+
+                // quoteInfo 包含文件 URL
+                Map<String, Object> quoteInfo = (Map<String, Object>) quoteData.get("quoteInfo");
+                if (quoteInfo != null) {
+                    record.put("quoteFileUrl", quoteInfo.get("fileUrl"));
+                    record.put("quotePrevUrl", quoteInfo.get("prevUrl"));
+                }
+
+                result.add(record);
+            }
+
+            log.debug("[PersonalQuoteGateway] 解析成功，返回 {} 条报价数据", result.size());
+        } catch (Exception e) {
+            log.warn("[PersonalQuoteGateway] 解析 JSON 失败: {}", e.getMessage());
+            // 解析失败时返回包含原始数据的记录
+            Map<String, Object> fallbackRecord = new LinkedHashMap<>();
+            fallbackRecord.put("projectOrderId", projectOrderId);
+            fallbackRecord.put("_rawData", json);
+            fallbackRecord.put("_parseError", e.getMessage());
+            result.add(fallbackRecord);
+        }
+
         return result;
     }
 
