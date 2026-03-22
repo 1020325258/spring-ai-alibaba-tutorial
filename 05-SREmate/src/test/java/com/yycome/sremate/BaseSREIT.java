@@ -360,23 +360,20 @@ abstract class BaseSREIT {
     /**
      * 断言 ontologyQuery 工具的参数正确性
      *
-     * 注意：entity 参数会根据 value 格式自动修正（C开头→Contract，纯数字→Order）
-     * 因此这里验证的是修正后的有效 entity，而非 LLM 原始传入的值
+     * v2.4 更新：工具不再自动修正 entity，信任 LLM 的判断
+     * 因此这里直接验证 LLM 传入的 entity 参数
      *
-     * @param entity     期望的实体类型 (Contract/Order)
+     * @param entity     期望的实体类型
      * @param queryScope 期望的查询范围 (可为 null 表示不验证)
      */
     protected void assertOntologyQueryParams(String entity, String queryScope) {
         assertToolCalled("ontologyQuery");
         Map<String, Object> params = getToolParams("ontologyQuery");
 
-        // 获取 value 参数，用于推断正确的 entity
-        Object valueObj = params.get("value");
-        String inferredEntity = inferEntityFromValue(valueObj != null ? valueObj.toString() : null);
-
-        // 验证 entity：使用推断出的正确 entity（与工具内的自动修正逻辑一致）
-        Assertions.assertThat(inferredEntity)
-                .as("entity 应该根据 value 格式自动修正为: " + entity)
+        // 直接验证 entity 参数（信任 LLM 的判断）
+        Object entityObj = params.get("entity");
+        Assertions.assertThat(entityObj)
+                .as("entity 参数应该为: " + entity)
                 .isEqualTo(entity);
 
         if (queryScope != null) {
@@ -390,8 +387,10 @@ abstract class BaseSREIT {
     }
 
     /**
-     * 根据 value 格式推断正确的 entity 类型（与 OntologyQueryTool 逻辑一致）
+     * 根据 value 格式推断正确的 entity 类型
+     * @deprecated v2.4 后工具不再自动修正 entity，此方法保留用于向后兼容
      */
+    @Deprecated
     private String inferEntityFromValue(String value) {
         if (value == null || value.isBlank()) {
             return null;

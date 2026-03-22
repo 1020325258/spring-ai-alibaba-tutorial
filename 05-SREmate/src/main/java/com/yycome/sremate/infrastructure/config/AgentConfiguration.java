@@ -32,7 +32,10 @@ public class AgentConfiguration {
     public ChatClient sreAgent(ChatClient.Builder builder, ToolCallbackProvider sreTools, EntityRegistry entityRegistry) throws Exception {
         String promptContent = sreAgentPrompt.getContentAsString(StandardCharsets.UTF_8);
         String ontologySummary = entityRegistry.getSummaryForPrompt();
-        String finalPrompt = promptContent.replace("{{ontology_summary}}", ontologySummary);
+        String entitySummary = entityRegistry.getEntitySummaryForPrompt();
+        String finalPrompt = promptContent
+                .replace("{{ontology_summary}}", ontologySummary)
+                .replace("{{entity_summary}}", entitySummary);
 
         return builder
                 .defaultSystem(finalPrompt)

@@ -75,9 +75,9 @@ class ContractOntologyIT extends BaseSREIT {
     // ── 版式/配置表查询 ──────
 
     @Test
-    void contractForm_shouldUseContractEntityAndContractFormScope() {
+    void contractInstance_shouldUseContractEntityAndContractInstanceScope() {
         ask("C1773303150687211的版式");
-        assertOntologyQueryParams("Contract", "ContractForm");
+        assertOntologyQueryParams("Contract", "ContractInstance");
         assertAllToolsSuccess();
     }
 
@@ -85,6 +85,15 @@ class ContractOntologyIT extends BaseSREIT {
     void contractConfig_shouldUseContractEntityAndConfigScope() {
         ask("C1767173898135504的配置表");
         assertOntologyQueryParams("Contract", "ContractConfig");
+        assertAllToolsSuccess();
+    }
+
+    // ── ContractInstance 直接查询 ──────
+
+    @Test
+    void contractInstance_directQuery_shouldUseContractInstanceEntity() {
+        ask("101835395的实例信息");
+        assertOntologyQueryParams("ContractInstance", null);
         assertAllToolsSuccess();
     }
 }

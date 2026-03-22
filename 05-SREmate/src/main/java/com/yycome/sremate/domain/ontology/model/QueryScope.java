@@ -19,7 +19,7 @@ public enum QueryScope {
     CONTRACT_NODE("ContractNode", "展开到合同节点"),
     CONTRACT_QUOTATION_RELATION("ContractQuotationRelation", "展开到签约单据"),
     CONTRACT_FIELD("ContractField", "展开到合同字段"),
-    CONTRACT_FORM("ContractForm", "展开到版式"),
+    CONTRACT_INSTANCE("ContractInstance", "展开到合同实例"),
     CONTRACT_CONFIG("ContractConfig", "展开到配置表"),
     BUDGET_BILL("BudgetBill", "展开到报价单"),
     SUB_ORDER("SubOrder", "展开到S单");

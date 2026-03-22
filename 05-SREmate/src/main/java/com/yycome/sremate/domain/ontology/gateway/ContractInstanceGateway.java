@@ -13,14 +13,14 @@ import org.springframework.stereotype.Component;
 import java.util.*;
 
 /**
- * Contract 版式数据网关（本体论版）
+ * ContractInstance 实例数据网关（本体论版）
  * 引擎从 Contract 记录中取 platformInstanceId，直接传入 queryByField。
  * instanceId 为 0 时表示合同尚未生成，直接返回提示信息。
  */
 @Slf4j
 @Component
 @RequiredArgsConstructor
-public class ContractFormGateway implements EntityDataGateway {
+public class ContractInstanceGateway implements EntityDataGateway {
 
     private final HttpEndpointClient httpEndpointClient;
     private final ObjectMapper objectMapper;
@@ -33,12 +33,12 @@ public class ContractFormGateway implements EntityDataGateway {
 
     @Override
     public String getEntityName() {
-        return "ContractForm";
+        return "ContractInstance";
     }
 
     @Override
     public List<Map<String, Object>> queryByField(String fieldName, Object value) {
-        log.debug("[ContractFormGateway] queryByField: {} = {}", fieldName, value);
+        log.debug("[ContractInstanceGateway] queryByField: {} = {}", fieldName, value);
 
         String instanceId = String.valueOf(value);
 
@@ -46,7 +46,7 @@ public class ContractFormGateway implements EntityDataGateway {
         if ("0".equals(instanceId) || "null".equals(instanceId)) {
             Map<String, Object> result = new LinkedHashMap<>();
             result.put("instanceId", instanceId);
-            result.put("message", "合同未生成，无法查询对应协议平台版式信息");
+            result.put("message", "合同未生成，无法查询对应协议平台实例信息");
             return List.of(result);
         }
 
@@ -55,7 +55,7 @@ public class ContractFormGateway implements EntityDataGateway {
                     Map.of("instanceId", instanceId));
 
             if (rawJson == null) {
-                log.warn("[ContractFormGateway] 接口无响应 instanceId={}", instanceId);
+                log.warn("[ContractInstanceGateway] 接口无响应 instanceId={}", instanceId);
                 return Collections.emptyList();
             }
 
@@ -72,7 +72,7 @@ public class ContractFormGateway implements EntityDataGateway {
             }
             return List.of(result);
         } catch (Exception e) {
-            log.warn("[ContractFormGateway] 查询版式失败 instanceId={}: {}", instanceId, e.getMessage());
+            log.warn("[ContractInstanceGateway] 查询实例失败 instanceId={}: {}", instanceId, e.getMessage());
             return Collections.emptyList();
         }
     }
