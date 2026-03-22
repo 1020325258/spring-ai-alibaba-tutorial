@@ -5,6 +5,7 @@ import com.yycome.sremate.domain.ontology.model.OntologyEntity;
 import com.yycome.sremate.domain.ontology.model.OntologyRelation;
 import com.yycome.sremate.domain.ontology.model.QueryScope;
 import com.yycome.sremate.domain.ontology.service.EntityRegistry;
+import jakarta.annotation.PreDestroy;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -13,6 +14,7 @@ import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 /**
  * 本体论查询执行引擎
@@ -27,6 +29,19 @@ public class OntologyQueryEngine {
     private final EntityGatewayRegistry gatewayRegistry;
 
     private final ExecutorService executor = Executors.newFixedThreadPool(10);
+
+    @PreDestroy
+    public void shutdown() {
+        executor.shutdown();
+        try {
+            if (!executor.awaitTermination(5, TimeUnit.SECONDS)) {
+                executor.shutdownNow();
+            }
+        } catch (InterruptedException e) {
+            executor.shutdownNow();
+            Thread.currentThread().interrupt();
+        }
+    }
 
     /**
      * 对外唯一入口（字符串版本）
@@ -119,13 +134,13 @@ public class OntologyQueryEngine {
         LookupStrategy strategy = matchStrategy(entity, value);
 
         // 起始节点查询
-        log.info("▶ 起始节点 {} | key={} | value={}", entityName, strategy.getField(), value);
+        log.debug("▶ 起始节点 {} | key={} | value={}", entityName, strategy.getField(), value);
         long startTime = System.currentTimeMillis();
 
         List<Map<String, Object>> records =
             gatewayRegistry.getGateway(entityName).queryByField(strategy.getField(), value);
 
-        log.info("  ↳ 返回 {} 条记录, 耗时 {}ms", records.size(), System.currentTimeMillis() - startTime);
+        log.debug("  ↳ 返回 {} 条记录, 耗时 {}ms", records.size(), System.currentTimeMillis() - startTime);
 
         if (records.isEmpty()) return null;
 
@@ -176,7 +191,7 @@ public class OntologyQueryEngine {
                   .append(rel.getTo());
             }
         }
-        log.info(sb.toString());
+        log.debug(sb.toString());
     }
 
     /**
@@ -262,7 +277,7 @@ public class OntologyQueryEngine {
                     }
 
                     // 节点遍历日志
-                    log.info("  ├─ 节点 {} | key={} | value={} | 返回 {} 条 | 耗时 {}ms",
+                    log.debug("  ├─ 节点 {} | key={} | value={} | 返回 {} 条 | 耗时 {}ms",
                         rel.getTo(),
                         rel.getVia().get("target_field"),
                         childValue,
