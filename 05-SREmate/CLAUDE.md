@@ -720,3 +720,53 @@ playwright --help
 - `idle-timeout: 180000`（3 分钟）
 - `max-lifetime: 300000`（5 分钟）
 - `keepalive-time: 60000`（1 分钟心跳，防止 MySQL 提前关闭空闲连接）
+
+---
+
+## OpenSpec 变更管理规范
+
+所有文档相关操作必须遵循 OpenSpec 规范，变更完成后归档到 `openspec/changes/archive/` 目录。
+
+### 目录结构
+
+```
+openspec/
+├── config.yaml           # 项目配置
+├── specs/                # 能力规格文档
+│   └── <capability>/
+│       └── spec.md
+├── changes/              # 变更目录
+│   └── archive/          # 已完成的变更归档
+│       └── YYYY-MM-DD-<change-name>/
+│           ├── .openspec.yaml   # 元数据
+│           ├── proposal.md      # 变更提案
+│           └── tasks.md         # 任务列表
+└── explore-notes/        # 探索笔记
+```
+
+### 变更流程
+
+1. **创建变更**：在 `openspec/changes/<change-name>/` 创建变更
+2. **编写提案**：`proposal.md` 说明问题、解决方案和影响
+3. **任务列表**：`tasks.md` 跟踪实施任务
+4. **实施完成**：所有任务标记 `[x]` 完成
+5. **归档变更**：移动到 `archive/YYYY-MM-DD-<change-name>/`
+
+### 归档要求
+
+- **强制**：每次代码清理、功能变更完成后，必须归档到 OpenSpec
+- **格式**：`YYYY-MM-DD-<change-name>`（如 `2026-03-22-remove-unused-knowledge-module`）
+- **内容**：包含提案、任务列表、元数据文件
+
+### 相关命令
+
+```bash
+# 列出所有变更
+openspec list --json
+
+# 查看变更状态
+openspec status --change "<name>" --json
+
+# 归档变更
+/opsx:archive <change-name>
+```
