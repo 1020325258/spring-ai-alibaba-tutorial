@@ -169,4 +169,45 @@ public class EntityRegistry {
                 "，可用实体: " + ontology.getEntities().stream()
                     .map(OntologyEntity::getName).toList()));
     }
+
+    /**
+     * 检查实体是否存在
+     */
+    public boolean entityExists(String name) {
+        return ontology.getEntities().stream()
+            .anyMatch(e -> e.getName().equals(name));
+    }
+
+    /**
+     * 生成注入 system prompt 的实体摘要（供 LLM 意图识别使用）
+     * 格式：实体名称 + displayName + 别名 + 查询入口
+     */
+    public String getEntitySummaryForPrompt() {
+        StringBuilder sb = new StringBuilder();
+        sb.append("【可用实体】\n\n");
+
+        for (OntologyEntity entity : ontology.getEntities()) {
+            // 实体名称 + displayName
+            sb.append(String.format("%s(%s)", entity.getName(), entity.getDisplayName()));
+
+            // 别名列表
+            if (entity.getAliases() != null && !entity.getAliases().isEmpty()) {
+                sb.append(String.format(": 别名[%s]", String.join(", ", entity.getAliases())));
+            }
+            sb.append("\n");
+
+            // 查询入口
+            if (entity.getLookupStrategies() != null && !entity.getLookupStrategies().isEmpty()) {
+                sb.append("  查询入口: ");
+                List<String> entries = entity.getLookupStrategies().stream()
+                    .map(ls -> ls.getField())
+                    .toList();
+                sb.append(String.join(", ", entries));
+                sb.append("\n");
+            }
+            sb.append("\n");
+        }
+
+        return sb.toString();
+    }
 }

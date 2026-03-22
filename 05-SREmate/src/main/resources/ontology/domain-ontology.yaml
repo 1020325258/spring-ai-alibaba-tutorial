@@ -106,10 +106,10 @@ entities:
       - { name: mdmCode,         type: string, description: "MDM编码" }
       - { name: dueAmount,       type: string, description: "应付金额" }
 
-  - name: ContractForm
-    displayName: "版式"
-    aliases: ["版式数据", "form_id", "版式ID"]
-    description: "合同版式数据，通过合同的 platformInstanceId 关联"
+  - name: ContractInstance
+    displayName: "合同实例"
+    aliases: ["实例", "实例信息", "版式", "版式数据", "form_id", "版式ID", "instanceId"]
+    description: "协议平台合同实例，存储版式表单数据，通过合同的 platformInstanceId 关联"
     lookupStrategies:
       - field: instanceId
         pattern: ".*"
@@ -164,7 +164,7 @@ relations:
     via: { source_field: contractCode, target_field: contractCode }
 
   - from: Contract
-    to: ContractForm
+    to: ContractInstance
     domain: contract
     via: { source_field: platformInstanceId, target_field: instanceId }
 

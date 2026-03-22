@@ -53,7 +53,7 @@ class QueryScopeTest {
         assertThat(QueryScope.CONTRACT_NODE.getTargetEntity()).isEqualTo("ContractNode");
         assertThat(QueryScope.CONTRACT_QUOTATION_RELATION.getTargetEntity()).isEqualTo("ContractQuotationRelation");
         assertThat(QueryScope.CONTRACT_FIELD.getTargetEntity()).isEqualTo("ContractField");
-        assertThat(QueryScope.CONTRACT_FORM.getTargetEntity()).isEqualTo("ContractForm");
+        assertThat(QueryScope.CONTRACT_INSTANCE.getTargetEntity()).isEqualTo("ContractInstance");
         assertThat(QueryScope.CONTRACT_CONFIG.getTargetEntity()).isEqualTo("ContractConfig");
         assertThat(QueryScope.BUDGET_BILL.getTargetEntity()).isEqualTo("BudgetBill");
         assertThat(QueryScope.SUB_ORDER.getTargetEntity()).isEqualTo("SubOrder");

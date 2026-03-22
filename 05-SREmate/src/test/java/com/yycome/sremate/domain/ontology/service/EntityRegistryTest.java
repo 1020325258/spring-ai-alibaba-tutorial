@@ -87,7 +87,7 @@ class EntityRegistryTest {
         List<OntologyRelation> outgoing = registry.getOutgoingRelations("Contract");
         assertThat(outgoing).hasSizeGreaterThanOrEqualTo(5);
         assertThat(outgoing).extracting(OntologyRelation::getTo)
-            .contains("ContractNode", "ContractField", "ContractQuotationRelation", "ContractForm", "ContractConfig");
+            .contains("ContractNode", "ContractField", "ContractQuotationRelation", "ContractInstance", "ContractConfig");
     }
 
     @Test
@@ -96,5 +96,22 @@ class EntityRegistryTest {
         assertThat(entity).isNotNull();
         assertThat(entity.getDisplayName()).isEqualTo("合同");
         assertThat(entity.getLookupStrategies()).hasSize(2);
+    }
+
+    @Test
+    void getEntitySummaryForPrompt_shouldContainEntityNamesAndAliases() {
+        String summary = registry.getEntitySummaryForPrompt();
+        assertThat(summary).contains("【可用实体】");
+        assertThat(summary).contains("Contract(合同)");
+        assertThat(summary).contains("ContractInstance(合同实例)");
+        assertThat(summary).contains("别名");
+        assertThat(summary).contains("查询入口");
+    }
+
+    @Test
+    void entityExists_shouldReturnTrueForExistingEntity() {
+        assertThat(registry.entityExists("Contract")).isTrue();
+        assertThat(registry.entityExists("ContractInstance")).isTrue();
+        assertThat(registry.entityExists("UnknownEntity")).isFalse();
     }
 }

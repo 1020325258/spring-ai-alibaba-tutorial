@@ -2,7 +2,7 @@ package com.yycome.sremate.trigger.agent;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.yycome.sremate.domain.ontology.engine.OntologyQueryEngine;
-import com.yycome.sremate.domain.ontology.model.QueryScope;
+import com.yycome.sremate.domain.ontology.service.EntityRegistry;
 import com.yycome.sremate.infrastructure.annotation.DataQueryTool;
 import com.yycome.sremate.infrastructure.service.ToolExecutionTemplate;
 import com.yycome.sremate.infrastructure.service.ToolResult;
@@ -25,41 +25,35 @@ public class OntologyQueryTool {
 
     private final OntologyQueryEngine queryEngine;
     private final ObjectMapper objectMapper;
+    private final EntityRegistry entityRegistry;
 
     @Tool(description = """
         【本体论智能查询】根据起始实体和值，查询实体数据及关联数据。
 
         参数：
-        - entity: 起始实体类型（根据用户提供的编号格式判断）
-          - 订单号（纯数字）：Order
-          - 合同号（C开头）：Contract
-        - value: 起始值（订单号或合同号）
+        - entity: 起始实体类型（根据用户意图和上下文判断）
+          - Order: 订单（订单号）
+          - Contract: 合同（合同号）
+          - ContractInstance: 合同实例（instanceId）
+          - BudgetBill: 报价单（订单号）
+          - 其他实体见系统提示词中的【可用实体】列表
+        - value: 起始值（订单号、合同号、实例ID等，根据上下文判断）
         - queryScope: 目标实体（用户想查询什么数据，就传对应实体名）
           - 不传或 "list": 仅返回起始实体本身，不展开关联
-          - "Contract": 展开到合同数据
-          - "ContractNode": 展开到节点数据
-          - "ContractQuotationRelation": 展开到签约单据
-          - "ContractField": 展开到字段数据
-          - "ContractForm": 展开到版式数据
-          - "ContractConfig": 展开到配置表数据
-          - "BudgetBill": 展开到报价单数据
-          - "SubOrder": 展开到S单数据
+          - 目标实体名: 展开到该实体（如 ContractNode、ContractInstance）
           - 多个目标（逗号分隔）: "ContractNode,ContractQuotationRelation"
 
         示例：
-        - "825123110000002753下的合同" → entity=Order, value=825123110000002753, queryScope=Contract
+        - "825123110000002753的合同" → entity=Order, value=825123110000002753, queryScope=Contract
         - "C1767150648920281的节点" → entity=Contract, value=C1767150648920281, queryScope=ContractNode
+        - "101835395的实例信息" → entity=ContractInstance, value=101835395
         - "825123110000002753合同的签约单据和节点" → entity=Order, value=825123110000002753, queryScope=ContractNode,ContractQuotationRelation
-        - "826031111000001859的报价单" → entity=Order, value=826031111000001859, queryScope=BudgetBill
         """)
     @DataQueryTool
     public String ontologyQuery(String entity, String value, String queryScope) {
-        // 自动修正 entity：根据 value 格式推断正确的 entity
-        String correctedEntity = inferEntityFromValue(value, entity);
-        if (!correctedEntity.equals(entity)) {
-            log.info("[OntologyQueryTool] 自动修正 entity: {} -> {}", entity, correctedEntity);
-        }
-        final String finalEntity = correctedEntity;
+        // 校验 entity 合法性
+        validateEntity(entity);
+        final String finalEntity = entity;
 
         return ToolExecutionTemplate.execute("ontologyQuery", () -> {
             log.info("[OntologyQueryTool] 查询: entity={}, value={}, scope={}", finalEntity, value, queryScope);
@@ -75,28 +69,17 @@ public class OntologyQueryTool {
     }
 
     /**
-     * 根据 value 格式自动推断正确的 entity 类型
-     * 纯数字 → Order，C开头 → Contract
+     * 校验 entity 是否合法（在 EntityRegistry 中存在）
      */
-    private String inferEntityFromValue(String value, String providedEntity) {
-        if (value == null || value.isBlank()) {
-            return providedEntity;
+    private void validateEntity(String entity) {
+        if (entity == null || entity.isBlank()) {
+            throw new IllegalArgumentException("entity 参数不能为空");
         }
-
-        String trimmedValue = value.trim();
-
-        // C开头 → Contract
-        if (trimmedValue.toUpperCase().startsWith("C")) {
-            return "Contract";
+        if (!entityRegistry.entityExists(entity)) {
+            throw new IllegalArgumentException("未知实体: " + entity +
+                "，可用实体: " + entityRegistry.getOntology().getEntities().stream()
+                    .map(e -> e.getName()).toList());
         }
-
-        // 纯数字 → Order
-        if (trimmedValue.matches("\\d+")) {
-            return "Order";
-        }
-
-        // 无法推断，返回原值
-        return providedEntity;
     }
 
     @Tool(description = """
