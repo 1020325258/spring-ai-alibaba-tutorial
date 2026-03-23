@@ -161,6 +161,39 @@ class ContractOntologyIT extends BaseSREIT {
         assertOutputHasRecords();
     }
 
+    // ── 个性化报价查询：queryPersonalQuote（专用工具） ──────
+    // queryPersonalQuote 输出同样是 ontologyQuery 体系的 JSON 结构
+
+    @Test
+    void personalQuote_withSubOrder_shouldCallQueryPersonalQuote() {
+        ask("826031210000003581下S15260312120004471的个性化报价");
+
+        // 意图识别：应调用专用工具，不能误触发报价单工具
+        assertToolCalled("queryPersonalQuote");
+        assertToolNotCalled("queryBudgetBillList");
+        assertAllToolsSuccess();
+
+        // 输出结构：Order → contracts → contractQuotationRelations → personalQuotes 三跳层级
+        assertOutputField("queryEntity", "Order");
+        assertOutputHasRecords();
+        // records[0] 是 Order，应展开 contracts 子记录
+        assertFirstRecordHasField("contracts");
+    }
+
+    @Test
+    void personalQuote_withBillCode_shouldCallQueryPersonalQuote() {
+        ask("826031210000003581下GBILL260312104241050001的个性化报价");
+
+        // 意图识别
+        assertToolCalled("queryPersonalQuote");
+        assertAllToolsSuccess();
+
+        // 输出结构
+        assertOutputField("queryEntity", "Order");
+        assertOutputHasRecords();
+        assertFirstRecordHasField("contracts");
+    }
+
     // ── ContractInstance 直接查询 ──────
     // 这是曾经出错的用例（输出数据不符合预期），故做更细致的验证
 
