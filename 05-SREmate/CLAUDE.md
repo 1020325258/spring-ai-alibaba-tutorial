@@ -168,12 +168,21 @@ public class NewEntityGateway implements EntityDataGateway {
 
 #### 第四步：添加集成测试
 
+在 `ContractOntologyIT` 中补充两层验证：
+
 ```java
 @Test
-void newEntity_shouldCallOntologyQuery() {
+void newEntity_shouldUseContractEntityAndNewEntityScope() {
     ask("C1767173898135504的新实体数据");
-    assertToolCalled("ontologyQuery");
+
+    // 意图识别
+    assertOntologyQueryParams("Contract", "NewEntity");
     assertAllToolsSuccess();
+
+    // 数据输出
+    assertOutputField("queryEntity", "Contract");
+    assertOutputHasRecords();
+    assertFirstRecordHasField("关键字段名");
 }
 ```
 
@@ -284,25 +293,77 @@ private String resolveFieldShardingTable(String contractCode) {
 
 ## 集成测试
 
-| 方法 | 说明 |
-|------|------|
-| `assertToolCalled(toolName)` | 断言指定工具被调用且成功 |
-| `assertToolNotCalled(toolName)` | 断言指定工具未被调用 |
-| `assertAllToolsSuccess()` | 断言所有工具调用都成功 |
+### 测试文件职责
 
-**验证工具调用行为**，而非输出内容。测试更稳定，不受业务数据变化影响。
+| 文件 | 职责 | 说明 |
+|------|------|------|
+| `ContractOntologyIT` | **核心集成测试**，验证所有查询场景 | 每次迭代必须全部通过 |
+| `OntologyQueryEngineTest` | 单元测试：引擎多跳/多目标逻辑 | Mock，不依赖外部环境 |
+| `PersonalQuoteGatewayTest` | 单元测试：bindType 参数映射规则 | Mock，验证纯业务规则 |
+| `EntityRegistryTest` | 单元测试：YAML 解析和路径查找 | 不依赖外部环境 |
+
+**不要创建以下类型的测试**（无独立价值，应合并或删除）：
+- 只验证 Bean 注入的启动测试（隐含在所有集成测试中）
+- 只验证工具名被调用、不验证参数和输出的意图识别测试（粒度太粗）
+- 与 `ContractOntologyIT` 重叠的测试（合并进去）
+
+### ContractOntologyIT 两层验证规范
+
+每个测试方法必须覆盖两层：
 
 ```java
 @Test
-void orderContract_shouldCallOntologyQuery() {
-    ask("825123110000002753下的合同数据");
-    assertToolCalled("ontologyQuery");
-    assertToolNotCalled("queryContractsByOrderId");  // 禁止调用旧工具
+void contractBasic_shouldUseContractEntity() {
+    ask("C1767173898135504的合同基本信息");
+
+    // 第一层：意图识别 —— LLM 传了正确的参数？
+    assertOntologyQueryParams("Contract", null);
     assertAllToolsSuccess();
+
+    // 第二层：数据输出 —— 返回了正确的数据结构？
+    assertOutputField("queryEntity", "Contract");
+    assertOutputHasRecords();
+    assertFirstRecordHasField("contractCode");
 }
 ```
 
-**新增 @Tool 后测试必须覆盖**：意图识别、关键词触发、互斥验证。
+### 输出验证方法（BaseSREIT）
+
+| 方法 | 验证内容 | 使用场景 |
+|------|---------|---------|
+| `assertOutputField(path, value)` | 顶层字段精确值 | `queryEntity`、`queryValue` 元数据 |
+| `assertOutputHasRecords()` | `records` 非空 | 所有查询用例必加 |
+| `assertFirstRecordHasField(path)` | 字段**存在**（不验证值） | 关键字段存在性，支持嵌套路径如 `"formData/id"` |
+| `assertFirstRecordFieldEquals(path, value)` | 字段精确值 | 仅用于 ID 回显等极稳定字段 |
+
+### 验证策略：宽松原则
+
+避免维护成本剧增：
+
+| 验证对象 | 策略 | 原因 |
+|---------|------|------|
+| `queryEntity` / `queryValue` | **精确匹配** | 元数据，非常稳定 |
+| 关键字段是否存在 | **只验证存在** | 业务数据会变，值不稳定 |
+| ID 回显字段（如 `instanceId`） | **精确匹配** | 值等于查询输入，极稳定 |
+| 深层嵌套数据（如个性化报价明细） | **只验证第一层展开字段存在** | 防止深层数据变动导致脆断 |
+
+### 新增 @Tool 后测试模板
+
+```java
+@Test
+void newFeature_shouldUseCorrectTool() {
+    ask("触发关键词的自然语言问题");
+
+    // 第一层：意图识别
+    assertOntologyQueryParams("EntityName", "QueryScope");  // 或 assertToolCalled
+    assertAllToolsSuccess();
+
+    // 第二层：数据输出
+    assertOutputField("queryEntity", "EntityName");
+    assertOutputHasRecords();
+    assertFirstRecordHasField("关键字段名");
+}
+```
 
 ---
 
