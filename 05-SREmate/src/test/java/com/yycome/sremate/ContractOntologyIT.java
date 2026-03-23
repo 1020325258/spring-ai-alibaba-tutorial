@@ -81,11 +81,11 @@ class ContractOntologyIT extends BaseSREIT {
         assertOntologyQueryParams("Order", "Contract");
         assertAllToolsSuccess();
 
-        // 输出结构：queryEntity 是起始实体 Order，records 包含合同信息
+        // 输出结构：queryEntity 是起始实体 Order，records[0] 包含 contracts 子数组
         assertOutputField("queryEntity", "Order");
         assertOutputHasRecords();
-        // 合同记录应包含 contractCode
-        assertFirstRecordHasField("contractCode");
+        // Order 实体展开后，contracts 嵌套在 records[0] 中
+        assertFirstRecordHasField("contracts");
     }
 
     @Test
@@ -141,11 +141,11 @@ class ContractOntologyIT extends BaseSREIT {
         assertOntologyQueryParams("Contract", "ContractInstance");
         assertAllToolsSuccess();
 
-        // 输出结构
+        // 输出结构：Contract 实体展开后，contractInstances 嵌套在 records[0] 中
         assertOutputField("queryEntity", "Contract");
         assertOutputHasRecords();
-        // 版式记录应包含 instanceId
-        assertFirstRecordHasField("instanceId");
+        // Contract 实体展开后，contractInstances 嵌套在 records[0] 中
+        assertFirstRecordHasField("contractInstances");
     }
 
     @Test
@@ -161,16 +161,14 @@ class ContractOntologyIT extends BaseSREIT {
         assertOutputHasRecords();
     }
 
-    // ── 个性化报价查询：queryPersonalQuote（专用工具） ──────
-    // queryPersonalQuote 输出同样是 ontologyQuery 体系的 JSON 结构
+    // ── 个性化报价查询：通过 ontologyQuery 的 PersonalQuote scope ──────
 
     @Test
-    void personalQuote_withSubOrder_shouldCallQueryPersonalQuote() {
+    void personalQuote_withSubOrder_shouldUsePersonalQuoteScope() {
         ask("826031210000003581下S15260312120004471的个性化报价");
 
-        // 意图识别：应调用专用工具，不能误触发报价单工具
-        assertToolCalled("queryPersonalQuote");
-        assertToolNotCalled("queryBudgetBillList");
+        // 意图识别：应使用 ontologyQuery，queryScope=PersonalQuote
+        assertOntologyQueryParams("Order", "PersonalQuote");
         assertAllToolsSuccess();
 
         // 输出结构：Order → contracts → contractQuotationRelations → personalQuotes 三跳层级
@@ -181,11 +179,11 @@ class ContractOntologyIT extends BaseSREIT {
     }
 
     @Test
-    void personalQuote_withBillCode_shouldCallQueryPersonalQuote() {
+    void personalQuote_withBillCode_shouldUsePersonalQuoteScope() {
         ask("826031210000003581下GBILL260312104241050001的个性化报价");
 
         // 意图识别
-        assertToolCalled("queryPersonalQuote");
+        assertOntologyQueryParams("Order", "PersonalQuote");
         assertAllToolsSuccess();
 
         // 输出结构
