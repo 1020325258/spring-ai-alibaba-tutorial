@@ -16,6 +16,7 @@
     <module>03-spring-ai-alibaba-mcp/bailian-mcp-client</module>
     <module>04-AnalysisAgent</module>
     <module>05-SREmate</module>
+    <module>06-SRE-Agent</module>
   </modules>
 
   <properties>

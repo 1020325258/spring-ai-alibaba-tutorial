@@ -1,0 +1,198 @@
+endpoints:
+  - id: sign-order-list
+    name: 查询可签约子单列表(S单)
+    description: |
+      根据项目订单ID查询该订单下所有可签约的子单（也称S单、签约单）列表。
+      当用户询问以下问题时使用此接口：
+      - "查询某订单下的子单/S单/签约单"
+      - "查看订单的子单列表"
+      - "某订单有哪些可签约的子单"
+      - "查询826022518000001562的子单"
+      注意：子单、S单、签约单是同义词，都指代可签约的子订单。
+    category: contract
+    urlTemplate: "http://utopia-nrs-sales-project.${env}.ttb.test.ke.com/home/contract/getSignOrderList/V3?projectOrderId=${projectOrderId}"
+    method: GET
+    parameters:
+      - name: projectOrderId
+        type: string
+        description: 项目订单ID，用户提供的订单号
+        required: true
+        example: "826022518000001562"
+    headers:
+      X-NRS-User-Id: "1000000000000000"
+      Content-Type: "application/json"
+    timeout: 15
+    examples:
+      - "查询826022518000001562订单下的子单"
+      - "查询826022518000001562的子单"
+      - "查看订单826022518000001562的签约单列表"
+      - "项目订单826022518000001562有哪些可签约的S单"
+
+  - id: contract-form-data
+    name: 查询合同版式表单数据
+    description: |
+      根据合同实例ID查询对应的版式表单ID（form_id）及表单数据。
+      当用户询问以下问题时使用此接口：
+      - "查询某合同的版式"
+      - "查询合同实例的form_id"
+      - "某合同实例的版式是什么"
+      - "查询instanceId为xxx的表单数据"
+      - "合同版式查询"
+      注意：instanceId 是合同实例ID，form_id 是版式标识符。
+    category: contract
+    urlTemplate: "http://utopia-nrs-sales-project.${env}.ttb.test.ke.com/api/contract/command/getFormData?instanceId=${instanceId}"
+    method: GET
+    parameters:
+      - name: instanceId
+        type: string
+        description: 合同实例ID
+        required: true
+        example: "116894442"
+    headers:
+      X-NRS-User-Id: "1000000000000000"
+      Content-Type: "application/json"
+    timeout: 15
+    examples:
+      - "查询合同实例116894442的版式"
+      - "查询instanceId为116894442的form_id"
+      - "合同116894442的版式是什么"
+      - "获取合同实例116894442的表单数据"
+
+  - id: budget-bill-list
+    name: 查询报价单列表
+    description: |
+      根据项目订单ID查询该订单下的报价单列表，包含装修报价（decorateBudgetList）和个性化报价（personalBudgetList）。
+      当用户询问以下问题时使用此接口：
+      - "查询某订单的报价单"
+      - "某订单的报价单列表"
+      - "826031111000001859的报价单"
+      - "查看订单的报价"
+      返回字段：billType（账单类型）、billTypeDesc（账单类型描述）、statusDesc（状态描述）、billCode（账单编号）、originalBillCode（原始账单编号）
+    category: contract
+    urlTemplate: "http://utopia-atom.${env}.ttb.test.ke.com/api/budget-bill/list"
+    method: POST
+    requestBodyTemplate: '{"projectOrderId":"${projectOrderId}"}'
+    responseFields:
+      decorateBudgetList:
+        - billType
+        - billTypeDesc
+        - statusDesc
+        - billCode
+        - originalBillCode
+        - billTotalAmount
+        - ctime
+      personalBudgetList:
+        - billType
+        - billTypeDesc
+        - statusDesc
+        - billCode
+        - originalBillCode
+        - billTotalAmount
+        - ctime
+    parameters:
+      - name: projectOrderId
+        type: string
+        description: 项目订单ID，纯数字格式
+        required: true
+        example: "826031111000001859"
+    headers:
+      ucid: "1000000030598946"
+      displayName: "huyuyang005"
+      X-NRS-User-Id: "1000000000000000"
+      Content-Type: "application/json"
+    timeout: 15
+    examples:
+      - "826031111000001859的报价单"
+      - "查询826031111000001859的报价单列表"
+      - "查看订单826031111000001859的报价"
+
+  - id: sub-order-info
+    name: 查询子单基本信息
+    description: |
+      根据订单号查询对应的子单信息，支持按报价单号和变更单号筛选。
+      当用户询问以下问题时使用此接口：
+      - "查询某订单下某报价单的子单信息"
+      - "某订单下某报价单对应的子单是什么"
+      - "查询订单xxx下报价单xxx的子单"
+      - "826030611000000795下GBILL260309110407580001的子单信息"
+      参数说明：
+      - homeOrderNo：订单号（必填），纯数字格式
+      - quotationOrderNo：报价单号（可选），GBILL前缀+数字
+      - projectChangeNo：变更单号（可选）
+    category: contract
+    urlTemplate: "http://nrs-order-service.${env}.ttb.test.ke.com/api/subOrder/queryBaseInfoByHomeOrderNo?homeOrderNo=${homeOrderNo}&quotationOrderNo=${quotationOrderNo}&projectChangeNo=${projectChangeNo}"
+    method: GET
+    parameters:
+      - name: homeOrderNo
+        type: string
+        description: 订单号，纯数字格式
+        required: true
+        example: "826030611000000795"
+      - name: quotationOrderNo
+        type: string
+        description: 报价单号，GBILL前缀+数字，可选
+        required: false
+        example: "GBILL260309110407580001"
+      - name: projectChangeNo
+        type: string
+        description: 变更单号，可选
+        required: false
+        example: ""
+    headers:
+      X-NRS-User-Id: "1000000000000000"
+      Content-Type: "application/json"
+    timeout: 15
+    examples:
+      - "查询826030611000000795下GBILL260309110407580001的子单信息"
+      - "查询订单826030611000000795的子单"
+      - "826030611000000795订单下报价单GBILL260309110407580001对应的子单"
+
+  - id: contract-personal-data
+    name: 查询订单个性化报价数据
+    description: |
+      根据项目订单号及单据号查询该订单下对应单据的个性化报价数据。
+      当用户询问以下问题时使用此接口：
+      - "查询某订单的个性化报价"
+      - "某S单的个性化报价数据"
+      - "某报价单的个性化报价"
+      - "某变更单的个性化报价"
+      参数说明：
+      - projectOrderId：订单号（必填），纯数字
+      - subOrderNoList：S单号列表（可选），逗号分隔，如 S15260312120004471
+      - billCodeList：报价单号列表（可选），逗号分隔，如 GBILL260312104241050001
+      - changeOrderId：变更单号（可选），与订单号格式类似
+      注意：subOrderNoList、billCodeList、changeOrderId 三个参数至少传一个。
+    category: contract
+    urlTemplate: "http://utopia-nrs-sales-project.${env}.ttb.test.ke.com/api/contract/tool/getContractPersonalData?projectOrderId=${projectOrderId}&subOrderNoList=${subOrderNoList}&billCodeList=${billCodeList}&changeOrderId=${changeOrderId}"
+    method: GET
+    parameters:
+      - name: projectOrderId
+        type: string
+        description: 项目订单号，纯数字格式
+        required: true
+        example: "826031210000003581"
+      - name: subOrderNoList
+        type: string
+        description: S单号列表，逗号分隔，可为空
+        required: false
+        example: "S15260312120004471,S15260312120000427"
+      - name: billCodeList
+        type: string
+        description: 报价单号列表，逗号分隔，可为空
+        required: false
+        example: "GBILL260312104241050001"
+      - name: changeOrderId
+        type: string
+        description: 变更单号，格式与订单号类似（纯数字），可为空
+        required: false
+        example: "826031210000003581"
+    headers:
+      X-NRS-User-Id: "1000000000000000"
+      Content-Type: "application/json"
+    timeout: 15
+    examples:
+      - "826031210000003581的个性化报价数据"
+      - "826031210000003581下S15260312120004471的个性化报价"
+      - "826031210000003581下GBILL260312104241050001的个性化报价"
+      - "826031210000003581下变更单826031210000003581的个性化报价"
+

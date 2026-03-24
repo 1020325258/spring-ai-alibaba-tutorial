@@ -1,0 +1,10 @@
+entities:
+  - name: Order
+    description: "测试用"
+    lookupStrategies:
+      - field: orderId
+        pattern: ".*"
+relations:
+  - from: Order
+    to: NonExistentEntity
+    domain: test

@@ -1,0 +1,58 @@
+server:
+  port: 8090
+
+# 本体可视化页面固定端口（ontology.html 始终可通过此端口访问）
+ontology:
+  web:
+    port: 8091
+  servlet:
+    encoding:
+      charset: UTF-8
+      enabled: true
+      force: true
+
+spring:
+  application:
+    name: sre-agent
+  profiles:
+    active: local
+
+  # Spring AI Alibaba配置
+  ai:
+    dashscope:
+      api-key: ${AI_DASHSCOPE_API_KEY}
+      chat:
+        options:
+          model: qwen-turbo
+#          model: qwen3.5-122b-a10b
+          enable-thinking: false
+  # MySQL数据源配置（用于查询业务数据）
+  # 敏感配置请在 application-local.yml 中覆盖，该文件已被 .gitignore 忽略
+  datasource:
+    sre:
+      jdbc-url: ${DB_URL:jdbc:mysql://localhost:3306/sre_db?useUnicode=true&characterEncoding=utf-8&allowMultiQueries=true&useAffectedRows=true}
+      username: ${DB_USERNAME:root}
+      password: ${DB_PASSWORD:}
+      driver-class-name: com.mysql.cj.jdbc.Driver
+      hikari:
+        maximum-pool-size: 5
+        minimum-idle: 2
+        connection-timeout: 30000
+        idle-timeout: 600000
+        max-lifetime: 1800000
+
+  mandatory-file-encoding: UTF-8
+
+# 日志配置
+logging:
+  level:
+    root: INFO
+    com.yycome.sremate: DEBUG
+    org.springframework.ai: DEBUG
+
+# Actuator配置
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics

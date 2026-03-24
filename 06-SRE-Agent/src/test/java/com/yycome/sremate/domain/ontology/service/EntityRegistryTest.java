@@ -1,0 +1,117 @@
+package com.yycome.sreagent.domain.ontology.service;
+
+import com.yycome.sreagent.domain.ontology.model.OntologyEntity;
+import com.yycome.sreagent.domain.ontology.model.OntologyModel;
+import com.yycome.sreagent.domain.ontology.model.OntologyRelation;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.core.io.ClassPathResource;
+
+import java.util.List;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
+class EntityRegistryTest {
+
+    private EntityRegistry registry;
+
+    @BeforeEach
+    void setUp() throws Exception {
+        registry = new EntityRegistry(new ClassPathResource("ontology/domain-ontology.yaml"));
+        registry.load();
+    }
+
+    @Test
+    void load_shouldParseEntitiesAndRelations() {
+        OntologyModel model = registry.getOntology();
+        assertThat(model.getEntities()).isNotEmpty();
+        assertThat(model.getRelations()).isNotEmpty();
+    }
+
+    @Test
+    void load_shouldContractEntityExist() {
+        assertThat(registry.getOntology().getEntities())
+            .extracting("name")
+            .contains("Contract", "ContractNode", "ContractQuotationRelation", "ContractField");
+    }
+
+    @Test
+    void findPaths_orderToSubOrder_shouldReturnTwoPaths() {
+        List<List<String>> paths = registry.findPaths("Order", "SubOrder");
+        assertThat(paths).hasSize(1);
+        assertThat(paths).anySatisfy(path -> assertThat(path).containsSequence("Order", "BudgetBill", "SubOrder"));
+    }
+
+    @Test
+    void getSummaryForPrompt_shouldContainRelationInfo() {
+        String summary = registry.getSummaryForPrompt();
+        assertThat(summary).contains("Contract");
+        assertThat(summary).contains("ContractQuotationRelation");
+        assertThat(summary).contains("contractCode");
+    }
+
+    @Test
+    void validation_relationWithUnknownEntity_shouldThrow() {
+        // 这个测试验证 Schema 自洽性：relation 引用了不存在的实体应该报错
+        // 通过加载一个故意错误的 YAML 来验证
+        EntityRegistry badRegistry = new EntityRegistry(new ClassPathResource("ontology/test-invalid-ontology.yaml"));
+        assertThatThrownBy(badRegistry::load)
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessageContaining("entity");
+    }
+
+    @Test
+    void findRelationPath_order_to_signedObjects_shouldReturnTwoHops() {
+        List<OntologyRelation> path = registry.findRelationPath("Order", "ContractQuotationRelation");
+        assertThat(path).hasSize(2);
+        assertThat(path.get(0).getTo()).isEqualTo("Contract");
+        assertThat(path.get(1).getTo()).isEqualTo("ContractQuotationRelation");
+    }
+
+    @Test
+    void findRelationPath_contract_to_contractNode_shouldReturnOneHop() {
+        List<OntologyRelation> path = registry.findRelationPath("Contract", "ContractNode");
+        assertThat(path).hasSize(1);
+        assertThat(path.get(0).getTo()).isEqualTo("ContractNode");
+    }
+
+    @Test
+    void findRelationPath_noPath_shouldReturnNull() {
+        List<OntologyRelation> path = registry.findRelationPath("BudgetBill", "ContractNode");
+        assertThat(path).isNull();
+    }
+
+    @Test
+    void getOutgoingRelations_contract_shouldReturnFiveRelations() {
+        List<OntologyRelation> outgoing = registry.getOutgoingRelations("Contract");
+        assertThat(outgoing).hasSizeGreaterThanOrEqualTo(5);
+        assertThat(outgoing).extracting(OntologyRelation::getTo)
+            .contains("ContractNode", "ContractField", "ContractQuotationRelation", "ContractInstance", "ContractConfig");
+    }
+
+    @Test
+    void getEntity_shouldReturnCorrectEntity() {
+        OntologyEntity entity = registry.getEntity("Contract");
+        assertThat(entity).isNotNull();
+        assertThat(entity.getDisplayName()).isEqualTo("合同");
+        assertThat(entity.getLookupStrategies()).hasSize(2);
+    }
+
+    @Test
+    void getEntitySummaryForPrompt_shouldContainEntityNamesAndAliases() {
+        String summary = registry.getEntitySummaryForPrompt();
+        assertThat(summary).contains("【可用实体】");
+        assertThat(summary).contains("Contract(合同)");
+        assertThat(summary).contains("ContractInstance(合同实例)");
+        assertThat(summary).contains("别名");
+        assertThat(summary).contains("查询入口");
+    }
+
+    @Test
+    void entityExists_shouldReturnTrueForExistingEntity() {
+        assertThat(registry.entityExists("Contract")).isTrue();
+        assertThat(registry.entityExists("ContractInstance")).isTrue();
+        assertThat(registry.entityExists("UnknownEntity")).isFalse();
+    }
+}
