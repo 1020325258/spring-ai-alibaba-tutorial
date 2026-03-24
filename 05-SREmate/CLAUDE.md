@@ -2,11 +2,24 @@
 
 注意：
 1. 开发完进行测试，保证功能正常实现。
-2. **每次代码变更后必须运行全部测试**，确保已有功能不被破坏：
-   - **特别注意**：修改 Java 代码逻辑时，必须同步检查 `sre-agent.md` 提示词是否与代码保持一致（见下方反思记录）。
+2. **按变更范围选择测试**（避免不必要的 token 消耗）：
+
+   | 变更范围 | 运行命令 |
+   |---------|---------|
+   | 仅修改单元测试对应的类（引擎、基础设施工具类） | `./scripts/run-unit-tests.sh` |
+   | 修改 Gateway / Domain / Trigger / 提示词 | `./run-integration-tests.sh`（单元+集成） |
+   | 仅修改文档、YAML 配置、注释 | 无需运行测试 |
+
+   **单元测试脚本**（按需单独运行，无需外部环境）：
    ```bash
-   ./run-integration-tests.sh
+   JAVA_HOME=/Library/Java/JavaVirtualMachines/jdk-21.jdk/Contents/Home \
+   mvn test -f ../pom.xml -pl 05-SREmate \
+     -Dtest="ObservabilityAspectAnnotationTest,ToolExecutionTemplateTest,ToolResultTest,QueryScopeTest,EntityRegistryTest,OntologyQueryEngineTest,PersonalQuoteGatewayTest" \
+     -Dsurefire.failIfNoSpecifiedTests=false
    ```
+
+   - **特别注意**：修改 Java 代码逻辑时，必须同步检查 `sre-agent.md` 提示词是否与代码保持一致（见下方反思记录）。
+   - **git commit 前**：pre-commit hook 会自动检测 src/ 变更并运行 `./run-integration-tests.sh`，无需手动触发。
 
 ---
 
