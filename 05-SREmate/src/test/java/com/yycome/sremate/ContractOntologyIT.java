@@ -131,6 +131,38 @@ class ContractOntologyIT extends BaseSREIT {
         assertOutputHasRecords();
     }
 
+    // ── S单直查：entity=Order, queryScope=SubOrder（订单号直查） ────────────────────────
+
+    @Test
+    void subOrder_directFromOrder_shouldReturnSubOrders() {
+        // 直接使用订单号查询 S 单，验证 Order → SubOrder 直查路径
+        ask("825123110000002753的S单列表");
+
+        // 意图识别：Order → SubOrder 直查
+        assertOntologyQueryParams("Order", "SubOrder");
+        assertAllToolsSuccess();
+
+        // 输出结构
+        assertOutputField("queryEntity", "Order");
+        assertOutputHasRecords();
+    }
+
+    // ── SignableOrderInfo 多跳查询：Order → Contract → SignableOrderInfo ────────────────────────
+
+    @Test
+    void signableOrderInfo_shouldTraverseFromOrder() {
+        // 从订单号出发，查询 SignableOrderInfo（需要先查 Contract 获取 type）
+        // 使用已知有 type=8 销售合同的订单
+        ask("825123117000001474的弹窗S单");
+
+        // 意图识别：Order → Contract → SignableOrderInfo 多跳遍历
+        // 需要先确定实体类型，再确定 queryScope
+        assertAllToolsSuccess();
+
+        // 输出结构验证：应能返回 SignableOrderInfo 数据
+        assertOutputHasRecords();
+    }
+
     // ── 版式/配置表查询 ──────
 
     @Test
