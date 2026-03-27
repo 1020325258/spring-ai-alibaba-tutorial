@@ -45,8 +45,8 @@ class InvestigateAgentIT extends BaseSREAgentIT {
     @Test
     @DisplayName("排查弹窗提示'请先完成报价'的原因 - 验证 Skill 选择")
     void investigate_sales_contract_sign_dialog() {
-        // 当
-        String response = ask("排查销售合同弹窗提示\"请先完成报价\"的原因");
+        // 当 - 提供订单号，Skill 需要从 Order 出发查询 SignableOrderInfo 和 SubOrder
+        String response = ask("排查订单825123110000002753销售合同弹窗提示\"请先完成报价\"的原因");
 
         // 那么
         // 1. 应该调用 readSkill 加载对应的 Skill

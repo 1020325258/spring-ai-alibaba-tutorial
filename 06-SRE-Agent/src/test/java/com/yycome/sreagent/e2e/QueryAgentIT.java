@@ -160,4 +160,24 @@ class QueryAgentIT extends BaseSREAgentIT {
         // 4. 验证所有工具调用成功
         assertAllToolsSuccess();
     }
+
+    @Test
+    @DisplayName("查询销售合同可签约S单（订单号）- 验证 entity=Order, queryScope=SignableOrderInfo")
+    void query_signable_order_info_by_order() {
+        // 当 - 用户从订单号出发，引擎自动沿 Order→Contract(type=8)→SignableOrderInfo 两跳查询
+        String response = ask("查询826031915000003212销售合同的可签约S单");
+
+        // 那么
+        // 1. 工具调用层：应该调用 ontologyQuery
+        assertToolCalled("ontologyQuery");
+
+        // 2. 参数层：entity 应该是 Order（纯数字订单号）
+        assertToolParamEquals("ontologyQuery", "entity", "Order");
+
+        // 3. 参数层：queryScope 应该是 SignableOrderInfo
+        assertToolParamEquals("ontologyQuery", "queryScope", "SignableOrderInfo");
+
+        // 4. 验证所有工具调用成功
+        assertAllToolsSuccess();
+    }
 }
