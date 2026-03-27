@@ -41,6 +41,10 @@ public class FormalSignableOrderInfoGateway implements EntityDataGateway {
             log.warn("[FormalSignableOrderInfoGateway] 不支持的查询字段: {}", fieldName);
             return Collections.emptyList();
         }
+        if (value == null) {
+            log.warn("[FormalSignableOrderInfoGateway] projectOrderId 为 null，无法查询");
+            return Collections.emptyList();
+        }
         String projectOrderId = value.toString();
         if (projectOrderId.isEmpty() || "null".equals(projectOrderId)) {
             log.warn("[FormalSignableOrderInfoGateway] projectOrderId 为空，无法查询");
@@ -59,7 +63,7 @@ public class FormalSignableOrderInfoGateway implements EntityDataGateway {
             }
             return parseSignableOrders(rawJson, projectOrderId);
         } catch (Exception e) {
-            log.warn("[FormalSignableOrderInfoGateway] 查询正签可签约S单失败: {}", e.getMessage());
+            log.warn("[FormalSignableOrderInfoGateway] 查询正签可签约S单失败", e);
             return Collections.emptyList();
         }
     }
@@ -94,7 +98,7 @@ public class FormalSignableOrderInfoGateway implements EntityDataGateway {
                 }
             }
         } catch (Exception e) {
-            log.warn("[FormalSignableOrderInfoGateway] 解析正签可签约S单响应失败: {}", e.getMessage());
+            log.warn("[FormalSignableOrderInfoGateway] 解析正签可签约S单响应失败", e);
         }
         return result;
     }

@@ -64,6 +64,28 @@ class InvestigateAgentIT extends BaseSREAgentIT {
     }
 
     @Test
+    @DisplayName("排查弹窗提示'无定软电报价'的原因 - 验证关键词触发正确 Skill")
+    void investigate_sales_contract_sign_dialog_no_quote_keyword() {
+        // 当 - 用户使用"无定软电报价"关键词描述问题
+        String response = ask("订单825123110000002753的销售合同发起提示无定软电报价");
+
+        // 那么
+        // 1. 应该调用 readSkill 加载排查 Skill
+        assertToolCalled("readSkill");
+
+        // 2. 验证加载的是合同弹窗诊断 Skill
+        Map<String, Object> readSkillParams = getToolParams("readSkill");
+        Object skillName = readSkillParams.get("skillName");
+        assertThat(skillName)
+                .as("read_skill 应加载合同弹窗诊断 skill")
+                .isNotNull()
+                .hasToString("sales-contract-sign-dialog-diagnosis");
+
+        // 3. LLM-as-Judge：验证执行过程是否符合 Skill 规定的步骤（先查 SignableOrderInfo，再查 SubOrder）
+        assertSkillProcessCompliance("sales-contract-sign-dialog-diagnosis", response);
+    }
+
+    @Test
     @DisplayName("排查场景 - 验证 ontologyQuery 参数正确性及输出为排查结论")
     void investigate_should_pass_correct_params() {
         // 当

@@ -13,6 +13,7 @@ import org.junit.jupiter.api.TestInstance;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.prompt.Prompt;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
@@ -426,6 +427,93 @@ public abstract class BaseSREAgentIT {
                     .as("输出不应为原始 JSON（judge 解析失败，已降级）\n实际输出前200字: " + truncate(response, 200))
                     .doesNotStartWith("{")
                     .doesNotStartWith("[");
+        }
+    }
+
+    private static final String SKILL_COMPLIANCE_JUDGE_PROMPT = """
+            你是一个 SRE Agent 执行合规性评估专家。请判断以下执行过程是否符合技能指南的核心要求。
+
+            【技能名称】
+            %s
+
+            【技能指南（SKILL.md）】
+            %s
+
+            【实际执行的工具调用顺序（时间正序）】
+            %s
+
+            【Agent 最终输出（前800字）】
+            %s
+
+            【评估要点（仅以下三点，条件分支不作为违规依据）】
+            1. readSkill 必须是第一个被调用的工具（在任何 ontologyQuery 之前）
+            2. 技能指南第一步要求的 ontologyQuery（entity 和 queryScope）必须被调用
+            3. 输出结论必须是自然语言四段式（数据查询/分析/结论/建议），不能是裸 JSON
+
+            【重要说明】
+            - Agent 可能出于效率对多步查询并行或提前执行，只要核心查询都做了，条件分支偏差不算违规
+            - 不要对"是否根据中间结果决策跳过后续步骤"进行评判，这超出了静态合规检查的范围
+
+            【只输出以下 JSON，不要其他文字】
+            {"pass": true, "reason": "理由（30字以内）", "violations": []}
+            """;
+
+    /**
+     * LLM-as-Judge：验证 Agent 执行过程是否符合指定 Skill 的步骤要求。
+     * 读取技能的 SKILL.md，将工具调用序列和最终输出一起交给 LLM 评估合规性。
+     */
+    protected void assertSkillProcessCompliance(String skillName, String response) {
+        String skillContent;
+        try {
+            skillContent = new ClassPathResource("skills/" + skillName + "/SKILL.md")
+                    .getContentAsString(StandardCharsets.UTF_8);
+        } catch (IOException e) {
+            throw new AssertionError("无法读取技能文件: skills/" + skillName + "/SKILL.md → " + e.getMessage());
+        }
+
+        // TracingService 的 deque 以"最新在前"顺序存储，需反转为时间顺序
+        List<ToolCall> calls = new ArrayList<>(getToolCalls());
+        java.util.Collections.reverse(calls);
+        String toolSequence = calls.isEmpty() ? "（无工具调用）"
+                : calls.stream()
+                        .map(c -> c.name + "(" + c.params.entrySet().stream()
+                                .map(e -> e.getKey() + "=" + e.getValue())
+                                .collect(Collectors.joining(", ")) + ")")
+                        .collect(Collectors.joining(" → "));
+
+        String judgePrompt = SKILL_COMPLIANCE_JUDGE_PROMPT.formatted(
+                skillName, skillContent, toolSequence, truncate(response, 800));
+
+        String judgment;
+        try {
+            judgment = chatModel.call(new Prompt(judgePrompt))
+                    .getResult()
+                    .getOutput()
+                    .getText();
+        } catch (Exception e) {
+            Assertions.assertThat(toolSequence)
+                    .as("Skill 合规性 judge 调用失败（降级模式）\n工具调用序列: " + toolSequence)
+                    .contains("readSkill");
+            return;
+        }
+
+        try {
+            JsonNode result = OUTPUT_MAPPER.readTree(judgment.trim());
+            boolean pass = result.path("pass").asBoolean();
+            String reason = result.path("reason").asText("无理由");
+            JsonNode violations = result.path("violations");
+            String violationList = violations.isArray() && violations.size() > 0
+                    ? violations.toString() : "无";
+            Assertions.assertThat(pass)
+                    .as("执行过程不符合 Skill [" + skillName + "] 要求\n"
+                            + "原因: " + reason + "\n"
+                            + "违规点: " + violationList + "\n"
+                            + "工具调用序列: " + toolSequence)
+                    .isTrue();
+        } catch (Exception e) {
+            Assertions.assertThat(toolSequence)
+                    .as("Skill 合规性判断失败（降级模式），工具调用序列: " + toolSequence)
+                    .contains("readSkill");
         }
     }
 

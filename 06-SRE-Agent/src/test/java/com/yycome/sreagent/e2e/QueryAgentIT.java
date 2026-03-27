@@ -164,7 +164,7 @@ class QueryAgentIT extends BaseSREAgentIT {
     @Test
     @DisplayName("查询销售合同可签约S单（订单号）- 验证 entity=Order, queryScope=SignableOrderInfo")
     void query_signable_order_info_by_order() {
-        // 当 - 用户从订单号出发，引擎自动沿 Order→Contract(type=8)→SignableOrderInfo 两跳查询
+        // 当
         String response = ask("查询826031915000003212销售合同的可签约S单");
 
         // 那么
