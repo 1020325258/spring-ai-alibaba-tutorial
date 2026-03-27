@@ -170,10 +170,17 @@ public class NewEntityGateway implements EntityDataGateway {
 
     @Override
     public List<Map<String, Object>> queryByField(String fieldName, Object value) {
+        // value 必须先做 null 检查，再调用 toString()
+        if (value == null) {
+            log.warn("[NewEntityGateway] fieldName={} 的值为 null，无法查询", fieldName);
+            return Collections.emptyList();
+        }
         try {
             String json = httpEndpointClient.callPredefinedEndpointRaw("endpoint-id", Map.of("paramName", value));
             return parseAndTransform(json);
         } catch (Exception e) {
+            // 必须用 log.warn("msg", e) 保留完整堆栈，禁止用 e.getMessage()
+            log.warn("[NewEntityGateway] 查询失败", e);
             return Collections.emptyList();
         }
     }
@@ -354,6 +361,7 @@ void contractBasic_shouldUseContractEntity() {
 | `assertFirstRecordHasField(path)` | 字段**存在**（不验证值） | 关键字段存在性，支持嵌套路径如 `"formData/id"` |
 | `assertFirstRecordFieldEquals(path, value)` | 字段精确值 | 仅用于 ID 回显等极稳定字段 |
 | `assertOutputIsInvestigationConclusion(response)` | 输出是自然语言排查结论（LLM-as-Judge） | **排查类测试必加**，使用无工具绑定的 `ChatModel` 评估，避免污染 `TracingService` |
+| `assertSkillProcessCompliance(skillName, response)` | 执行过程符合 Skill 步骤（LLM-as-Judge） | **涉及 readSkill 的排查测试**，读取 SKILL.md 评估：readSkill 是否第一步、ontologyQuery 参数是否符合 Skill 步骤、输出是否四段式；不检查条件分支（Agent 可能并行调用） |
 
 ### 验证策略：宽松原则
 
@@ -424,6 +432,22 @@ void newFeature_shouldUseCorrectTool() {
 
 **教训**：**工具的存在本身也必须同步到提示词。** 新增 `@Tool` 方法后，除了在"新增专用工具"章节说明用法，还必须在"可用工具"列表中补充该工具的描述（包括使用时机、参数说明和可用值列表）。缺少描述 ≈ 工具不存在。
 
+### 问题复盘（2026-03-27 第三次）
+
+**现象**：`InvestigateAgentIT#investigate_sales_contract_sign_dialog_no_quote_keyword` 测试失败。用户描述"发起提示无定软电报价"，LLM 却调用了 `ontologyQuery(queryScope=PersonalQuote)` 而非 `readSkill`。
+
+**根本原因**：`sre-agent.md` 的 `readSkill` 使用时机写的是"当用户意图是'排查/诊断'时触发"，但用户描述中没有"排查""诊断"等明确关键词。同时，`sales-contract-sign-dialog-diagnosis` 的触发描述只写了"请先完成报价"，没有"无定软电报价"。LLM 看到"报价"二字，将其识别为个性化报价查询。
+
+**教训**：**`readSkill` 的触发不能依赖"排查/诊断"等元关键词。** 症状描述（如"弹窗提示XXX""发起提示XXX"）也应触发对应技能。在 `sre-agent.md` 的 `readSkill` 章节中，必须为每个技能明确列出触发场景（包括症状短语），并说明"描述已知业务症状即触发，无需排查等关键词"。
+
+### 问题复盘（2026-03-27 第四次）
+
+**现象**：`assertSkillProcessCompliance` 中 judge 报告"未先调用 readSkill"，但日志显示 readSkill 确实是第一个被调用的。
+
+**根本原因**：`TracingService` 的 `ConcurrentLinkedDeque` 以"最新在前"的顺序存储，`captureNewToolCalls` 迭代时得到的是反时间顺序（最新 → 最旧）。传给 judge LLM 的工具调用序列是倒序的，judge 自然误判。
+
+**教训**：在 `assertSkillProcessCompliance` 中，构建工具调用序列字符串前，必须先对 `getToolCalls()` 返回的列表调用 `Collections.reverse()` 得到时间正序，再传给 judge。
+
 ---
 
 ## UI 验证规范（Playwright）
@@ -444,6 +468,39 @@ playwright screenshot http://localhost:8089/ontology.html screenshot.png --full-
 **参数约束**：`idle-timeout` < `max-lifetime` < MySQL `wait_timeout` - 30s
 
 **当前配置**：`idle-timeout: 180000`，`max-lifetime: 300000`，`keepalive-time: 60000`
+
+---
+
+## Skill 编写规范
+
+### 触发条件
+
+在 `sre-agent.md` 的 `readSkill` 章节中，每个技能必须：
+- 列出触发词/触发场景（包括**症状短语**，不只是"排查XXX"类措辞）
+- 说明"描述已知业务症状即触发，无需排查、诊断等关键词"
+
+### 排查型 Skill 结构规范
+
+每个排查步骤必须明确两件事：
+1. **当前步骤的查询动作**（调用哪个 ontologyQuery）
+2. **根据结果判断用户描述是否属实**，并明确后续动作
+
+```
+步骤 N：执行 XXX 查询
+  - 若结果非空 → [用户描述属实/不属实]，[结束排查 or 继续下一步]
+  - 若结果为空 → [用户描述属实/不属实]，[结束排查 or 继续下一步]
+```
+
+**核心原则**：每步查询都是"验证用户描述"的机会，应明确给出"属实/不属实"的判断，而不是模糊地说"数据正常，请确认场景"。
+
+### 决策矩阵规范
+
+排查型 Skill 的决策矩阵必须包含"用户描述是否属实"列：
+
+| 步骤结果 | 后续 | 结论 | 用户描述是否属实 |
+|---------|------|------|----------------|
+| 步骤1 有数据 | 排查结束 | 系统数据正常，用户描述不符实际 | ❌ 不属实 |
+| 步骤1 无数据 | 继续步骤2 | 用户描述属实，继续定位原因 | ✅ 属实 |
 
 ---
 
