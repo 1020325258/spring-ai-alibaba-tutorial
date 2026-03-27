@@ -180,4 +180,17 @@ class QueryAgentIT extends BaseSREAgentIT {
         // 4. 验证所有工具调用成功
         assertAllToolsSuccess();
     }
+
+    @Test
+    @DisplayName("查询正签合同可签约S单（订单号）- 验证 entity=Order, queryScope=FormalSignableOrderInfo")
+    void query_formal_signable_order_info_by_order() {
+        // 当
+        String response = ask("查询826031915000003212订单下正签合同的可签约S单");
+
+        // 那么
+        assertToolCalled("ontologyQuery");
+        assertToolParamEquals("ontologyQuery", "entity", "Order");
+        assertToolParamEquals("ontologyQuery", "queryScope", "FormalSignableOrderInfo");
+        assertAllToolsSuccess();
+    }
 }

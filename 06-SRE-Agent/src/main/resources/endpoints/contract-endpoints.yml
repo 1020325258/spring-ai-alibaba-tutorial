@@ -147,6 +147,29 @@ endpoints:
       - "查询订单826030611000000795的子单"
       - "826030611000000795订单下报价单GBILL260309110407580001对应的子单"
 
+  - id: formal-sign-order-list
+    name: 查询正签合同可签约S单列表
+    description: |
+      根据项目订单ID查询正签合同（contractType=3）下所有可签约的S单列表。
+      当用户询问以下问题时使用此接口：
+      - "查询某订单的正签可签约S单"
+      - "订单下正签合同的可签约S单有哪些"
+    category: contract
+    urlTemplate: "http://utopia-nrs-sales-project.${env}.ttb.test.ke.com/home/contract/formalQuotation/list/v2?projectOrderId=${projectOrderId}&contractType=3"
+    method: GET
+    parameters:
+      - name: projectOrderId
+        type: string
+        description: 项目订单ID
+        required: true
+        example: "826031915000003212"
+    headers:
+      X-NRS-User-Id: "1000000000000000"
+      Content-Type: "application/json"
+    timeout: 15
+    examples:
+      - "查询826031915000003212订单下正签合同的可签约S单"
+
   - id: contract-personal-data
     name: 查询订单个性化报价数据
     description: |

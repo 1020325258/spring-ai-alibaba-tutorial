@@ -55,6 +55,7 @@
 | 825123110000002753的合同 | Order | 825123110000002753 | Contract |
 | C1767150648920281的节点 | Contract | C1767150648920281 | ContractNode |
 | 826032617000003337销售合同可签约的S单 | Order | 826032617000003337 | SignableOrderInfo |
+| 826031915000003212订单正签合同的可签约S单 | Order | 826031915000003212 | FormalSignableOrderInfo |
 | 101835395的实例信息 | ContractInstance | 101835395 | list |
 | 826031111000001859的报价单 | Order | 826031111000001859 | BudgetBill |
 
