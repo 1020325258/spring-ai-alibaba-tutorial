@@ -21,7 +21,10 @@ import java.util.Map;
  * 可观测性切面
  * 记录工具调用的详细信息，集成追踪和指标收集
  *
- * 注意：SRE-Agent 不使用 DirectOutput，所有工具调用都经过 LLM 处理
+ * 日志层级：
+ * - [TOOL] 工具调用层：工具名 + 参数
+ * - [AGENT] Agent 状态层：意图识别、Skill 加载、数据查询、结论输出
+ * - [LLM] LLM 调用层：请求/响应（可选，详细模式）
  */
 @Slf4j
 @Aspect
@@ -31,6 +34,9 @@ public class ObservabilityAspect {
 
     private final TracingService tracingService;
     private final MetricsCollector metricsCollector;
+
+    /** 是否启用详细 LLM 日志（生产环境建议关闭） */
+    private static final boolean DETAILED_LLM_LOG = false;
 
     @Around("@annotation(org.springframework.ai.tool.annotation.Tool)")
     public Object logToolCall(ProceedingJoinPoint joinPoint) throws Throwable {
@@ -54,7 +60,7 @@ public class ObservabilityAspect {
         // 开始追踪（保留原有 TracingService 兼容性）
         TracingContext tracing = tracingService.startToolCall(toolName, params);
 
-        // 入口日志：工具名 + 参数
+        // 入口日志：工具名 + 参数（工具调用层）
         log.info("[TOOL] {}({})", toolName, buildParamsString(paramNames, args));
 
         try {
@@ -70,6 +76,9 @@ public class ObservabilityAspect {
             // 记录性能指标
             metricsCollector.recordToolCall(toolName, duration, true);
 
+            // 成功日志（工具调用层）
+            log.info("[TOOL] {} → {}ms, ok", toolName, duration);
+
             return result;
         } catch (Exception e) {
             long duration = System.currentTimeMillis() - startTime;
@@ -83,7 +92,7 @@ public class ObservabilityAspect {
             // 记录性能指标
             metricsCollector.recordToolCall(toolName, duration, false);
 
-            // 错误日志
+            // 错误日志（工具调用层）
             log.error("[TOOL] {} → {}ms, error: {}", toolName, duration, e.getMessage());
 
             throw e;

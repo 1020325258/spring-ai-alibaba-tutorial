@@ -37,9 +37,6 @@ public class ToolCallContext {
     /** 是否为数据查询类工具 */
     private boolean dataQuery;
 
-    /** 完整结果（用于 DirectOutputHolder） */
-    private Object fullResult;
-
     /**
      * 获取耗时（毫秒）
      */
@@ -89,7 +86,6 @@ public class ToolCallContext {
     public void endSuccess(Object result) {
         this.endTime = System.currentTimeMillis();
         this.success = true;
-        this.fullResult = result;
         if (result != null) {
             String str = result.toString();
             this.resultPreview = str.length() > 100 ? str.substring(0, 100) + "..." : str;

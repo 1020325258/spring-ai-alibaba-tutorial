@@ -23,44 +23,49 @@
 
 ---
 
-## DirectOutput 机制
+## 端到端测试
 
-### 原理与性能
+### 测试脚本
 
-数据查询类工具（标记 `@DataQueryTool`）的结果绕过 LLM 二次处理，直接输出给用户。
-
-| 场景 | 优化前 | 优化后 | 提升 |
-|------|--------|--------|------|
-| 单合同查询 | 8秒 | 1-2秒 | **4-8倍** |
-| 订单→多合同→关联数据 | 16-20秒 | 2-4秒 | **5-10倍** |
-
-**耗时分析**：首字节时间 1-2.5秒（LLM 意图识别），工具耗时 100-500ms，DirectOutput 生效后总耗时 = 首字节时间。
-
-### @DataQueryTool 注解使用规范
-
-**核心原则**：`@DataQueryTool` 只能标记在**最外层的用户直调工具**上，内部工具禁止标记。
-
-```
-用户 → LLM 调用 → ontologyQuery (有 @DataQueryTool) → DirectOutput 输出
-                    ↓ 内部调用
-                    callPredefinedEndpoint (无 @DataQueryTool)
+```bash
+# 运行端到端测试（问题排查 + 数据查询 + Skill 机制）
+./scripts/run-e2e-tests.sh
 ```
 
-| 错误场景 | 后果 |
-|---------|------|
-| `ontologyQuery` 内部调用带有 `@DataQueryTool` 的工具 | DirectOutput 捕获中间结果，而非最终结果 |
+### 测试文件
 
-```java
-// ✅ 正确：最外层工具标记注解
-@Tool(description = "本体论统一查询入口")
-@DataQueryTool
-public String ontologyQuery(String entity, String value, String queryScope) { }
+| 文件 | 职责 | 说明 |
+|------|------|------|
+| `BaseSREAgentIT` | 端到端测试基类 | 提供 `ask()` 方法发起自然语言请求 |
+| `InvestigateAgentIT` | 问题排查测试 | 验证 read_skill + ontologyQuery 能力 |
+| `QueryAgentIT` | 数据查询测试 | 验证 ontologyQuery 参数正确性 |
+| `SkillMechanismIT` | Skill 机制测试 | 验证 SkillRegistry + read_skill 工具 |
 
-// ✅ 正确：内部工具不标记注解
-public String callPredefinedEndpoint(String endpointId, Map<String, String> params) { }
-```
+### 验证方式
 
-**判断标准**：该工具是否会被 LLM 直接调用？ ✅ 是 → 添加；❌ 否（仅被内部调用）→ 不添加
+- **工具调用层**：验证 LLM 调用了正确的工具（ontologyQuery、read_skill）
+- **参数层**：验证工具参数正确（entity、queryScope、skillName）
+- **输出层**：验证返回数据格式正确
+
+### 测试报告
+
+测试执行后自动生成报告：`06-SRE-Agent/docs/test-execution-report.md`
+
+---
+
+## 输出机制
+
+所有输出都通过 LLM 处理并流式输出，保证输出的质量和一致性。
+
+### 流式输出优势
+
+- LLM 对工具返回的原始数据进行解释和总结
+- 支持复杂场景的结论输出（如排查分析）
+- 输出格式更友好，可读性强
+
+### 耗时分析
+
+首字节时间 1-2.5秒（LLM 意图识别），工具耗时 100-500ms，总耗时 = 首字节时间 + 工具耗时 + LLM 处理时间。
 
 ---
 
@@ -348,6 +353,7 @@ void contractBasic_shouldUseContractEntity() {
 | `assertOutputHasRecords()` | `records` 非空 | 所有查询用例必加 |
 | `assertFirstRecordHasField(path)` | 字段**存在**（不验证值） | 关键字段存在性，支持嵌套路径如 `"formData/id"` |
 | `assertFirstRecordFieldEquals(path, value)` | 字段精确值 | 仅用于 ID 回显等极稳定字段 |
+| `assertOutputIsInvestigationConclusion(response)` | 输出是自然语言排查结论（LLM-as-Judge） | **排查类测试必加**，使用无工具绑定的 `ChatModel` 评估，避免污染 `TracingService` |
 
 ### 验证策略：宽松原则
 
@@ -409,6 +415,14 @@ void newFeature_shouldUseCorrectTool() {
 **根本原因**：删除 `SCOPE_ALIAS` 时，只更新了 Java 代码，未同步更新 `sre-agent.md` 提示词。
 
 **教训**：凡是修改工具参数的合法取值范围（增删枚举值、删除简写别名、重命名参数），必须同步检查并更新 `sre-agent.md`，然后运行 `ContractOntologyIT` 集成测试验证。
+
+### 问题复盘（2026-03-27）
+
+**现象**：测试失败。`InvestigateAgentIT#investigate_missing_personal_quote` 断言 `readSkill` 被调用，但实际 LLM 只调用了 `ontologyQuery`，完全跳过了 `readSkill`。
+
+**根本原因**：`readSkill` 工具已通过 `@Tool` 注解注册并绑定到 `ChatClient`，但 `sre-agent.md` 的"可用工具"章节从未描述该工具（只有一个不存在的 `querySkills` 引用）。LLM 看不到 `readSkill`，自然不会调用它。
+
+**教训**：**工具的存在本身也必须同步到提示词。** 新增 `@Tool` 方法后，除了在"新增专用工具"章节说明用法，还必须在"可用工具"列表中补充该工具的描述（包括使用时机、参数说明和可用值列表）。缺少描述 ≈ 工具不存在。
 
 ---
 

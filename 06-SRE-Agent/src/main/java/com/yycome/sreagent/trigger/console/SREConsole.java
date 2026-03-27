@@ -1,7 +1,6 @@
 package com.yycome.sreagent.trigger.console;
 
 import com.yycome.sreagent.infrastructure.config.EnvironmentConfig;
-import com.yycome.sreagent.infrastructure.service.DirectOutputHolder;
 import com.yycome.sreagent.infrastructure.service.MetricsCollector;
 import com.yycome.sreagent.infrastructure.service.TracingService;
 import com.yycome.sreagent.trigger.console.command.*;
@@ -42,9 +41,6 @@ public class SREConsole implements CommandLineRunner {
 
     @Autowired
     private MetricsCollector metricsCollector;
-
-    @Autowired
-    private DirectOutputHolder directOutputHolder;
 
     @Autowired
     private EnvironmentConfig environmentConfig;
@@ -152,13 +148,8 @@ public class SREConsole implements CommandLineRunner {
                 final long[] firstTokenMs = {-1};
                 StringBuilder responseBuilder = new StringBuilder();
                 interrupted.set(false);
-                directOutputHolder.startRequest();
 
                 java.util.concurrent.CountDownLatch latch = new java.util.concurrent.CountDownLatch(1);
-                // 标记是否已触发直接输出旁路
-                java.util.concurrent.atomic.AtomicBoolean directOutputUsed = new java.util.concurrent.atomic.AtomicBoolean(false);
-                // 记录工具调用耗时
-                java.util.concurrent.atomic.AtomicLong totalToolDuration = new java.util.concurrent.atomic.AtomicLong(0);
 
                 // 每次请求独立处理，不传入对话历史，防止 LLM 模仿历史模式跳过工具调用
                 Disposable sub = sreAgent.prompt()
@@ -166,44 +157,15 @@ public class SREConsole implements CommandLineRunner {
                         .stream()
                         .content()
                         .doOnNext(chunk -> {
-                            // 首字节到达时检查 DirectOutput
+                            // 记录首字节时间
                             if (firstTokenMs[0] < 0) {
                                 firstTokenMs[0] = System.currentTimeMillis();
-
-                                // 首字节到达时，检查是否有直接输出
-                                // 由于工具调用在 LLM 输出前执行，此时所有工具结果应该已经收集完毕
-                                if (directOutputHolder.hasOutput() && !directOutputUsed.get()) {
-                                    directOutputUsed.set(true);
-                                    String aggregatedOutput = directOutputHolder.getAndClearAggregated();
-                                    // 显示 DirectOutput 标记
-                                    System.out.println(Ansi.ansi().fg(Ansi.Color.CYAN)
-                                            .a("\n[DirectOutput] ✓ 已生效，绕过 LLM 处理").reset());
-                                    System.out.println(aggregatedOutput);
-                                    responseBuilder.append(aggregatedOutput);
-                                    // 关键：立即中断流，不再等待 LLM 完成剩余输出
-                                    currentSubscription.get().dispose();
-                                    return;
-                                }
                             }
-                            // 已走直接输出路径，忽略后续 LLM token
-                            if (directOutputUsed.get()) return;
-
                             // 正常输出 LLM 内容
                             System.out.print(chunk);
                             responseBuilder.append(chunk);
                         })
                         .doOnComplete(() -> {
-                            // 流结束时，聚合输出所有工具结果
-                            if (directOutputHolder.hasOutput()) {
-                                directOutputUsed.set(true);
-                                String aggregatedOutput = directOutputHolder.getAggregatedOutput();
-                                // 显示 DirectOutput 标记
-                                System.out.println(Ansi.ansi().fg(Ansi.Color.CYAN)
-                                        .a("\n[DirectOutput] ✓ 已生效，绕过 LLM 处理").reset());
-                                System.out.println(aggregatedOutput);
-                                responseBuilder.append(aggregatedOutput);
-                                directOutputHolder.clear();
-                            }
                             System.out.println();
                             latch.countDown();
                         })
@@ -223,17 +185,8 @@ public class SREConsole implements CommandLineRunner {
                 long ttfbMs  = firstTokenMs[0] < 0 ? totalMs : firstTokenMs[0] - startMs;
 
                 // 显示耗时信息
-                if (directOutputUsed.get()) {
-                    System.out.println(Ansi.ansi().fg(Ansi.Color.CYAN)
-                            .a(String.format("⏱ 首字节: %dms | 工具耗时: %dms | 总耗时: %dms",
-                                    ttfbMs, totalToolDuration.get(), totalMs)).reset());
-                    // 显示工具调用列表
-                    System.out.println(Ansi.ansi().fg(Ansi.Color.CYAN)
-                            .a(formatToolSummary(directOutputHolder)).reset());
-                } else {
-                    System.out.println(Ansi.ansi().fg(Ansi.Color.CYAN)
-                            .a(String.format("⏱ 首字节: %dms | 总耗时: %dms", ttfbMs, totalMs)).reset());
-                }
+                System.out.println(Ansi.ansi().fg(Ansi.Color.CYAN)
+                        .a(String.format("⏱ 首字节: %dms | 总耗时: %dms", ttfbMs, totalMs)).reset());
 
                 String response = responseBuilder.toString();
 
@@ -399,35 +352,5 @@ public class SREConsole implements CommandLineRunner {
         } catch (Exception e) {
             // 剪贴板复制失败不影响主流程
         }
-    }
-
-    /**
-     * 格式化工具调用摘要
-     */
-    private String formatToolSummary(DirectOutputHolder holder) {
-        List<DirectOutputHolder.ToolResult> results = holder.getResults();
-        if (results.isEmpty()) {
-            return "";
-        }
-
-        StringBuilder sb = new StringBuilder();
-        sb.append(" | 工具: ");
-
-        Map<String, Long> toolCounts = new LinkedHashMap<>();
-        for (DirectOutputHolder.ToolResult r : results) {
-            toolCounts.merge(r.toolName, 1L, Long::sum);
-        }
-
-        boolean first = true;
-        for (Map.Entry<String, Long> entry : toolCounts.entrySet()) {
-            if (!first) sb.append(", ");
-            sb.append(entry.getKey());
-            if (entry.getValue() > 1) {
-                sb.append("(").append(entry.getValue()).append(")");
-            }
-            first = false;
-        }
-
-        return sb.toString();
     }
 }
