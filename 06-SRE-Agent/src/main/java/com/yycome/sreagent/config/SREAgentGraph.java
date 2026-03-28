@@ -22,6 +22,7 @@ import org.springframework.stereotype.Component;
 import reactor.core.publisher.Flux;
 
 import java.util.*;
+import java.util.stream.Collectors;
 
 import static com.alibaba.cloud.ai.graph.StateGraph.END;
 import static com.alibaba.cloud.ai.graph.StateGraph.START;
@@ -89,15 +90,32 @@ public class SREAgentGraph extends Agent {
         // Agent 名称标签
         AssistantMessage agentHeader = new AssistantMessage("**[" + agentName + "]**\n\n");
 
-        // 选中的 agent 流式输出（token-by-token）
-        Flux<Message> agentStream = "query".equals(routing)
-                ? queryAgent.streamMessages(input)
-                : investigateAgent.streamMessages(input);
-
-        return Flux.concat(
-                Flux.just((Message) routerMsg, (Message) agentHeader),
-                agentStream
-        );
+        if ("query".equals(routing)) {
+            // 查询结果：收集所有 token，规范化代码块格式后一次性发送。
+            // 避免流式渲染时 ```json 无换行导致 Studio 前端 react-markdown children=undefined → 显示 "undefined"
+            Flux<Message> agentStream = queryAgent.streamMessages(input)
+                    .filter(msg -> msg instanceof AssistantMessage am && !am.getText().isEmpty())
+                    .collectList()
+                    .flatMapMany(messages -> {
+                        String fullText = messages.stream()
+                                .map(m -> ((AssistantMessage) m).getText())
+                                .collect(Collectors.joining());
+                        // 规范化：确保 ```json 后有换行（LLM 有时漏掉换行导致解析失败）
+                        String normalized = fullText.replaceAll("```json([^\\n])", "```json\n$1");
+                        return Flux.just((Message) new AssistantMessage(normalized));
+                    });
+            return Flux.concat(
+                    Flux.just((Message) routerMsg, (Message) agentHeader),
+                    agentStream
+            );
+        } else {
+            // 排查结论：保持 token 级别流式输出，展示逐步推理过程
+            Flux<Message> agentStream = investigateAgent.streamMessages(input);
+            return Flux.concat(
+                    Flux.just((Message) routerMsg, (Message) agentHeader),
+                    agentStream
+            );
+        }
     }
 
     private String determineRouting(String input) {
