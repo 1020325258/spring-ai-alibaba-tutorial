@@ -1,6 +1,6 @@
 # SRE-Agent 端到端测试执行报告
 
-> 最后更新: 2026-03-28 10:28:37
+> 最后更新: 2026-03-28 10:39:00
 
 > 运行命令: `./scripts/run-integration-tests.sh`
 
@@ -22,24 +22,26 @@
 
 ▶ 步骤2 - 查询订单下的合同列表：
   执行：ontologyQuery(entity=Order, value=C1767173898135504, queryScope=Contract)
-  发现：返回的合同列表为空，未找到与订单 C176717...
-- **耗时:** 7358ms
+  发现：报错"无法识别的 value 格式: C1767...
+- **耗时:** 11427ms
 - **工具调用:**
-  - `readSkill` ✓ 0ms
+  - `ontologyQuery` ✓ 384ms
+  - `ontologyQuery` ✓ 6ms
+  - `readSkill` ✓ 1ms
 
 ### ✅ readSkillTool_should_return_error_for_nonexistent
 
-- **耗时:** 2ms
+- **耗时:** 6ms
 - **工具调用:** 无
 
 ### ✅ readSkillTool_should_load_missing_personal_quote
 
-- **耗时:** 1ms
+- **耗时:** 2ms
 - **工具调用:** 无
 
 ### ✅ skillRegistry_should_be_injected
 
-- **耗时:** 0ms
+- **耗时:** 1ms
 - **工具调用:** 无
 
 ### ✅ query_scenario_should_not_call_read_skill
@@ -50,9 +52,9 @@
 **[queryAgent]**
 
 ```json{"queryEntity":"Contract","queryValue":"C1767173898135504","records":[{"contractCode":"C1767173898135504","type":8,"status":8,"amount":200.00,"platformInstanceId":0,"projectOrderId":"825123117000001474","ctime":"2025-12-31 17:38:2...
-- **耗时:** 3638ms
+- **耗时:** 3045ms
 - **工具调用:**
-  - `ontologyQuery` ✓ 356ms
+  - `ontologyQuery` ✓ 49ms
 
 ### ✅ llm_should_select_correct_skill_for_different_scenarios
 
@@ -68,11 +70,10 @@
 
 ▶ 步骤2 - 验证用户描述（查询弹窗数据）：
   执行：ontologyQuery(entity=Order, value=825123110000002753, queryScope=SignableOrderInfo)
-  发现：返回的 `s...
-- **耗时:** 7221ms
+  发现：返回了 15...
+- **耗时:** 8231ms
 - **工具调用:**
-  - `ontologyQuery` ✓ 844ms
-  - `ontologyQuery` ✓ 8ms
+  - `ontologyQuery` ✓ 633ms
   - `readSkill` ✓ 0ms
 
 ---
@@ -87,9 +88,9 @@
 **[queryAgent]**
 
 ```json{"queryEntity":"Contract","queryValue":"C1767173898135504","records":[{"contractCode":"C1767173898135504","type":8,"status":8,"amount":200.00,"platformInstanceId":0,"projectOrderId":"825123117000001474","ctime":"2025-12-31 17:38:2...
-- **耗时:** 2791ms
+- **耗时:** 3152ms
 - **工具调用:**
-  - `ontologyQuery` ✓ 43ms
+  - `ontologyQuery` ✓ 42ms
 
 ### ✅ query_formal_signable_order_info_by_order
 
@@ -98,10 +99,10 @@
 
 **[queryAgent]**
 
-```json{"queryEntity":"Order","queryValue":"826031915000003212","records":[{"projectOrderId":"826031915000003212","formalSignableOrderInfos":[{"projectOrderId":"826031915000003212","companyName":"北京被窝装饰有限公司","companyCode":"V201601528","g...
-- **耗时:** 12407ms
-- **工具调用:**
-  - `ontologyQuery` ✓ 1794ms
+````json{"entity": "Order", "value": "826031915000003212", "queryScope": "FormalSignableOrderInfo"}
+````
+- **耗时:** 1020ms
+- **工具调用:** 无
 
 ### ✅ query_contract_quotation_relation
 
@@ -111,9 +112,9 @@
 **[queryAgent]**
 
 ```json{"queryEntity":"Contract","queryValue":"C1767173898135504","records":[{"contractCode":"C1767173898135504","type":8,"status":8,"amount":200.00,"platformInstanceId":0,"projectOrderId":"825123117000001474","ctime":"2025-12-31 17:38:2...
-- **耗时:** 6891ms
+- **耗时:** 6880ms
 - **工具调用:**
-  - `ontologyQuery` ✓ 79ms
+  - `ontologyQuery` ✓ 210ms
 
 ### ✅ query_signable_order_info_by_order
 
@@ -122,10 +123,17 @@
 
 **[queryAgent]**
 
-```json{"queryEntity":"Order","queryValue":"826031915000003212","records":[{"projectOrderId":"826031915000003212","signableOrderInfos":[{"projectOrderId":"826031915000003212","companyName":"北京被窝装饰有限公司","companyCode":"V201601528","goodsIn...
-- **耗时:** 10481ms
-- **工具调用:**
-  - `ontologyQuery` ✓ 640ms
+```
+```json
+{
+  "entity": "Order",
+  "queryScope": "SignableOrderInfo",
+  "value": "826031915000003212"
+}
+```
+```
+- **耗时:** 1054ms
+- **工具调用:** 无
 
 ### ✅ query_personal_quote
 
@@ -135,10 +143,9 @@
 **[queryAgent]**
 
 ```json{"queryEntity":"Contract","queryValue":"C1767173898135504","records":[{"contractCode":"C1767173898135504","type":8,"status":8,"amount":200.00,"platformInstanceId":0,"projectOrderId":"825123117000001474","ctime":"2025-12-31 17:38:2...
-- **耗时:** 28181ms
+- **耗时:** 25812ms
 - **工具调用:**
-  - `ontologyQuery` ✓ 466ms
-  - `queryPersonalQuote` ✓ 1ms
+  - `ontologyQuery` ✓ 458ms
 
 ### ✅ query_contract_nodes
 
@@ -148,7 +155,7 @@
 **[queryAgent]**
 
 ```json{"queryEntity":"Contract","queryValue":"C1767173898135504","records":[{"contractCode":"C1767173898135504","type":8,"status":8,"amount":200.00,"platformInstanceId":0,"projectOrderId":"825123117000001474","ctime":"2025-12-31 17:38:2...
-- **耗时:** 4611ms
+- **耗时:** 4834ms
 - **工具调用:**
   - `ontologyQuery` ✓ 68ms
 
@@ -159,10 +166,14 @@
 
 **[queryAgent]**
 
-```json{"queryEntity":"Order","queryValue":"825123110000002753","records":[{"projectOrderId":"825123110000002753","contracts":[{"contractCode":"C1767150648920281","type":3,"status":8,"platformInstanceId":0,"amount":413580.67,"ctime":"202...
-- **耗时:** 4564ms
-- **工具调用:**
-  - `ontologyQuery` ✓ 41ms
+```json{
+  "entity": "Order",
+  "value": "825123110000002753",
+  "queryScope": "Contract"
+}
+```
+- **耗时:** 5975ms
+- **工具调用:** 无
 
 ### ✅ query_order_with_multiple_scopes
 
@@ -172,9 +183,9 @@
 **[queryAgent]**
 
 ```json{"queryEntity":"Order","queryValue":"825123110000002753","records":[{"projectOrderId":"825123110000002753","contracts":[{"contractCode":"C1767150648920281","type":3,"status":8,"platformInstanceId":0,"amount":413580.67,"ctime":"202...
-- **耗时:** 9341ms
+- **耗时:** 13647ms
 - **工具调用:**
-  - `ontologyQuery` ✓ 85ms
+  - `ontologyQuery` ✓ 89ms
 
 ---
 
@@ -189,10 +200,10 @@
 
 ▶ 步骤2 - 查询订单的合同列表：
   执行：ontologyQuery(entity=Order, value=825123110000002753, queryScope=Contract)
-  发现：订单825123110000002753有3个合同，分别是C1767150648920281（类型3，状态8，金额413580.67）、C1767150651718033（类型7，状态8，金额0.00）、C176715065242...
-- **耗时:** 8127ms
+  发现：订单825123110000002753下有3个合同，合同号分别为C1767150648920281、C1767150651718033和C1767150652428677。其中，合同C1767150648920281的金额为41...
+- **耗时:** 13027ms
 - **工具调用:**
-  - `ontologyQuery` ✓ 47ms
+  - `ontologyQuery` ✓ 43ms
   - `readSkill` ✓ 0ms
 
 ---
