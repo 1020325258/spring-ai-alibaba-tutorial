@@ -21,6 +21,7 @@ import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Flux;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -100,8 +101,8 @@ public class SREAgentGraph extends Agent {
                         String fullText = messages.stream()
                                 .map(m -> ((AssistantMessage) m).getText())
                                 .collect(Collectors.joining());
-                        // 规范化：确保 ```json 后有换行（LLM 有时漏掉换行导致解析失败）
-                        String normalized = fullText.replaceAll("```json([^\\n])", "```json\n$1");
+                        // 规范化：确保 ```json 后有换行，并对 JSON 内容做 pretty-print
+                        String normalized = normalizeAndPrettifyJson(fullText);
                         return Flux.just((Message) new AssistantMessage(normalized));
                     });
             return Flux.concat(
@@ -128,6 +129,37 @@ public class SREAgentGraph extends Agent {
             log.warn("路由 LLM 调用失败，降级为 investigate", e);
             return "investigate";
         }
+    }
+
+    private static final ObjectMapper PRETTY_MAPPER = new ObjectMapper();
+
+    /**
+     * 规范化查询 Agent 的输出：
+     * 1. 确保 ```json 后有换行（修复 react-markdown streaming undefined 问题）
+     * 2. 对代码块内的 JSON 做 pretty-print（缩进格式化，便于阅读）
+     */
+    private String normalizeAndPrettifyJson(String text) {
+        int start = text.indexOf("```json");
+        if (start < 0) return text;
+
+        int contentStart = start + "```json".length();
+        // 跳过可能已有的换行
+        if (contentStart < text.length() && text.charAt(contentStart) == '\n') {
+            contentStart++;
+        }
+        int end = text.lastIndexOf("```");
+        if (end <= start) return text;
+
+        String jsonContent = text.substring(contentStart, end).trim();
+        String pretty;
+        try {
+            Object obj = PRETTY_MAPPER.readValue(jsonContent, Object.class);
+            pretty = PRETTY_MAPPER.writerWithDefaultPrettyPrinter().writeValueAsString(obj);
+        } catch (Exception e) {
+            pretty = jsonContent; // 非合法 JSON 时保持原样
+        }
+
+        return text.substring(0, start) + "```json\n" + pretty + "\n```" + text.substring(end + 3);
     }
 
     /**
