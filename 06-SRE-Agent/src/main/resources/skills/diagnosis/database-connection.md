@@ -1,3 +1,8 @@
+---
+name: database-connection
+description: 排查数据库连接超时、连接池耗尽等问题
+---
+
 # 问题：数据库连接超时
 
 ## 问题特征

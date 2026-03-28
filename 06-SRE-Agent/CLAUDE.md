@@ -448,6 +448,20 @@ void newFeature_shouldUseCorrectTool() {
 
 **教训**：在 `assertSkillProcessCompliance` 中，构建工具调用序列字符串前，必须先对 `getToolCalls()` 返回的列表调用 `Collections.reverse()` 得到时间正序，再传给 judge。
 
+### 问题复盘（2026-03-28）
+
+**现象一**：`@SpringBootTest` 集成测试挂起，JVM 进程 30+ 分钟无任何测试输出。
+
+**根本原因**：`SREConsole` 是 `CommandLineRunner`，实现了交互式终端输入循环（JLine `readLine()`）。`@SpringBootTest` 内部调用 `SpringApplication.run()`，它会同步执行所有 `CommandLineRunner`。`SREConsole.run()` 阻塞在 `readLine()` 上，导致 Spring 上下文启动永不完成，测试永远无法运行。
+
+**教训**：`SREConsole` 已有 `@ConditionalOnProperty(name="sre.console.enabled", matchIfMissing=true)` 注解，只需在测试类的 `@SpringBootTest(properties="sre.console.enabled=false")` 中禁用即可。**所有使用 `@SpringBootTest` 且项目有阻塞式 CLI 的测试类必须加此配置。**
+
+**现象二**：`SREAgentGraph.streamMessages()` 返回空流，`ask()` 得到空字符串，`assertOutputIsInvestigationConclusion` 断言失败。
+
+**根本原因**：`Agent.streamMessages()` = `stream().transform(this::extractMessages)`，`extractMessages` 仅过滤 `StreamingOutput` 中 `outputType == AGENT_MODEL_STREAMING || AGENT_TOOL_FINISHED` 的条目。`SREAgentGraph` 的 `AgentNode` 内部用 `blockLast()` 消费了 `ReactAgent.streamMessages()` 的所有流，只向 StateGraph 状态写入一个 `Map.of("result", text)`。`StateGraph.stream()` 发出的是普通 `NodeOutput`，不是 `StreamingOutput`，因此 `extractMessages` 过滤掉所有内容，外层收不到任何文本。
+
+**教训**：继承 `Agent` 并用 `NodeAction` 封装内部 `ReactAgent` 时，必须**覆写 `streamMessages(String)`**，直接将用户请求路由到对应的 `ReactAgent.streamMessages()` 并透传其 `Flux<Message>`。StateGraph 继续保留用于 Studio 可视化，但实际流式执行走覆写路径。具体实现见 `SREAgentGraph.streamMessages()` / `determineRouting()`。
+
 ---
 
 ## UI 验证规范（Playwright）

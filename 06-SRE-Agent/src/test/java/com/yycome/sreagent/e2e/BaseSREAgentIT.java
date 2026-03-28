@@ -1,5 +1,8 @@
 package com.yycome.sreagent.e2e;
 
+import com.alibaba.cloud.ai.graph.agent.flow.agent.LlmRoutingAgent;
+import com.yycome.sreagent.config.SREAgentGraph;
+import com.alibaba.cloud.ai.graph.exception.GraphRunnerException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.yycome.sreagent.infrastructure.service.TracingService;
@@ -10,13 +13,14 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.TestInfo;
 import org.junit.jupiter.api.TestInstance;
-import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.util.StringUtils;
 
 import java.io.IOException;
 import java.lang.reflect.Method;
@@ -33,7 +37,6 @@ import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
 /**
@@ -53,7 +56,7 @@ public abstract class BaseSREAgentIT {
             new java.util.concurrent.atomic.AtomicBoolean(false);
 
     @Autowired
-    protected ChatClient supervisorAgent;
+    private SREAgentGraph sreAgent;
 
     /** 无工具绑定的底层模型，专用于 LLM-as-Judge 评估，避免干扰 TracingService */
     @Autowired
@@ -152,7 +155,7 @@ public abstract class BaseSREAgentIT {
 
     /**
      * 向 Agent 发起自然语言请求，自动捕获耗时和工具调用情况。
-     * 所有端到端测试方法应使用此方法而非直接调用 supervisorAgent。
+     * 所有端到端测试方法应使用此方法而非直接调用 sreAgent。
      */
     protected String ask(String question) {
         int tracesBefore = tracingService.getTraceCount();
@@ -161,29 +164,29 @@ public abstract class BaseSREAgentIT {
         AtomicLong ttfbMs = new AtomicLong(-1);
         StringBuilder responseBuilder = new StringBuilder();
         CountDownLatch latch = new CountDownLatch(1);
-        AtomicReference<reactor.core.Disposable> subscription = new AtomicReference<>();
 
         long start = System.currentTimeMillis();
 
-        // 使用流式调用，所有输出通过 LLM 处理
-        reactor.core.Disposable sub = supervisorAgent.prompt()
-                .user(question)
-                .stream()
-                .content()
-                .doOnNext(chunk -> {
-                    // 记录首字节时间
-                    if (ttfbMs.get() < 0) {
-                        ttfbMs.set(System.currentTimeMillis() - start);
-                    }
-                    responseBuilder.append(chunk);
-                })
-                .doOnComplete(latch::countDown)
-                .doOnError(e -> latch.countDown())
-                .doOnCancel(latch::countDown)
-                .subscribe();
-        subscription.set(sub);
         try {
-            latch.await();
+            sreAgent.streamMessages(question)
+                    .filter(msg -> msg instanceof AssistantMessage am && StringUtils.hasText(am.getText()))
+                    .map(msg -> ((AssistantMessage) msg).getText())
+                    .doOnNext(chunk -> {
+                        if (ttfbMs.get() < 0) {
+                            ttfbMs.set(System.currentTimeMillis() - start);
+                        }
+                        responseBuilder.append(chunk);
+                    })
+                    .doOnComplete(latch::countDown)
+                    .doOnError(e -> latch.countDown())
+                    .subscribe();
+        } catch (GraphRunnerException e) {
+            latch.countDown();
+            throw new RuntimeException("sreAgent.streamMessages 失败", e);
+        }
+
+        try {
+            latch.await(120, java.util.concurrent.TimeUnit.SECONDS);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         }
