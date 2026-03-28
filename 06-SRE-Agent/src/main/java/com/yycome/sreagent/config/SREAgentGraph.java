@@ -70,17 +70,34 @@ public class SREAgentGraph extends Agent {
     }
 
     /**
-     * 重写 streamMessages：先路由再直接委托给子 Agent，绕过 StateGraph 的 extractMessages 过滤。
-     * StateGraph 里的 AgentNode 调用 blockLast() 消费了子 Agent 的流，导致外层无 StreamingOutput
-     * 可提取。覆写后直接透传子 Agent 的 Flux<Message>，使 SSE 和测试都能收到流式文本。
+     * 重写 streamMessages：先输出路由决策标签，再委托给对应子 Agent 流式输出。
+     * 这样 Studio/SSE 前端可以看到：① 路由器的决策（query/investigate）② 哪个 agent 在处理
+     * ③ 该 agent 的完整流式输出（token-by-token）。
+     *
+     * <p>与 GraphProcessor 模式类似：每个 agent 有自己独立的标签输出，可观测各自所做的动作。
+     * 区别在于保留了 token 级别的流式输出（而非等节点完成后一次性输出）。
      */
     @Override
     public Flux<Message> streamMessages(String input) throws GraphRunnerException {
         String routing = determineRouting(input);
-        log.info("streamMessages routing: input='{}', routing='{}'", input, routing);
-        return "query".equals(routing)
+        String agentName = "query".equals(routing) ? "queryAgent" : "investigateAgent";
+        log.info("streamMessages routing: input='{}', routing='{}', agent='{}'", input, routing, agentName);
+
+        // 路由器决策标签（立即输出）
+        AssistantMessage routerMsg = new AssistantMessage(
+                "> **[路由器]** → `" + routing + "` 类型，路由至 **" + agentName + "**\n\n");
+        // Agent 名称标签
+        AssistantMessage agentHeader = new AssistantMessage("**[" + agentName + "]**\n\n");
+
+        // 选中的 agent 流式输出（token-by-token）
+        Flux<Message> agentStream = "query".equals(routing)
                 ? queryAgent.streamMessages(input)
                 : investigateAgent.streamMessages(input);
+
+        return Flux.concat(
+                Flux.just((Message) routerMsg, (Message) agentHeader),
+                agentStream
+        );
     }
 
     private String determineRouting(String input) {

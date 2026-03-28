@@ -306,6 +306,10 @@ public abstract class BaseSREAgentIT {
 
     /**
      * 将最后一次 ask() 的输出解析为 JsonNode。
+     * 支持以下输出格式（兼容 streamMessages 的 agent 标签和 JSON 代码块包裹）：
+     * - 纯 JSON：{...}
+     * - 带标签：**[queryAgent]**\n\n{...}  或  **[queryAgent]**\n\n```json\n{...}\n```
+     * - 带路由器前缀：> **[路由器]** ...\n\n**[queryAgent]**\n\n{...}
      */
     protected JsonNode parseOutput() {
         String output = currentRecord != null ? currentRecord.output : null;
@@ -313,10 +317,32 @@ public abstract class BaseSREAgentIT {
                 .as("ask() 的输出不能为空")
                 .isNotBlank();
         try {
-            return OUTPUT_MAPPER.readTree(output);
+            return OUTPUT_MAPPER.readTree(extractJsonPart(output));
         } catch (Exception e) {
             throw new AssertionError("输出不是合法 JSON: " + truncate(output, 200) + "\n原因: " + e.getMessage());
         }
+    }
+
+    /**
+     * 从可能带有 agent 标签或 ```json 代码块的输出中提取纯 JSON 字符串。
+     */
+    private String extractJsonPart(String output) {
+        // 优先从 ```json ... ``` 代码块中提取
+        int codeBlockStart = output.indexOf("```json");
+        if (codeBlockStart >= 0) {
+            int contentStart = codeBlockStart + "```json".length();
+            int codeBlockEnd = output.lastIndexOf("```");
+            if (codeBlockEnd > contentStart) {
+                return output.substring(contentStart, codeBlockEnd).trim();
+            }
+        }
+        // 退化：找到第一个 { 和最后一个 } 之间的内容
+        int start = output.indexOf('{');
+        int end = output.lastIndexOf('}');
+        if (start >= 0 && end > start) {
+            return output.substring(start, end + 1);
+        }
+        return output;
     }
 
     /**
@@ -399,7 +425,7 @@ public abstract class BaseSREAgentIT {
             """;
 
     protected void assertOutputIsInvestigationConclusion(String response) {
-        String judgePrompt = JUDGE_PROMPT_TEMPLATE.formatted(truncate(response, 500));
+        String judgePrompt = JUDGE_PROMPT_TEMPLATE.formatted(truncate(response, 2000));
 
         String judgment;
         try {

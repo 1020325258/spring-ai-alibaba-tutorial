@@ -20,6 +20,7 @@ description: 排查合同发起时缺少个性化报价的原因
    - ontologyQuery(entity=ContractQuotationRelation, value={签约单据ID}, queryScope=PersonalQuote)
 
 4. **分析数据链并输出结论**
+   - **必须按数据链逐步说明每步发现了什么、为何继续或终止排查**
    - 断点位置 + 可能原因 + 建议操作
    - **必须输出结论，不能只返回数据**
 
@@ -40,26 +41,6 @@ description: 排查合同发起时缺少个性化报价的原因
 - 报价未创建或未绑定
 - 报价状态异常（status不为1）
 - 报价金额为0或异常
-```
-
-## 输出格式
-
-**必须同时包含数据和结论**：
-
-```json
-{
-  "queryEntity": "Order",
-  "queryValue": "825123110000002753",
-  "dataChain": {
-    "order": {...},
-    "contracts": [...],
-    "analysis": {
-      "断点位置": "xxx",
-      "可能原因": ["原因1", "原因2"],
-      "建议操作": ["操作1", "操作2"]
-    }
-  }
-}
 ```
 
 ## Example
