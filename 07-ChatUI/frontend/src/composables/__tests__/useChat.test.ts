@@ -60,4 +60,28 @@ describe('useChat', () => {
     await sendMessage('test')
     expect(isStreaming.value).toBe(false)
   })
+
+  it('handles HTTP error responses', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: false,
+      status: 500,
+    }))
+
+    const { messages, sendMessage } = useChat()
+    await sendMessage('test')
+
+    const assistant = messages.value.find(m => m.role === 'assistant')
+    expect(assistant?.content).toContain('[错误]')
+  })
+
+  it('handles network failure', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('Network error')))
+
+    const { messages, sendMessage } = useChat()
+    await sendMessage('test')
+
+    const assistant = messages.value.find(m => m.role === 'assistant')
+    expect(assistant?.content).toContain('[错误]')
+    expect(assistant?.content).toContain('Network error')
+  })
 })

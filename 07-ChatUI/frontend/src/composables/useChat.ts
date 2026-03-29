@@ -41,7 +41,7 @@ export function useChat() {
         if (done) break
 
         buffer += decoder.decode(value, { stream: true })
-        const lines = buffer.split('\n')
+        const lines = buffer.split(/\r?\n/)
         buffer = lines.pop() ?? ''
 
         for (const line of lines) {
@@ -59,6 +59,10 @@ export function useChat() {
       msg.content = `[错误] ${err instanceof Error ? err.message : '请求失败'}`
     } finally {
       const msg = messages.value[assistantIdx]
+      // Cancel the reader to free resources (may not exist if fetch failed early)
+      if (typeof reader !== 'undefined') {
+        await reader.cancel().catch(() => {}) // ignore cancel errors
+      }
       msg.streaming = false
       isStreaming.value = false
     }
