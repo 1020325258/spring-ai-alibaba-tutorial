@@ -1,4 +1,0 @@
-/**
- * @vitest-environment jsdom
- */
-export {};
