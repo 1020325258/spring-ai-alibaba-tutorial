@@ -298,45 +298,13 @@ public class SREConsole implements CommandLineRunner {
     private void printBanner() {
         System.out.println();
         System.out.println(Ansi.ansi().fg(Ansi.Color.CYAN).bold()
-                .a("  ███████╗██████╗ ███████╗███╗   ███╗ █████╗ ████████╗███████╗").reset());
+                .a("╔═══════════════════════════════════════════════════════════╗").reset());
         System.out.println(Ansi.ansi().fg(Ansi.Color.CYAN).bold()
-                .a("  ██╔════╝██╔══██╗██╔════╝████╗ ████║██╔══██╗╚══██╔══╝██╔════╝").reset());
-        System.out.println(Ansi.ansi().bold()
-                .a("  ███████╗██████╔╝█████╗  ██╔████╔██║███████║   ██║   █████╗  ").reset());
-        System.out.println(Ansi.ansi().bold()
-                .a("  ╚════██║██╔══██╗██╔══╝  ██║╚██╔╝██║██╔══██║   ██║   ██╔══╝  ").reset());
-        System.out.println(Ansi.ansi().fg(Ansi.Color.BLUE).bold()
-                .a("  ███████║██║  ██║███████╗██║ ╚═╝ ██║██║  ██║   ██║   ███████╗").reset());
-        System.out.println(Ansi.ansi().fg(Ansi.Color.BLUE).bold()
-                .a("  ╚══════╝╚═╝  ╚═╝╚══════╝╚═╝     ╚═╝╚═╝  ╚═╝   ╚═╝   ╚══════╝").reset());
-        System.out.println();
-
-        System.out.println(Ansi.ansi().fg(Ansi.Color.CYAN)
-                .a("  ──────────────────────────────────────────────────────────────").reset());
-        System.out.println(Ansi.ansi().fg(Ansi.Color.GREEN).bold()
-                .a("      智能 SRE 值班助手  ·  v2.0  ·  Powered by Qwen-Turbo      ").reset());
-        System.out.println(Ansi.ansi().fg(Ansi.Color.MAGENTA)
-                .a("      当前环境: " + environmentConfig.getCurrentEnvDescription() + "      ").reset());
-        System.out.println(Ansi.ansi().fg(Ansi.Color.CYAN)
-                .a("  ──────────────────────────────────────────────────────────────").reset());
-        System.out.println();
-
-        System.out.println(Ansi.ansi().fg(Ansi.Color.YELLOW).bold().a("  可用命令").reset()
-                .fg(Ansi.Color.WHITE).a("  ·  ·  ·  ·  ·  ·  ·  ·  ·  ·  ·  ·  ·  ·  ·  ·  ·  ·").reset());
-        System.out.println(Ansi.ansi().fg(Ansi.Color.WHITE).bold().a("  ├─ /tools ").reset()
-                .fg(Ansi.Color.YELLOW).a(" 显示数据查询工具").reset());
-        System.out.println(Ansi.ansi().fg(Ansi.Color.WHITE).bold().a("  ├─ /help  ").reset()
-                .fg(Ansi.Color.YELLOW).a(" 显示帮助信息").reset());
-        System.out.println(Ansi.ansi().fg(Ansi.Color.WHITE).bold().a("  ├─ /stats ").reset()
-                .fg(Ansi.Color.YELLOW).a(" 查看性能统计").reset());
-        System.out.println(Ansi.ansi().fg(Ansi.Color.WHITE).bold().a("  ├─ /trace ").reset()
-                .fg(Ansi.Color.YELLOW).a(" 查看最近工具调用记录").reset());
-        System.out.println(Ansi.ansi().fg(Ansi.Color.WHITE).bold().a("  ├─ /env   ").reset()
-                .fg(Ansi.Color.YELLOW).a(" 查看或切换环境").reset());
-        System.out.println(Ansi.ansi().fg(Ansi.Color.WHITE).bold().a("  └─ /quit  ").reset()
-                .fg(Ansi.Color.YELLOW).a(" 退出程序").reset());
-        System.out.println();
-        System.out.println(Ansi.ansi().fg(Ansi.Color.GREEN).a("  输入 / 查看所有命令  ·  Tab 自动补全").reset());
+                .a("║           SRE-Agent v2.0  Started                          ║").reset());
+        System.out.println(Ansi.ansi().fg(Ansi.Color.CYAN).bold()
+                .a("║   环境: " + environmentConfig.getCurrentEnvDescription() + "                                ║").reset());
+        System.out.println(Ansi.ansi().fg(Ansi.Color.CYAN).bold()
+                .a("╚═══════════════════════════════════════════════════════════╝").reset());
         System.out.println();
     }
 

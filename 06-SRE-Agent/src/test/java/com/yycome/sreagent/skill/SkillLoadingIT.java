@@ -27,8 +27,8 @@ class SkillLoadingIT {
     }
 
     @Test
-    @DisplayName("SkillRegistry 能获取 missing-personal-quote-diagnosis Skill")
-    void skillRegistryShouldFindMissingPersonalQuoteDiagnosisSkill() {
+    @DisplayName("SkillRegistry 能获取 sales-contract-sign-dialog-diagnosis Skill")
+    void skillRegistryShouldFindSalesContractSignDialogDiagnosisSkill() {
         assertThat(skillRegistry).isNotNull();
         // 验证 Skill 加载
     }

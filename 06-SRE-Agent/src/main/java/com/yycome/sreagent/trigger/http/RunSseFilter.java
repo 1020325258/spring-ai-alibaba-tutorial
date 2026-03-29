@@ -14,21 +14,29 @@ import org.springframework.util.StreamUtils;
 import jakarta.servlet.*;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
 
 /**
- * 拦截 /run_sse 请求，使用 streamMessages() 替代 stream() 避免重复输出。
+ * 拦截 /run_sse 请求，调用 streamMessages() 替代 Studio ExecutionController 的 stream() 路径。
  *
- * 根因：Studio 使用 agent.stream() 返回 Flux&lt;NodeOutput&gt;，
- * 在 LlmRoutingAgent + ReactAgent 两层结构中，两个节点都会发出包含相同文本的 NodeOutput，
- * 导致 Studio 前端拼接两次相同内容。使用 streamMessages() 可避免此问题。
+ * 根因：Studio ExecutionController 调用 agent.stream(UserMessage, RunnableConfig)，
+ * 返回 Flux&lt;NodeOutput&gt;。SREAgentGraph 的自定义节点（AgentNode / AdminNode）通过
+ * state["result"] 传递结果，产生普通 NodeOutput 而非 StreamingOutput，Studio 无法从中
+ * 提取可渲染的 chunk 内容，导致 UI 无输出。
+ *
+ * 本 Filter 短路 Studio 的处理链，直接调用 streamMessages() 获取 Flux&lt;Message&gt;，
+ * 并以与 ExecutionController 相同的 SSE 格式写回响应。
  */
 @Component
 @Order(Ordered.HIGHEST_PRECEDENCE)
 public class RunSseFilter implements Filter {
+
+    private static final Logger log = LoggerFactory.getLogger(RunSseFilter.class);
 
     private final SREAgentGraph sreAgent;
     private final ObjectMapper objectMapper;
@@ -94,6 +102,7 @@ public class RunSseFilter implements Filter {
                                 }
                             },
                             error -> {
+                                log.error("RunSseFilter streamMessages error", error);
                                 try {
                                     writer.write("data: [DONE]\n\n");
                                     writer.flush();

@@ -31,7 +31,7 @@ public class ReadSkillTool {
         - If the skill is not found, an error will be returned
 
         Example:
-        - read_skill("missing-personal-quote-diagnosis")
+        - read_skill("sales-contract-sign-dialog-diagnosis")
         """)
     public String readSkill(
             @ToolParam(description = "The name of the skill to read, must match one of the names in the Available Skills list") String skillName) {

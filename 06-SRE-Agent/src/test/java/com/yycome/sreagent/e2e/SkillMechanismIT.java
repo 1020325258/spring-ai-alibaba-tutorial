@@ -42,10 +42,10 @@ class SkillMechanismIT extends BaseSREAgentIT {
     }
 
     @Test
-    @DisplayName("ReadSkillTool 能加载 missing-personal-quote-diagnosis Skill")
-    void readSkillTool_should_load_missing_personal_quote() {
+    @DisplayName("ReadSkillTool 能加载 sales-contract-sign-dialog-diagnosis Skill")
+    void readSkillTool_should_load_sales_contract_sign_dialog_diagnosis() {
         // 当
-        String content = readSkillTool.readSkill("missing-personal-quote-diagnosis");
+        String content = readSkillTool.readSkill("sales-contract-sign-dialog-diagnosis");
 
         // 那么
         assertThat(content)
@@ -78,7 +78,7 @@ class SkillMechanismIT extends BaseSREAgentIT {
     @DisplayName("LLM 在排查场景中调用 read_skill - 完整流程")
     void llm_should_call_read_skill_in_investigate_scenario() {
         // 当 - 发起排查请求
-        String response = ask("排查合同C1767173898135504发起时缺少个性化报价的原因");
+        String response = ask("销售合同C1767173898135504发起时弹窗提示\"请先完成报价\"");
 
         // 那么
         // LLM 可能调用 readSkill（按 Skill 流程），也可能直接返回数据（DirectOutput）

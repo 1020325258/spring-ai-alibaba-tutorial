@@ -8,13 +8,16 @@ import com.alibaba.cloud.ai.graph.agent.ReactAgent;
 import com.alibaba.cloud.ai.graph.exception.GraphRunnerException;
 import com.alibaba.cloud.ai.graph.exception.GraphStateException;
 import com.alibaba.cloud.ai.graph.state.strategy.ReplaceStrategy;
-import com.alibaba.cloud.ai.graph.streaming.StreamingOutput;
+import com.yycome.sreagent.config.node.AdminNode;
+import com.yycome.sreagent.config.node.AgentNode;
+import com.yycome.sreagent.config.node.RouterDispatcher;
+import com.yycome.sreagent.config.node.RouterNode;
+import com.yycome.sreagent.infrastructure.config.EnvironmentConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.model.ChatModel;
-import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Lazy;
@@ -23,8 +26,6 @@ import reactor.core.publisher.Flux;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.*;
-import java.util.stream.Collectors;
-
 import static com.alibaba.cloud.ai.graph.StateGraph.END;
 import static com.alibaba.cloud.ai.graph.StateGraph.START;
 import static com.alibaba.cloud.ai.graph.action.AsyncNodeAction.node_async;
@@ -36,23 +37,13 @@ import static com.alibaba.cloud.ai.graph.action.AsyncEdgeAction.edge_async;
  *
  * extends Agent（抽象类），通过 initGraph() 构建图结构，
  * 供 SREAgentLoader 向 Spring AI Alibaba Studio 注册。
+ *
+ * 各节点实现见 {@code config.node} 包：RouterNode、AgentNode、AdminNode、RouterDispatcher。
  */
 @Component
 public class SREAgentGraph extends Agent {
 
     private static final Logger log = LoggerFactory.getLogger(SREAgentGraph.class);
-
-    static final String ROUTER_PROMPT = """
-            你是一个路由器，根据用户问题判断应该使用哪个 Agent 处理。
-
-            回复规则：
-            - 用户想查询数据（订单、合同、节点、报价等）→ 只回复 "query"
-            - 用户想排查问题（排查工单、诊断异常、弹窗提示等）→ 只回复 "investigate"
-
-            用户问题: %s
-
-            注意：只回复一个单词，不要其他文字。
-            """;
 
     @Lazy
     @Autowired
@@ -65,70 +56,60 @@ public class SREAgentGraph extends Agent {
     private ReactAgent investigateAgent;
 
     private final ChatModel chatModel;
+    private final EnvironmentConfig environmentConfig;
 
-    public SREAgentGraph(ChatModel chatModel) {
+    public SREAgentGraph(ChatModel chatModel, EnvironmentConfig environmentConfig) {
         super("sre-agent", "SRE-Agent: 数据查询和问题排查");
         this.chatModel = chatModel;
+        this.environmentConfig = environmentConfig;
     }
 
     /**
-     * 重写 streamMessages：先输出路由决策标签，再委托给对应子 Agent 流式输出。
-     * 这样 Studio/SSE 前端可以看到：① 路由器的决策（query/investigate）② 哪个 agent 在处理
-     * ③ 该 agent 的完整流式输出（token-by-token）。
-     *
-     * <p>与 GraphProcessor 模式类似：每个 agent 有自己独立的标签输出，可观测各自所做的动作。
-     * 区别在于保留了 token 级别的流式输出（而非等节点完成后一次性输出）。
+     * 重写 streamMessages：调用 compiledGraph.stream()，按节点名从 state 提取输出转为 Message。
+     * 参考 GraphProcessor 模式（04-AnalysisAgent），对 Flux&lt;NodeOutput&gt; 按节点逐个处理：
+     * <ul>
+     *   <li>router 节点 → 输出路由决策标签（读 state["routingTarget"]）</li>
+     *   <li>queryAgent / investigateAgent / admin 节点 → 输出结果（读 state["result"]）</li>
+     * </ul>
      */
     @Override
     public Flux<Message> streamMessages(String input) throws GraphRunnerException {
-        String routing = determineRouting(input);
-        String agentName = "query".equals(routing) ? "queryAgent" : "investigateAgent";
-        log.info("streamMessages routing: input='{}', routing='{}', agent='{}'", input, routing, agentName);
-
-        // 路由器决策标签（立即输出）
-        AssistantMessage routerMsg = new AssistantMessage(
-                "> **[路由器]** → `" + routing + "` 类型，路由至 **" + agentName + "**\n\n");
-        // Agent 名称标签
-        AssistantMessage agentHeader = new AssistantMessage("**[" + agentName + "]**\n\n");
-
-        if ("query".equals(routing)) {
-            // 查询结果：收集所有 token，规范化代码块格式后一次性发送。
-            // 避免流式渲染时 ```json 无换行导致 Studio 前端 react-markdown children=undefined → 显示 "undefined"
-            Flux<Message> agentStream = queryAgent.streamMessages(input)
-                    .filter(msg -> msg instanceof AssistantMessage am && !am.getText().isEmpty())
-                    .collectList()
-                    .flatMapMany(messages -> {
-                        String fullText = messages.stream()
-                                .map(m -> ((AssistantMessage) m).getText())
-                                .collect(Collectors.joining());
-                        // 规范化：确保 ```json 后有换行，并对 JSON 内容做 pretty-print
-                        String normalized = normalizeAndPrettifyJson(fullText);
-                        return Flux.just((Message) new AssistantMessage(normalized));
-                    });
-            return Flux.concat(
-                    Flux.just((Message) routerMsg, (Message) agentHeader),
-                    agentStream
-            );
-        } else {
-            // 排查结论：保持 token 级别流式输出，展示逐步推理过程
-            Flux<Message> agentStream = investigateAgent.streamMessages(input);
-            return Flux.concat(
-                    Flux.just((Message) routerMsg, (Message) agentHeader),
-                    agentStream
-            );
-        }
-    }
-
-    private String determineRouting(String input) {
-        try {
-            String fullPrompt = String.format(ROUTER_PROMPT, input);
-            var response = chatModel.call(new Prompt(fullPrompt));
-            String result = response.getResult().getOutput().getText().trim().toLowerCase();
-            return result.contains("query") ? "query" : "investigate";
-        } catch (Exception e) {
-            log.warn("路由 LLM 调用失败，降级为 investigate", e);
-            return "investigate";
-        }
+        Map<String, Object> inputs = Map.of(OverAllState.DEFAULT_INPUT_KEY, input);
+        return Flux.defer(() -> {
+            try {
+                log.info("streamMessages 开始执行，input={}", input);
+                return getAndCompileGraph()
+                        .stream(inputs, RunnableConfig.builder().build())
+                        .doOnSubscribe(s -> log.info("streamMessages 图已订阅"))
+                        .doOnNext(no -> log.info("streamMessages 收到节点: {}", no.node()))
+                        .doOnError(e -> log.error("streamMessages 图执行异常（异步）", e))
+                        .doOnComplete(() -> log.info("streamMessages 图执行完成"))
+                        .flatMap(no -> {
+                            String nodeName = no.node();
+                            if (StateGraph.START.equals(nodeName) || StateGraph.END.equals(nodeName)) {
+                                return Flux.<Message>empty();
+                            }
+                            if ("router".equals(nodeName)) {
+                                String target = no.state().value("routingTarget", "investigateAgent");
+                                log.info("streamMessages router → {}", target);
+                                return Flux.just((Message) new AssistantMessage(
+                                        "> **[路由器]** 路由至 **" + target + "**\n\n"));
+                            }
+                            if ("queryAgent".equals(nodeName) || "investigateAgent".equals(nodeName)
+                                    || "admin".equals(nodeName)) {
+                                String result = no.state().value("result", "");
+                                log.info("streamMessages {} 结果长度: {}", nodeName, result.length());
+                                String normalized = normalizeAndPrettifyJson(result);
+                                return Flux.just((Message) new AssistantMessage(normalized));
+                            }
+                            log.warn("streamMessages 未知节点: {}", nodeName);
+                            return Flux.<Message>empty();
+                        });
+            } catch (Exception e) {
+                log.error("streamMessages 图执行异常（同步）", e);
+                return Flux.error(e);
+            }
+        });
     }
 
     private static final ObjectMapper PRETTY_MAPPER = new ObjectMapper();
@@ -172,7 +153,7 @@ public class SREAgentGraph extends Agent {
 
         StateGraph graph = new StateGraph(() -> {
             Map<String, KeyStrategy> keyStrategyMap = new HashMap<>();
-            keyStrategyMap.put("routing", new ReplaceStrategy());
+            keyStrategyMap.put("routingTarget", new ReplaceStrategy());
             keyStrategyMap.put("result", new ReplaceStrategy());
             keyStrategyMap.put(OverAllState.DEFAULT_INPUT_KEY, new ReplaceStrategy());
             return keyStrategyMap;
@@ -180,89 +161,17 @@ public class SREAgentGraph extends Agent {
 
         graph.addNode("router", node_async(new RouterNode(chatModel)))
              .addNode("queryAgent", node_async(new AgentNode(queryAgent)))
-             .addNode("investigateAgent", node_async(new AgentNode(investigateAgent)));
+             .addNode("investigateAgent", node_async(new AgentNode(investigateAgent)))
+             .addNode("admin", node_async(new AdminNode(environmentConfig)));
 
         graph.addEdge(START, "router")
-             .addConditionalEdges("router", edge_async(new RouterEdge()),
-                     Map.of("queryAgent", "queryAgent", "investigateAgent", "investigateAgent"))
+             .addConditionalEdges("router", edge_async(new RouterDispatcher()),
+                     Map.of("queryAgent", "queryAgent", "investigateAgent", "investigateAgent", "admin", "admin"))
              .addEdge("queryAgent", END)
-             .addEdge("investigateAgent", END);
+             .addEdge("investigateAgent", END)
+             .addEdge("admin", END);
 
         return graph;
     }
 
-    // ==================== 内部类 ====================
-
-    /**
-     * 路由节点：LLM 判断用户意图
-     */
-    private static class RouterNode implements com.alibaba.cloud.ai.graph.action.NodeAction {
-        private final ChatModel chatModel;
-        private final Logger log = LoggerFactory.getLogger(RouterNode.class);
-
-
-        public RouterNode(ChatModel chatModel) {
-            this.chatModel = chatModel;
-        }
-
-        @Override
-        public Map<String, Object> apply(OverAllState state) throws Exception {
-            String input = state.value(OverAllState.DEFAULT_INPUT_KEY, "");
-            log.info("RouterNode 收到 input: {}", input);
-
-            String fullPrompt = String.format(ROUTER_PROMPT, input);
-            var response = chatModel.call(new Prompt(fullPrompt));
-            String result = response.getResult().getOutput().getText().trim().toLowerCase();
-
-            String routing = result.contains("query") ? "query" : "investigate";
-            log.info("RouterNode routing 结果: {}", routing);
-
-            return Map.of("routing", routing);
-        }
-    }
-
-    /**
-     * Agent 节点：封装 ReactAgent 调用，同步等待结果
-     */
-    private static class AgentNode implements com.alibaba.cloud.ai.graph.action.NodeAction {
-        private final ReactAgent agent;
-        private final Logger log = LoggerFactory.getLogger(AgentNode.class);
-
-        public AgentNode(ReactAgent agent) {
-            this.agent = agent;
-        }
-
-        @Override
-        public Map<String, Object> apply(OverAllState state) throws Exception {
-            String input = state.value(OverAllState.DEFAULT_INPUT_KEY, "");
-            log.info("AgentNode 收到 input: {}", input);
-
-            StringBuilder resultBuilder = new StringBuilder();
-
-            agent.streamMessages(input)
-                    .filter(msg -> msg instanceof AssistantMessage am && !am.getText().isEmpty())
-                    .doOnNext(msg -> resultBuilder.append(((AssistantMessage) msg).getText()))
-                    .blockLast();
-
-            String result = resultBuilder.toString();
-            log.info("AgentNode 执行完成, result length: {}", result.length());
-
-            return Map.of("result", result);
-        }
-    }
-
-    /**
-     * 路由边：根据路由结果选择目标节点
-     */
-    private static class RouterEdge implements com.alibaba.cloud.ai.graph.action.EdgeAction {
-        private final Logger log = LoggerFactory.getLogger(RouterEdge.class);
-
-        @Override
-        public String apply(OverAllState state) throws Exception {
-            String routing = state.value("routing", "");
-            String target = "query".equals(routing) ? "queryAgent" : "investigateAgent";
-            log.info("RouterEdge 选择目标: {}", target);
-            return target;
-        }
-    }
 }

@@ -217,7 +217,7 @@ void newEntity_shouldUseContractEntityAndNewEntityScope() {
 
 ### 环境切换
 
-通过 `/env` 命令查看和切换环境。可用环境：`nrs-escrow`（测试环境，默认）、`offline-beta`（基准环境）。
+通过页面输入框的"当前环境"、"切换到xxx环境"等关键词查看和切换环境。可用环境：`nrs-escrow`（测试环境，默认）、`offline-beta`（基准环境）。
 
 **接口模板占位符**：`urlTemplate: "http://服务名.${env}.ttb.test.ke.com/api/..."`
 
@@ -462,16 +462,23 @@ void newFeature_shouldUseCorrectTool() {
 
 **教训**：继承 `Agent` 并用 `NodeAction` 封装内部 `ReactAgent` 时，必须**覆写 `streamMessages(String)`**，直接将用户请求路由到对应的 `ReactAgent.streamMessages()` 并透传其 `Flux<Message>`。StateGraph 继续保留用于 Studio 可视化，但实际流式执行走覆写路径。具体实现见 `SREAgentGraph.streamMessages()` / `determineRouting()`。
 
+### 问题复盘（2026-03-28 第二次）
+
+**现象一**：Studio 页面 queryAgent 代码块显示 `undefined`。
+
+**根本原因**：Studio 前端 `react-markdown` 在流式渲染时，收到 ` ```json ` token 后内容还未到达，`code` 组件的 `children = undefined`，`String(undefined) = "undefined"` 被写入 DOM，且 streaming 结束后不再更新（最终态仍为 `undefined`）。另一个诱因是 LLM 有时输出 ` ```json{JSON} `（无换行），导致解析器把 JSON 当作 info string 而非内容。
+
+**修复方案**：`SREAgentGraph.streamMessages()` 查询路径改为收集全部 token、`normalizeAndPrettifyJson()` 规范化 + pretty-print 后**一次性**发送给前端，彻底绕过部分渲染问题。
+
+**教训**：查询类 Agent 的输出（有明确结束点的 JSON）不需要 token 级流式，应先收集再发送；排查类 Agent（逐步推理）才需要 token 级流式。两种路径在 `SREAgentGraph.streamMessages()` 中已通过 `if ("query"...)` 分支分开处理。
+
+**现象二**：改完提示词后，QueryAgentIT 测试全量失败（工具调用为零），但排查路径正常。
+
+**根本原因**：`sre-agent.md` 输出规则中加入了带 `{工具返回的原始 JSON}` 占位符的代码块模板。LLM 把这个 `{...}` 解读为"填空题"，直接生成 JSON 文本而不调用 `ontologyQuery` 工具。
+
+**教训**：**系统提示词中禁止使用 `{占位符}` 形式的模板示例来说明输出格式。** 应使用纯文字描述（如"用 \`\`\`json 代码块包裹"），不要用含花括号的模板变量，否则 LLM 会尝试自己填充而跳过工具调用。
+
 ---
-
-## UI 验证规范（Playwright）
-
-涉及 UI 代码修改时，使用 Playwright 验证 UI 正确性。
-
-```bash
-# 截图
-playwright screenshot http://localhost:8089/ontology.html screenshot.png --full-page
-```
 
 ---
 

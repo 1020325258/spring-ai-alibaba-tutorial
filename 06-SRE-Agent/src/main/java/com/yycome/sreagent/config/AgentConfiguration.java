@@ -105,7 +105,6 @@ public class AgentConfiguration {
     private String buildSkillsList(SkillRegistry skillRegistry) {
         StringBuilder sb = new StringBuilder();
         sb.append("## Available Skills\n\n");
-        sb.append("- missing-personal-quote-diagnosis: 排查合同发起时缺少个性化报价的原因\n");
         sb.append("- sales-contract-sign-dialog-diagnosis: 排查销售/正签合同弹窗提示\"请先完成报价\"的原因\n");
         return sb.toString();
     }

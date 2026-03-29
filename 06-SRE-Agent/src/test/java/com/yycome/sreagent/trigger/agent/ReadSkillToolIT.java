@@ -23,7 +23,7 @@ class ReadSkillToolIT {
     @DisplayName("read_skill 工具能返回 Skill 内容")
     void readSkillShouldReturnSkillContent() {
         // When
-        String content = readSkillTool.readSkill("missing-personal-quote-diagnosis");
+        String content = readSkillTool.readSkill("sales-contract-sign-dialog-diagnosis");
 
         // Then
         assertThat(content).isNotNull();
