@@ -12,7 +12,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * ReadSkillTool 集成测试
  * 验收：8.4 Skill 加载验收 - read_skill 工具能返回 Skill 内容
  */
-@SpringBootTest(properties = "sre.console.enabled=false")
+@SpringBootTest
 @ActiveProfiles("local")
 class ReadSkillToolIT {
 
