@@ -1,0 +1,6 @@
+# Frontend build output
+src/main/resources/static/
+
+# Frontend dependencies & build
+frontend/node_modules/
+frontend/dist/
