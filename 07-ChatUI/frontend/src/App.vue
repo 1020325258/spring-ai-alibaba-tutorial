@@ -29,7 +29,7 @@
             <MarkdownRender
               :nodes="msg.nodes"
               :final="!msg.streaming"
-              :max-live-nodes="msg.streaming ? 0 : 320"
+              :max-live-nodes="msg.streaming ? MAX_LIVE_NODES_STREAMING : MAX_LIVE_NODES_DONE"
               :is-dark="true"
             />
             <span v-if="msg.streaming" class="cursor-blink">▌</span>
@@ -66,6 +66,9 @@ import { ref, nextTick, watch } from 'vue'
 import MarkdownRender from 'markstream-vue'
 import { useChat } from './composables/useChat'
 
+const MAX_LIVE_NODES_STREAMING = 0
+const MAX_LIVE_NODES_DONE = 320
+
 const { messages, isStreaming, sendMessage } = useChat()
 const inputText = ref('')
 const listRef = ref<HTMLElement>()
@@ -90,12 +93,12 @@ function resetInputHeight() {
 }
 
 // Auto-scroll to bottom when messages change
-watch(messages, async () => {
+watch(() => messages.value.length, async () => {
   await nextTick()
   if (listRef.value) {
     listRef.value.scrollTop = listRef.value.scrollHeight
   }
-}, { deep: true })
+})
 </script>
 
 <style scoped>

@@ -35,6 +35,7 @@ export function useChat() {
       const reader = res.body.getReader()
       const decoder = new TextDecoder()
       let buffer = ''
+      let chunkCount = 0
 
       while (true) {
         const { done, value } = await reader.read()
@@ -51,9 +52,16 @@ export function useChat() {
 
           const msg = messages.value[assistantIdx]
           msg.content += chunk
-          msg.nodes = parseMarkdownToStructure(msg.content, md)
+          chunkCount++
+          if (chunkCount % 5 === 0) {
+            msg.nodes = parseMarkdownToStructure(msg.content, md)
+          }
         }
       }
+
+      // Final parse to ensure all content is parsed
+      const msg = messages.value[assistantIdx]
+      msg.nodes = parseMarkdownToStructure(msg.content, md)
     } catch (err) {
       const msg = messages.value[assistantIdx]
       msg.content = `[错误] ${err instanceof Error ? err.message : '请求失败'}`
