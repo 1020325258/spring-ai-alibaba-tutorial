@@ -47,7 +47,7 @@ describe('useChat', () => {
     await sendMessage('hi')
 
     const assistant = messages.value.find(m => m.role === 'assistant')
-    expect(assistant?.content).toBe('你好，有什么可以帮你？')
+    expect(assistant?.content).toBe('你\n好，\n有什么可以帮你？\n')
   })
 
   it('sets isStreaming to false after stream ends', async () => {

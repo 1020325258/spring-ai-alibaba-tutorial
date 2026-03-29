@@ -1,0 +1,55 @@
+{
+  "version": 1,
+  "skills": {
+    "markstream-angular": {
+      "source": "Simon-He95/markstream-vue",
+      "sourceType": "github",
+      "computedHash": "200d5f7bb2bb52930047b77b783b89bcbd4bd39cc9ae0a3f1f5f0d908f0e82c4"
+    },
+    "markstream-custom-components": {
+      "source": "Simon-He95/markstream-vue",
+      "sourceType": "github",
+      "computedHash": "5946c40cd03d529ea299a53f6d206a68610304bce5de76481316ad5b562ca72e"
+    },
+    "markstream-install": {
+      "source": "Simon-He95/markstream-vue",
+      "sourceType": "github",
+      "computedHash": "0c095b49c2f22a0db48d6581769508052f7c75d3c79b353146cf200f2e14b9a7"
+    },
+    "markstream-migration": {
+      "source": "Simon-He95/markstream-vue",
+      "sourceType": "github",
+      "computedHash": "1a50bea049671da01a39da66e2d2adb2c8eaae27e49cf36954fa72c185902842"
+    },
+    "markstream-nuxt": {
+      "source": "Simon-He95/markstream-vue",
+      "sourceType": "github",
+      "computedHash": "4082f34667955de155184654068ee449534d1af20a12783c871f2a53e0cbbf66"
+    },
+    "markstream-react": {
+      "source": "Simon-He95/markstream-vue",
+      "sourceType": "github",
+      "computedHash": "e0bd58794f14b58c79643e762cc21896d490720ee9ab4d6f3bd4a5939f72ec28"
+    },
+    "markstream-vue": {
+      "source": "Simon-He95/markstream-vue",
+      "sourceType": "github",
+      "computedHash": "6f451b01d7526fc43887c90169ca6c2501ff4fbc83acaeafc20653e8f034e3aa"
+    },
+    "markstream-vue2": {
+      "source": "Simon-He95/markstream-vue",
+      "sourceType": "github",
+      "computedHash": "d436d8ee3642cd2ce85aa205dd722b767c33b676784ef49a489535dacb0e8aff"
+    },
+    "markstream-vue2-cli": {
+      "source": "Simon-He95/markstream-vue",
+      "sourceType": "github",
+      "computedHash": "53b239567b8895fedfbba94036df11d24b016d7179edfff01b8b163806f201bb"
+    },
+    "markstream-vue2-vite": {
+      "source": "Simon-He95/markstream-vue",
+      "sourceType": "github",
+      "computedHash": "4b1b6137564141c90fac5fb88e23e99551fbcfef015b6ac08c3b40a2898f7e58"
+    }
+  }
+}

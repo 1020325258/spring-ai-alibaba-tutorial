@@ -46,32 +46,62 @@ export function useChat() {
         buffer = lines.pop() ?? ''
 
         for (const line of lines) {
-          if (!line.startsWith('data: ')) continue
-          const chunk = line.slice(6)
+          // 兼容 data: 和 data: 两种格式
+          if (!line.startsWith('data:')) continue
+          const chunk = line.startsWith('data: ')
+            ? line.slice(6)
+            : line.slice(5)
           if (chunk === '[DONE]') continue
+          if (!chunk) continue
 
+          // 替换整个消息对象以触发 Vue 响应式更新
           const msg = messages.value[assistantIdx]
-          msg.content += chunk
+          const newContent = msg.content + chunk + '\n'
+          messages.value[assistantIdx] = {
+            ...msg,
+            content: newContent,
+          }
           chunkCount++
           if (chunkCount % 5 === 0) {
-            msg.nodes = parseMarkdownToStructure(msg.content, md)
+            const updatedMsg = messages.value[assistantIdx]
+            const nodes = parseMarkdownToStructure(updatedMsg.content, md)
+            messages.value[assistantIdx] = {
+              ...updatedMsg,
+              nodes,
+            }
           }
         }
       }
 
       // Final parse to ensure all content is parsed
       const msg = messages.value[assistantIdx]
-      msg.nodes = parseMarkdownToStructure(msg.content, md)
+      console.log('[sendMessage] 最终content:', JSON.stringify(msg.content).slice(0, 300))
+      const finalNodes = parseMarkdownToStructure(msg.content, md)
+      // 统计各节点类型
+      const typeCount: Record<string, number> = {}
+      finalNodes.forEach(n => { typeCount[n.type] = (typeCount[n.type] || 0) + 1 })
+      console.log('[sendMessage] 最终nodes类型统计:', typeCount)
+      console.log('[sendMessage] 最终nodes:', JSON.stringify(finalNodes).slice(0, 500))
+      messages.value[assistantIdx] = {
+        ...msg,
+        nodes: finalNodes,
+      }
     } catch (err) {
+      console.error('[sendMessage] 错误:', err)
       const msg = messages.value[assistantIdx]
-      msg.content = `[错误] ${err instanceof Error ? err.message : '请求失败'}`
+      messages.value[assistantIdx] = {
+        ...msg,
+        content: `[错误] ${err instanceof Error ? err.message : '请求失败'}`,
+      }
     } finally {
       const msg = messages.value[assistantIdx]
-      // Cancel the reader to free resources (may not exist if fetch failed early)
       if (typeof reader !== 'undefined') {
-        await reader.cancel().catch(() => {}) // ignore cancel errors
+        await reader.cancel().catch(() => {})
       }
-      msg.streaming = false
+      messages.value[assistantIdx] = {
+        ...msg,
+        streaming: false,
+      }
       isStreaming.value = false
     }
   }

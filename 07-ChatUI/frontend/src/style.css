@@ -1,14 +1,16 @@
+/* 引入 markstream-vue 样式 */
+@import 'markstream-vue/index.css';
+
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
-  --bg: #1a1a1a;
-  --surface: #2a2a2a;
-  --border: #3a3a3a;
-  --text: #e0e0e0;
-  --text-muted: #888;
-  --accent: #4a9eff;
-  --user-bubble: #1e3a5f;
-  --radius: 12px;
+  --bg: #f3f4f6;
+  --surface: #fff;
+  --border: #e5e7eb;
+  --text: #1f2937;
+  --text-muted: #6b7280;
+  --accent: #3b82f6;
+  --radius: 16px;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 }
 
@@ -20,7 +22,15 @@ body {
   line-height: 1.6;
 }
 
-/* scrollbar */
-::-webkit-scrollbar { width: 6px; }
+/* 滚动条样式 */
+::-webkit-scrollbar { width: 8px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: #9ca3af; }
+
+/* markstream-vue 代码块样式适配浅色主题 */
+.markstream-vue {
+  --markstream-code-fallback-bg: #f9fafb;
+  --markstream-code-fallback-fg: #374151;
+  --markstream-code-border-color: #e5e7eb;
+}
