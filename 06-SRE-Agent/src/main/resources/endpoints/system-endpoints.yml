@@ -1,0 +1,112 @@
+endpoints:
+  - id: health-check
+    name: 应用健康检查
+    description: 检查应用的运行状态和健康情况，包括数据库连接、磁盘空间等
+    category: system
+    urlTemplate: "http://${host}:${port}/actuator/health"
+    method: GET
+    parameters:
+      - name: host
+        type: string
+        description: 应用服务器地址
+        required: true
+        example: "localhost"
+      - name: port
+        type: integer
+        description: 应用端口号
+        required: true
+        example: "8080"
+    timeout: 10
+    examples:
+      - "检查 localhost:8080 的应用健康状态"
+      - "查看 192.168.1.100:8080 的应用是否正常"
+
+  - id: metrics
+    name: 应用性能指标
+    description: 获取应用的性能指标数据，包括内存、CPU、线程等
+    category: system
+    urlTemplate: "http://${host}:${port}/actuator/metrics/${metricName}"
+    method: GET
+    parameters:
+      - name: host
+        type: string
+        description: 应用服务器地址
+        required: true
+      - name: port
+        type: integer
+        description: 应用端口号
+        required: true
+      - name: metricName
+        type: string
+        description: 指标名称，如 jvm.memory.used, process.cpu.usage
+        required: false
+        defaultValue: "jvm.memory.used"
+    timeout: 10
+
+  - id: thread-dump
+    name: 线程转储
+    description: 获取应用的线程堆栈信息，用于分析线程阻塞或死锁问题
+    category: system
+    urlTemplate: "http://${host}:${port}/actuator/threaddump"
+    method: GET
+    parameters:
+      - name: host
+        type: string
+        description: 应用服务器地址
+        required: true
+      - name: port
+        type: integer
+        description: 应用端口号
+        required: true
+    timeout: 15
+
+  - id: heap-dump
+    name: 堆内存转储
+    description: 获取应用的堆内存快照，用于分析内存泄漏问题
+    category: system
+    urlTemplate: "http://${host}:${port}/actuator/heapdump"
+    method: GET
+    parameters:
+      - name: host
+        type: string
+        description: 应用服务器地址
+        required: true
+      - name: port
+        type: integer
+        description: 应用端口号
+        required: true
+    timeout: 30
+
+  - id: env-info
+    name: 环境信息
+    description: 获取应用的环境变量和配置属性信息
+    category: system
+    urlTemplate: "http://${host}:${port}/actuator/env"
+    method: GET
+    parameters:
+      - name: host
+        type: string
+        description: 应用服务器地址
+        required: true
+      - name: port
+        type: integer
+        description: 应用端口号
+        required: true
+    timeout: 10
+
+  - id: info
+    name: 应用信息
+    description: 获取应用的基本信息，包括版本、描述等
+    category: system
+    urlTemplate: "http://${host}:${port}/actuator/info"
+    method: GET
+    parameters:
+      - name: host
+        type: string
+        description: 应用服务器地址
+        required: true
+      - name: port
+        type: integer
+        description: 应用端口号
+        required: true
+    timeout: 10

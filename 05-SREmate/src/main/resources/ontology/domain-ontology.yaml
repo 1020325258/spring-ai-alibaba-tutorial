@@ -100,11 +100,26 @@ entities:
     lookupStrategies:
       - field: quotationOrderNo
         pattern: ".*"
+      - field: homeOrderNo
+        pattern: "^\\d{15,}$"
     attributes:
       - { name: orderNo,         type: string, description: "S单编号" }
       - { name: projectChangeNo, type: string, description: "变更单号" }
       - { name: mdmCode,         type: string, description: "MDM编码" }
       - { name: dueAmount,       type: string, description: "应付金额" }
+      - { name: status,          type: string, description: "S单状态" }
+
+  - name: SignableOrderInfo
+    displayName: "弹窗可签约S单"
+    aliases: ["弹窗S单", "签约弹窗数据"]
+    description: "合同弹窗可签约的S单列表，根据合同类型（type）路由到不同接口：type=8销售合同→sign-order-list，type=3正签合同→对应端点"
+    lookupStrategies:
+      - field: contractCode
+        pattern: "^C\\d+"
+    attributes:
+      - { name: contractCode, type: string, description: "合同编号" }
+      - { name: projectOrderId, type: string, description: "订单号" }
+      - { name: type, type: string, description: "合同类型" }
 
   - name: ContractInstance
     displayName: "合同实例"
@@ -173,11 +188,23 @@ relations:
     domain: contract
     via: { source_field: contractCode, target_field: contractCode }
 
+  - from: Contract
+    to: SignableOrderInfo
+    domain: contract
+    description: "合同弹窗可签约S单，根据合同type字段路由到不同接口"
+    via: { source_field: contractCode, target_field: contractCode }
+
   - from: BudgetBill
     to: SubOrder
     domain: quote
     description: "报价单拆分形成S单"
     via: { source_field: billCode, target_field: quotationOrderNo }
+
+  - from: Order
+    to: SubOrder
+    domain: Order
+    description: "订单下S单列表，可按订单号直查"
+    via: { source_field: projectOrderId, target_field: homeOrderNo }
 
   - from: ContractQuotationRelation
     to: PersonalQuote

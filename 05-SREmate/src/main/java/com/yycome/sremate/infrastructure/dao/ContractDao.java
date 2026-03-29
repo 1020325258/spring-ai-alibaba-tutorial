@@ -146,7 +146,7 @@ public class ContractDao {
      */
     public List<Map<String, Object>> fetchContractsByOrderId(String projectOrderId) {
         List<Map<String, Object>> rows = jdbcTemplate.queryForList(
-                "SELECT contract_code, type, status, platform_instance_id, amount, ctime " +
+                "SELECT contract_code, type, status, platform_instance_id, amount, project_order_id, ctime " +
                 "FROM contract WHERE project_order_id = ? AND status != 9 AND del_status = 0",
                 projectOrderId);
         // 格式化时间字段，转换为驼峰格式
@@ -157,6 +157,7 @@ public class ContractDao {
             result.put("status", row.get("status"));
             result.put("platformInstanceId", row.get("platform_instance_id"));
             result.put("amount", row.get("amount"));
+            result.put("projectOrderId", row.get("project_order_id"));
             result.put("ctime", DateTimeUtil.format(row.get("ctime")));
             return result;
         }).toList();

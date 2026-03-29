@@ -1,5 +1,7 @@
 package com.yycome.sremate;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.yycome.sremate.infrastructure.service.DirectOutputHolder;
 import com.yycome.sremate.infrastructure.service.TracingService;
 import com.yycome.sremate.infrastructure.service.model.TracingContext;
@@ -384,6 +386,92 @@ abstract class BaseSREIT {
                 assertToolParamEquals("ontologyQuery", "queryScope", queryScope);
             }
         }
+    }
+
+    // ── 输出内容验证 ────────────────────────────────────────────
+
+    private static final ObjectMapper OUTPUT_MAPPER = new ObjectMapper();
+
+    /**
+     * 将最后一次 ask() 的输出解析为 JsonNode。
+     * 输出必须是合法 JSON，否则断言失败。
+     */
+    protected JsonNode parseOutput() {
+        String output = currentRecord != null ? currentRecord.output : null;
+        Assertions.assertThat(output)
+                .as("ask() 的输出不能为空")
+                .isNotBlank();
+        try {
+            return OUTPUT_MAPPER.readTree(output);
+        } catch (Exception e) {
+            throw new AssertionError("输出不是合法 JSON: " + truncate(output, 200) + "\n原因: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 断言输出 JSON 的顶层字段值等于期望值。
+     * 适用于验证 queryEntity、queryValue 等元数据。
+     */
+    protected void assertOutputField(String fieldPath, String expectedValue) {
+        JsonNode root = parseOutput();
+        JsonNode node = root.at("/" + fieldPath.replace(".", "/"));
+        Assertions.assertThat(node.isMissingNode())
+                .as("输出 JSON 中缺少字段: " + fieldPath)
+                .isFalse();
+        Assertions.assertThat(node.asText())
+                .as("输出字段 [" + fieldPath + "] 期望: " + expectedValue)
+                .isEqualTo(expectedValue);
+    }
+
+    /**
+     * 断言输出的 records 数组不为空（说明查询到了数据）。
+     */
+    protected void assertOutputHasRecords() {
+        JsonNode root = parseOutput();
+        JsonNode records = root.path("records");
+        Assertions.assertThat(records.isArray())
+                .as("输出 JSON 中 records 应为数组")
+                .isTrue();
+        Assertions.assertThat(records.size())
+                .as("records 不应为空")
+                .isGreaterThan(0);
+    }
+
+    /**
+     * 断言 records[0] 中存在指定字段（字段值不为 null/missing）。
+     * 只验证字段存在，不验证具体值，避免因业务数据变化导致测试失败。
+     *
+     * @param fieldPath 字段路径，支持嵌套（如 "formData/cn"）
+     */
+    protected void assertFirstRecordHasField(String fieldPath) {
+        JsonNode root = parseOutput();
+        JsonNode firstRecord = root.path("records").path(0);
+        Assertions.assertThat(firstRecord.isMissingNode())
+                .as("records[0] 不存在")
+                .isFalse();
+        JsonNode field = firstRecord.at("/" + fieldPath.replace(".", "/"));
+        Assertions.assertThat(field.isMissingNode() || field.isNull())
+                .as("records[0] 中缺少字段: " + fieldPath)
+                .isFalse();
+    }
+
+    /**
+     * 断言 records[0] 中指定字段的值等于期望值。
+     * 用于验证查询值回显（如 instanceId 等于查询输入），这类值非常稳定。
+     */
+    protected void assertFirstRecordFieldEquals(String fieldPath, String expectedValue) {
+        JsonNode root = parseOutput();
+        JsonNode firstRecord = root.path("records").path(0);
+        Assertions.assertThat(firstRecord.isMissingNode())
+                .as("records[0] 不存在")
+                .isFalse();
+        JsonNode field = firstRecord.at("/" + fieldPath.replace(".", "/"));
+        Assertions.assertThat(field.isMissingNode() || field.isNull())
+                .as("records[0] 中缺少字段: " + fieldPath)
+                .isFalse();
+        Assertions.assertThat(field.asText())
+                .as("records[0]." + fieldPath + " 期望: " + expectedValue)
+                .isEqualTo(expectedValue);
     }
 
     /**

@@ -39,8 +39,14 @@ class EntityRegistryTest {
     @Test
     void findPaths_orderToSubOrder_shouldReturnTwoPaths() {
         List<List<String>> paths = registry.findPaths("Order", "SubOrder");
-        assertThat(paths).hasSize(1);
+        // 现在有两条路径：
+        // 1. Order → BudgetBill → SubOrder (通过 BudgetBill)
+        // 2. Order → SubOrder (直连)
+        assertThat(paths).hasSize(2);
+        // 验证 BudgetBill 路径
         assertThat(paths).anySatisfy(path -> assertThat(path).containsSequence("Order", "BudgetBill", "SubOrder"));
+        // 验证直连路径
+        assertThat(paths).anySatisfy(path -> assertThat(path).containsSequence("Order", "SubOrder"));
     }
 
     @Test

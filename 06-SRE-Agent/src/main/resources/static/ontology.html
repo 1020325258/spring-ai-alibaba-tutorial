@@ -1,0 +1,665 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SREmate 本体可视化</title>
+    <style>
+        :root {
+            --bg-deep:      #1e1e2e;
+            --bg-panel:     #2a2a3e;
+            --bg-card:      #313150;
+            --bg-hover:     #3a3a5c;
+            --border:       #404060;
+            --text-primary: #e0e0f0;
+            --text-muted:   #8888aa;
+            --text-dim:     #5a5a7a;
+            --accent-blue:  #4FC3F7;
+            --accent-orange:#FFB74D;
+            --accent-green: #A5D6A7;
+            --accent-purple:#CE93D8;
+            --badge-bg:     rgba(79,195,247,0.12);
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", sans-serif;
+            background: var(--bg-deep);
+            color: var(--text-primary);
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* ── 顶部标题栏 ── */
+        .topbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            height: 48px;
+            padding: 0 20px;
+            background: var(--bg-panel);
+            border-bottom: 1px solid var(--border);
+            flex-shrink: 0;
+        }
+        .topbar-title {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 15px;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+        }
+        .topbar-logo {
+            width: 22px;
+            height: 22px;
+            border-radius: 6px;
+            background: linear-gradient(135deg, var(--accent-blue), var(--accent-purple));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: 700;
+        }
+        .topbar-badge {
+            font-size: 11px;
+            color: var(--text-muted);
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            padding: 2px 8px;
+            border-radius: 20px;
+        }
+        .topbar-hint {
+            font-size: 12px;
+            color: var(--text-dim);
+        }
+
+        /* ── 主体布局 ── */
+        .main {
+            display: flex;
+            height: calc(100vh - 48px);
+        }
+
+        /* ── 图谱区 ── */
+        #network {
+            width: 100%;
+            height: 100%;
+            background: var(--bg-deep);
+        }
+
+        /* ── 图谱工具栏 ── */
+        .graph-toolbar {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            display: flex;
+            gap: 8px;
+            z-index: 10;
+        }
+        .toolbar-btn {
+            background: var(--bg-panel);
+            border: 1px solid var(--border);
+            color: var(--text-muted);
+            width: 32px;
+            height: 32px;
+            border-radius: 6px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            transition: all 0.15s;
+        }
+        .toolbar-btn:hover {
+            background: var(--bg-hover);
+            color: var(--text-primary);
+            border-color: var(--accent-blue);
+        }
+
+        /* ── 侧边栏 ── */
+        #sidebar {
+            width: 300px;
+            background: var(--bg-panel);
+            border-left: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* ── 统计卡片区 ── */
+        .stats-row {
+            display: flex;
+            gap: 1px;
+            background: var(--border);
+            border-bottom: 1px solid var(--border);
+            flex-shrink: 0;
+        }
+        .stat-card {
+            flex: 1;
+            background: var(--bg-panel);
+            padding: 14px 16px;
+            text-align: center;
+        }
+        .stat-num {
+            font-size: 22px;
+            font-weight: 700;
+            color: var(--accent-blue);
+            line-height: 1;
+        }
+        .stat-label {
+            font-size: 11px;
+            color: var(--text-muted);
+            margin-top: 4px;
+        }
+
+        /* ── 侧边栏滚动内容 ── */
+        .sidebar-body {
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px;
+            scrollbar-width: thin;
+            scrollbar-color: var(--border) transparent;
+        }
+        .sidebar-body::-webkit-scrollbar { width: 4px; }
+        .sidebar-body::-webkit-scrollbar-track { background: transparent; }
+        .sidebar-body::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+        /* ── 空状态提示 ── */
+        .empty-hint {
+            text-align: center;
+            padding: 40px 20px;
+            color: var(--text-dim);
+        }
+        .empty-hint-icon { font-size: 32px; margin-bottom: 10px; }
+        .empty-hint-text { font-size: 12px; line-height: 1.6; }
+
+        /* ── 实体详情卡片 ── */
+        .entity-card { animation: fadeIn 0.2s ease; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+
+        .entity-header {
+            margin-bottom: 14px;
+        }
+        .entity-name-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 4px;
+        }
+        .entity-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+        .entity-name {
+            font-size: 16px;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+        .entity-display-name {
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-bottom: 8px;
+            padding-left: 18px;
+        }
+        .entity-description {
+            font-size: 12px;
+            color: var(--text-muted);
+            line-height: 1.5;
+            padding-left: 18px;
+            margin-bottom: 10px;
+        }
+        .entity-table-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 11px;
+            color: var(--accent-blue);
+            background: var(--badge-bg);
+            border: 1px solid rgba(79,195,247,0.2);
+            padding: 3px 8px;
+            border-radius: 4px;
+            margin-left: 18px;
+        }
+
+        /* ── 属性列表 ── */
+        .section-title {
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text-dim);
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            margin: 16px 0 8px;
+        }
+        .attr-list { display: flex; flex-direction: column; gap: 4px; }
+        .attr-item {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 8px 10px;
+        }
+        .attr-top {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .attr-name {
+            font-size: 12px;
+            font-weight: 500;
+            color: var(--text-primary);
+        }
+        .attr-type {
+            font-size: 10px;
+            color: var(--accent-purple);
+            background: rgba(206,147,216,0.12);
+            border: 1px solid rgba(206,147,216,0.2);
+            padding: 1px 5px;
+            border-radius: 3px;
+            margin-left: auto;
+        }
+        .attr-desc {
+            font-size: 11px;
+            color: var(--text-muted);
+            margin-top: 3px;
+        }
+
+        /* ── 图例 ── */
+        .legend-section {
+            margin-top: 4px;
+            padding-top: 16px;
+            border-top: 1px solid var(--border);
+            flex-shrink: 0;
+            padding: 16px;
+        }
+        .legend-title {
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text-dim);
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            margin-bottom: 10px;
+        }
+        .legend-items { display: flex; flex-direction: column; gap: 8px; }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 12px;
+            color: var(--text-muted);
+        }
+        .legend-dot {
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            flex-shrink: 0;
+            border: 2px solid;
+        }
+        .legend-dot.contract {
+            background: #4FC3F7;
+            border-color: #0288D1;
+            box-shadow: 0 0 6px rgba(79, 195, 247, 0.4);
+        }
+        .legend-dot.quote {
+            background: #FFB74D;
+            border-color: #EF6C00;
+            box-shadow: 0 0 6px rgba(255, 183, 77, 0.4);
+        }
+        .legend-dot.default {
+            background: #A5D6A7;
+            border-color: #388E3C;
+            box-shadow: 0 0 6px rgba(165, 214, 167, 0.4);
+        }
+    </style>
+</head>
+<body>
+
+    <!-- 顶部标题栏 -->
+    <div class="topbar">
+        <div class="topbar-title">
+            <div class="topbar-logo">S</div>
+            SREmate 本体关系图
+            <span class="topbar-badge" id="version-badge">加载中...</span>
+        </div>
+        <div class="topbar-hint">点击节点查看实体详情 · 滚轮缩放 · 拖拽移动</div>
+    </div>
+
+    <div class="main">
+        <!-- 图谱区 -->
+        <div style="position:relative;flex:1;height:100%;">
+            <div id="network"></div>
+            <div class="graph-toolbar">
+                <button class="toolbar-btn" id="btn-fit" title="适应视图">⊡</button>
+                <button class="toolbar-btn" id="btn-physics" title="开关物理布局">⚛</button>
+            </div>
+        </div>
+
+        <!-- 侧边栏 -->
+        <div id="sidebar">
+            <!-- 统计 -->
+            <div class="stats-row">
+                <div class="stat-card">
+                    <div class="stat-num" id="stat-entities">-</div>
+                    <div class="stat-label">实体</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-num" id="stat-relations" style="color:var(--accent-orange)">-</div>
+                    <div class="stat-label">关系</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-num" id="stat-domains" style="color:var(--accent-green)">-</div>
+                    <div class="stat-label">领域</div>
+                </div>
+            </div>
+
+            <!-- 实体详情 / 空状态 -->
+            <div class="sidebar-body">
+                <div id="entity-info">
+                    <div class="empty-hint">
+                        <div class="empty-hint-icon">🔍</div>
+                        <div class="empty-hint-text">点击图谱中的节点<br>查看实体详细信息</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 图例 -->
+            <div class="legend-section">
+                <div class="legend-title">领域图例</div>
+                <div class="legend-items">
+                    <div class="legend-item">
+                        <div class="legend-dot contract"></div>
+                        <span>签约领域 (contract)</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-dot quote"></div>
+                        <span>报价领域 (quote)</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-dot default"></div>
+                        <span>通用实体</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+    <script>
+        // ── 安全转义函数 ──────────────────────────────────────
+        function escapeHtml(text) {
+            if (text == null) return '';
+            const div = document.createElement('div');
+            div.textContent = String(text);
+            return div.innerHTML;
+        }
+
+        // ── 配色方案 ────────────────────────────────────────
+        const DOMAIN_COLOR = {
+            contract: {
+                bg: '#4FC3F7',
+                border: '#0288D1',
+                hover: '#81D4FA',
+                glow: 'rgba(79, 195, 247, 0.4)'
+            },
+            quote: {
+                bg: '#FFB74D',
+                border: '#EF6C00',
+                hover: '#FFCC80',
+                glow: 'rgba(255, 183, 77, 0.4)'
+            },
+            default: {
+                bg: '#A5D6A7',
+                border: '#388E3C',
+                hover: '#C8E6C9',
+                glow: 'rgba(165, 214, 167, 0.4)'
+            }
+        };
+
+        let network = null;
+        let physicsEnabled = false;
+
+        // ── 层级自适应计算（BFS） ────────────────────────────
+        function calculateEntityLevels(entities, relations) {
+            const levels = {};
+            const adjacencyList = {};
+
+            // 构建邻接表
+            relations.forEach(r => {
+                if (!adjacencyList[r.from]) adjacencyList[r.from] = [];
+                adjacencyList[r.from].push(r.to);
+            });
+
+            // BFS 从 Order 出发
+            const queue = [{ name: 'Order', level: 0 }];
+            const visited = new Set(['Order']);
+
+            while (queue.length > 0) {
+                const { name, level } = queue.shift();
+                levels[name] = level;
+
+                const neighbors = adjacencyList[name] || [];
+                neighbors.forEach(neighbor => {
+                    if (!visited.has(neighbor)) {
+                        visited.add(neighbor);
+                        queue.push({ name: neighbor, level: level + 1 });
+                    }
+                });
+            }
+
+            // 未访问到的实体（无入边）放在 Level 0
+            entities.forEach(e => {
+                if (levels[e.name] === undefined) {
+                    levels[e.name] = 0;
+                }
+            });
+
+            return levels;
+        }
+
+        fetch('/api/ontology')
+            .then(r => r.json())
+            .then(data => {
+                const entities = data.entities || [];
+                const relations = data.relations || [];
+
+                // 统计
+                document.getElementById('stat-entities').textContent = entities.length;
+                document.getElementById('stat-relations').textContent = relations.length;
+                const domains = new Set(relations.map(r => r.domain).filter(Boolean));
+                document.getElementById('stat-domains').textContent = domains.size || '-';
+                document.getElementById('version-badge').textContent =
+                    entities.length + ' 个实体 · ' + relations.length + ' 条关系';
+
+                // 推断实体领域（取第一条出现的 domain）
+                const entityDomain = {};
+                relations.forEach(r => {
+                    if (r.domain && !entityDomain[r.from]) entityDomain[r.from] = r.domain;
+                    if (r.domain && !entityDomain[r.to])   entityDomain[r.to]   = r.domain;
+                });
+
+                // 自适应计算层级
+                const entityLevel = calculateEntityLevels(entities, relations);
+
+                // 构建节点
+                const nodes = entities.map(e => {
+                    const domainKey = entityDomain[e.name] || 'default';
+                    const color = DOMAIN_COLOR[domainKey] || DOMAIN_COLOR.default;
+                    const level = entityLevel[e.name] || 0;
+                    const label = e.name + (e.displayName ? '\n' + e.displayName : '');
+
+                    // Level 0 使用圆角矩形，其他使用椭圆
+                    const shape = level === 0 ? 'box' : 'ellipse';
+                    // Level 0 节点稍大
+                    const widthConstraint = level === 0
+                        ? { minimum: 110, maximum: 150 }
+                        : { minimum: 100, maximum: 140 };
+
+                    return {
+                        id: e.name,
+                        label: label,
+                        level: level,
+                        shape: shape,
+                        color: {
+                            background: color.bg,
+                            border: color.border,
+                            highlight: { background: color.hover, border: color.border, borderWidth: 4 },
+                            hover:      { background: color.hover, border: color.border, borderWidth: 4 }
+                        },
+                        font: {
+                            size: 13,
+                            color: '#1e1e2e',
+                            face: '-apple-system, BlinkMacSystemFont, sans-serif',
+                            bold: { size: 15, color: '#0a0a12' },
+                            multi: true
+                        },
+                        widthConstraint: widthConstraint,
+                        borderWidth: 2,
+                        borderWidthSelected: 4,
+                        shadow: {
+                            enabled: true,
+                            color: color.glow,
+                            size: 15,
+                            x: 0,
+                            y: 4
+                        },
+                        margin: level === 0 ? 12 : 10
+                    };
+                });
+
+                // 构建边
+                const edges = relations.map((r, i) => {
+                    const targetDomainKey = entityDomain[r.to] || 'default';
+                    const targetColor = DOMAIN_COLOR[targetDomainKey] || DOMAIN_COLOR.default;
+                    const viaStr = r.via ? r.via.source_field : '';
+                    return {
+                        id: i,
+                        from: r.from,
+                        to: r.to,
+                        label: viaStr,
+                        arrows: { to: { enabled: true, scaleFactor: 0.9 } },
+                        color: {
+                            color: '#5a5a8a',
+                            highlight: targetColor.border,
+                            hover: targetColor.border,
+                            inherit: false
+                        },
+                        font: {
+                            size: 10,
+                            color: '#b0b0d0',
+                            align: 'middle',
+                            background: '#2a2a3e',
+                            strokeWidth: 0
+                        },
+                        smooth: { type: 'curvedCW', roundness: 0.15 },
+                        width: 1.5,
+                        selectionWidth: 3,
+                        hoverWidth: 3
+                    };
+                });
+
+                // 创建图谱
+                network = new vis.Network(
+                    document.getElementById('network'),
+                    { nodes: new vis.DataSet(nodes), edges: new vis.DataSet(edges) },
+                    {
+                        layout: {
+                            hierarchical: {
+                                direction: 'UD',
+                                sortMethod: 'directed',
+                                shakeTowards: 'roots',
+                                levelSeparation: 150,
+                                nodeSpacing: 170,
+                                treeSpacing: 200
+                            }
+                        },
+                        physics: { enabled: false },
+                        interaction: {
+                            hover: true,
+                            tooltipDelay: 150,
+                            navigationButtons: false,
+                            keyboard: true
+                        },
+                        nodes: { margin: 10 },
+                        edges: { selectionWidth: 3 }
+                    }
+                );
+
+                // 点击节点显示详情
+                network.on('click', function(params) {
+                    if (params.nodes.length > 0) {
+                        const entityName = params.nodes[0];
+                        const entity = entities.find(e => e.name === entityName);
+                        if (entity) showEntityInfo(entity, entityDomain[entity.name]);
+                    } else {
+                        document.getElementById('entity-info').innerHTML = `
+                            <div class="empty-hint">
+                                <div class="empty-hint-icon">🔍</div>
+                                <div class="empty-hint-text">点击图谱中的节点<br>查看实体详细信息</div>
+                            </div>`;
+                    }
+                });
+
+                // 工具栏按钮
+                document.getElementById('btn-fit').addEventListener('click', () => {
+                    network.fit({ animation: { duration: 400, easingFunction: 'easeInOutQuad' } });
+                });
+                document.getElementById('btn-physics').addEventListener('click', function() {
+                    physicsEnabled = !physicsEnabled;
+                    network.setOptions({ physics: { enabled: physicsEnabled } });
+                    this.style.color = physicsEnabled ? 'var(--accent-blue)' : '';
+                    this.style.borderColor = physicsEnabled ? 'var(--accent-blue)' : '';
+                });
+            })
+            .catch(err => {
+                document.getElementById('entity-info').innerHTML =
+                    '<div style="padding:20px;color:#f48fb1;font-size:13px;">⚠ 加载本体数据失败<br><span style="color:var(--text-dim);font-size:11px;">' + err.message + '</span></div>';
+                document.getElementById('version-badge').textContent = '加载失败';
+            });
+
+        function showEntityInfo(entity, domainKey) {
+            const color = DOMAIN_COLOR[domainKey] || DOMAIN_COLOR.default;
+            const attrs = entity.attributes || [];
+
+            let html = '<div class="entity-card">';
+
+            // 实体头部（所有用户数据转义）
+            html += '<div class="entity-header">';
+            html += `<div class="entity-name-row">
+                        <div class="entity-dot" style="background:${color.bg};box-shadow:0 0 6px ${color.glow}"></div>
+                        <span class="entity-name">${escapeHtml(entity.name)}</span>
+                     </div>`;
+            if (entity.displayName) {
+                html += `<div class="entity-display-name">${escapeHtml(entity.displayName)}</div>`;
+            }
+            if (entity.description) {
+                html += `<div class="entity-description">${escapeHtml(entity.description)}</div>`;
+            }
+            if (entity.table) {
+                html += `<span class="entity-table-badge">⊞ ${escapeHtml(entity.table)}</span>`;
+            }
+            html += '</div>';
+
+            // 属性列表（所有用户数据转义）
+            if (attrs.length > 0) {
+                html += '<div class="section-title">属性字段</div>';
+                html += '<div class="attr-list">';
+                attrs.forEach(attr => {
+                    html += `<div class="attr-item">
+                        <div class="attr-top">
+                            <span class="attr-name">${escapeHtml(attr.name)}</span>
+                            <span class="attr-type">${escapeHtml(attr.type)}</span>
+                        </div>`;
+                    if (attr.description) {
+                        html += `<div class="attr-desc">${escapeHtml(attr.description)}</div>`;
+                    }
+                    html += '</div>';
+                });
+                html += '</div>';
+            }
+
+            html += '</div>';
+            document.getElementById('entity-info').innerHTML = html;
+        }
+    </script>
+</body>
+</html>

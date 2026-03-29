@@ -1,0 +1,247 @@
+entities:
+  - name: Order
+    displayName: "订单"
+    aliases: ["项目订单"]
+    description: "项目订单，纯数字编号"
+    lookupStrategies:
+      - field: projectOrderId
+        pattern: "^\\d{15,}$"
+    attributes:
+      - { name: projectOrderId, type: string, description: "订单号，纯数字" }
+
+  - name: Contract
+    displayName: "合同"
+    aliases: ["合同数据", "合同信息"]
+    description: "合同实体，C前缀编号"
+    table: contract
+    lookupStrategies:
+      - field: contractCode
+        pattern: "^C\\d+"
+      - field: projectOrderId
+        pattern: "^\\d{15,}$"
+    attributes:
+      - { name: contractCode,       type: string, description: "合同编号，C前缀+数字" }
+      - { name: type,               type: enum,   description: "合同类型" }
+      - { name: status,             type: string, description: "合同状态" }
+      - { name: amount,             type: number, description: "合同金额" }
+      - { name: projectOrderId,     type: string, description: "所属订单号" }
+      - { name: platformInstanceId, type: string, description: "协议平台实例 ID" }
+      - { name: ctime,              type: string, description: "创建时间" }
+
+  - name: ContractNode
+    displayName: "合同节点"
+    aliases: ["节点", "流程节点", "合同流程"]
+    description: "合同节点/流程节点"
+    table: contract_node
+    lookupStrategies:
+      - field: contractCode
+        pattern: "^C\\d+"
+    attributes:
+      - { name: contractCode, type: string }
+      - { name: nodeType,     type: string }
+      - { name: fireTime,     type: string }
+
+  - name: ContractQuotationRelation
+    displayName: "签约单据"
+    aliases: ["合同签约对象", "关联单据", "签约单"]
+    description: "合同签约的单据对象，存储合同关联的报价单和S单"
+    table: contract_quotation_relation
+    lookupStrategies:
+      - field: contractCode
+        pattern: "^C\\d+"
+    attributes:
+      - { name: contractCode, type: string }
+      - { name: billCode,     type: string, description: "签约单据编号" }
+      - { name: companyCode,  type: string, description: "公司编码" }
+      - { name: bindType,     type: string, description: "绑定类型" }
+      - { name: status,       type: string, description: "状态" }
+      - { name: ctime,        type: string, description: "创建时间" }
+      - { name: mtime,        type: string, description: "修改时间" }
+
+  - name: ContractField
+    displayName: "合同字段"
+    aliases: ["合同扩展字段", "字段数据"]
+    description: "合同字段数据，按contractCode取模分10张表，返回动态字段 map"
+    table: contract_field_sharding
+    lookupStrategies:
+      - field: contractCode
+        pattern: "^C\\d+"
+    attributes:
+      - { name: contractCode, type: string }
+
+  - name: BudgetBill
+    displayName: "报价单"
+    aliases: ["报价", "预算单"]
+    description: "报价单，挂在订单下"
+    lookupStrategies:
+      - field: projectOrderId
+        pattern: "^\\d{15,}$"
+    attributes:
+      - { name: billCode,       type: string, description: "报价单编号" }
+      - { name: projectOrderId, type: string, description: "所属订单号" }
+
+  - name: PersonalQuote
+    displayName: "个性化报价"
+    aliases: ["个性化报价数据"]
+    description: "个性化报价数据，通过签约单据(ContractQuotationRelation)的billCode和bindType查询，bindType=1映射到billCodeList，bindType=2映射到subOrderNoList，bindType=3映射到changeOrderId"
+    lookupStrategies:
+      - field: projectOrderId
+        pattern: "^\\d{15,}$"
+    attributes:
+      - { name: projectOrderId,   type: string, description: "订单号" }
+      - { name: subOrderNoList,   type: string, description: "S单号列表，逗号分隔" }
+      - { name: billCodeList,     type: string, description: "报价单号列表，逗号分隔" }
+      - { name: changeOrderId,    type: string, description: "变更单号" }
+
+  - name: SubOrder
+    displayName: "S单"
+    aliases: ["子单", "签约子单", "S单信息"]
+    description: "S单，从报价单拆分而来，需要 homeOrderNo + quotationOrderNo 双参数查询"
+    lookupStrategies:
+      - field: quotationOrderNo
+        pattern: ".*"
+      - field: homeOrderNo
+        pattern: "^\\d{15,}$"
+    attributes:
+      - { name: orderNo,         type: string, description: "S单编号" }
+      - { name: projectChangeNo, type: string, description: "变更单号" }
+      - { name: mdmCode,         type: string, description: "MDM编码" }
+      - { name: dueAmount,       type: string, description: "应付金额" }
+      - { name: status,          type: string, description: "S单状态" }
+
+  - name: SignableOrderInfo
+    displayName: "弹窗可签约S单"
+    aliases: ["弹窗S单", "签约弹窗数据", "可签约S单"]
+    description: "订单下可签约的S单列表，通过 projectOrderId 直接调用 sign-order-list 接口查询"
+    lookupStrategies:
+      - field: projectOrderId
+        pattern: "^\\d{15,}$"
+    attributes:
+      - { name: projectOrderId,      type: string,  description: "订单号" }
+      - { name: companyName,         type: string,  description: "公司名称" }
+      - { name: companyCode,         type: string,  description: "公司编码" }
+      - { name: goodsInfo,           type: string,  description: "商品信息/套餐名称" }
+      - { name: orderAmount,         type: number,  description: "订单金额" }
+      - { name: orderCreateTime,     type: string,  description: "下单时间" }
+      - { name: bindType,            type: number,  description: "绑定类型" }
+      - { name: bindCode,            type: string,  description: "绑定的S单编号，逗号分隔" }
+      - { name: packageInstanceName, type: string,  description: "套餐实例名称" }
+      - { name: mustSelect,          type: boolean, description: "是否必选" }
+
+  - name: ContractInstance
+    displayName: "合同实例"
+    aliases: ["实例", "实例信息", "版式", "版式数据", "form_id", "版式ID", "instanceId"]
+    description: "协议平台合同实例，存储版式表单数据，通过合同的 platformInstanceId 关联"
+    lookupStrategies:
+      - field: instanceId
+        pattern: ".*"
+    attributes:
+      - { name: instanceId,   type: string, description: "协议平台实例 ID" }
+      - { name: formData,     type: object, description: "版式表单数据对象，包含 formId（版式模板ID）、cformData（表单字段内容）、cn（合同编号）、creator（创建人）、application（应用标识）等字段" }
+
+  - name: FormalSignableOrderInfo
+    displayName: "正签可签约S单"
+    aliases: ["正签弹窗S单", "正签合同可签约S单"]
+    description: "订单下正签合同（type=3）可签约的S单列表，通过 projectOrderId 调用 formalQuotation/list/v2 接口查询"
+    lookupStrategies:
+      - field: projectOrderId
+        pattern: "^\\d{15,}$"
+    attributes:
+      - { name: projectOrderId,      type: string,  description: "订单号" }
+      - { name: companyName,         type: string,  description: "公司名称" }
+      - { name: companyCode,         type: string,  description: "公司编码" }
+      - { name: goodsInfo,           type: string,  description: "商品信息/套餐名称" }
+      - { name: orderAmount,         type: number,  description: "订单金额" }
+      - { name: orderCreateTime,     type: string,  description: "下单时间" }
+      - { name: bindType,            type: number,  description: "绑定类型" }
+      - { name: bindCode,            type: string,  description: "绑定的S单编号，逗号分隔" }
+      - { name: packageInstanceName, type: string,  description: "套餐实例名称" }
+      - { name: mustSelect,          type: boolean, description: "是否必选" }
+
+  - name: ContractConfig
+    displayName: "配置表"
+    aliases: ["合同配置", "合同配置表"]
+    description: "合同城市公司配置数据"
+    lookupStrategies:
+      - field: contractCode
+        pattern: "^C\\d+"
+    attributes:
+      - { name: contractCode,          type: string, description: "合同编号" }
+      - { name: projectOrderId,        type: string, description: "所属订单号" }
+      - { name: contractConfigId,      type: string, description: "配置快照ID" }
+      - { name: version,               type: number, description: "配置版本号" }
+      - { name: businessType,          type: string, description: "业务类型" }
+      - { name: gbCode,                type: string, description: "区域编码" }
+      - { name: companyCode,           type: string, description: "公司编码" }
+      - { name: type,                  type: enum,   description: "合同类型" }
+      - { name: typeName,              type: string, description: "合同类型名称" }
+      - { name: cityCompanyInfo,       type: array,  description: "城市公司配置列表，包含 formId、formKey 等版式配置字段" }
+
+relations:
+  - from: Order
+    to: Contract
+    domain: Order
+    via: { source_field: projectOrderId, target_field: projectOrderId }
+
+  - from: Order
+    to: BudgetBill
+    domain: quote
+    via: { source_field: projectOrderId, target_field: projectOrderId }
+
+  - from: Contract
+    to: ContractNode
+    domain: contract
+    via: { source_field: contractCode, target_field: contractCode }
+
+  - from: Contract
+    to: ContractQuotationRelation
+    domain: contract
+    description: "合同签约的单据对象"
+    via: { source_field: contractCode, target_field: contractCode }
+
+  - from: Contract
+    to: ContractField
+    domain: contract
+    via: { source_field: contractCode, target_field: contractCode }
+
+  - from: Contract
+    to: ContractInstance
+    domain: contract
+    via: { source_field: platformInstanceId, target_field: instanceId }
+
+  - from: Contract
+    to: ContractConfig
+    domain: contract
+    via: { source_field: contractCode, target_field: contractCode }
+
+  - from: BudgetBill
+    to: SubOrder
+    domain: quote
+    description: "报价单拆分形成S单"
+    via: { source_field: billCode, target_field: quotationOrderNo }
+
+  - from: Order
+    to: SubOrder
+    domain: Order
+    description: "订单下S单列表，可按订单号直查"
+    via: { source_field: projectOrderId, target_field: homeOrderNo }
+
+  - from: Order
+    to: SignableOrderInfo
+    domain: Order
+    description: "订单下可签约的S单，直接通过 projectOrderId 查询"
+    via: { source_field: projectOrderId, target_field: projectOrderId }
+
+  - from: Order
+    to: FormalSignableOrderInfo
+    domain: Order
+    description: "订单下正签合同可签约的S单，直接通过 projectOrderId 查询"
+    via: { source_field: projectOrderId, target_field: projectOrderId }
+
+  - from: ContractQuotationRelation
+    to: PersonalQuote
+    domain: quote
+    description: "签约单据关联个性化报价，通过billCode和bindType查询"
+    via: { source_field: billCode, target_field: projectOrderId }
+
+
