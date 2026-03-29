@@ -43,7 +43,7 @@ import java.util.stream.Collectors;
  * SRE-Agent 端到端测试基类
  * 自动捕获每个测试的输入、输出、耗时、工具调用情况，并写入报告文档。
  */
-@SpringBootTest(properties = "sre.console.enabled=false")
+@SpringBootTest
 @ActiveProfiles("local")
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public abstract class BaseSREAgentIT {

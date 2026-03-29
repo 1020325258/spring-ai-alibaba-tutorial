@@ -13,7 +13,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * Skill 加载集成测试
  * 验收：8.4 Skill 加载验收
  */
-@SpringBootTest(properties = "sre.console.enabled=false")
+@SpringBootTest
 @ActiveProfiles("local")
 class SkillLoadingIT {
 

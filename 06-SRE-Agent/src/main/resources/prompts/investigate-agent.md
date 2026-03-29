@@ -24,7 +24,6 @@
 
 | skillName | 触发场景 |
 |-----------|----------|
-| `missing-personal-quote-diagnosis` | 缺少个性化报价、个性化报价异常、合同发起缺失报价 |
 | `sales-contract-sign-dialog-diagnosis` | 弹窗提示"请先完成报价"、发起提示"无定软电报价"、弹窗没有数据、合同弹窗异常 |
 
 ### ontologyQuery
