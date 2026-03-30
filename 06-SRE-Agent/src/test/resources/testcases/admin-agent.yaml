@@ -1,0 +1,39 @@
+agent: adminAgent
+cases:
+  - name: 本体实体列表查询
+    input: 本体模型有哪些
+    expected:
+      - type: contains
+        value: Order
+      - type: contains
+        value: Contract
+      - type: contains
+        value: ContractNode
+
+  - name: 本体关系列表查询
+    input: 本体关系有哪些
+    expected:
+      - type: contains
+        value: Order
+      - type: contains
+        value: Contract
+
+  - name: 单个实体详情查询
+    input: Order实体有哪些属性
+    expected:
+      - type: contains
+        value: projectOrderId
+
+  - name: 环境列表查询
+    input: 当前环境是什么
+    expected:
+      - type: contains
+        value: nrs-escrow
+      - type: contains
+        value: offline-beta
+
+  - name: 环境切换
+    input: 切换到offline-beta
+    expected:
+      - type: contains
+        value: offline-beta

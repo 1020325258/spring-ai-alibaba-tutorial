@@ -82,10 +82,13 @@ public class AdminNode implements NodeAction {
         String lowerInput = input.toLowerCase();
         Map<String, String> envs = environmentConfig.getAvailableEnvironments();
 
-        // 环境切换命令：优先纯代码处理
+        // 查看/切换环境：纯代码处理（优先于 LLM）
+        // "当前环境"、"查看环境"、"环境列表"、"切换到xxx"
         if (lowerInput.contains("环境") || lowerInput.contains("switch") || lowerInput.contains("env")) {
             String envResult = handleEnvSwitch(lowerInput, envs);
             if (envResult != null) return envResult;
+            // 用户提到了"环境"但没有找到具体环境，返回环境列表
+            return buildEnvListResponse();
         }
 
         // 非环境命令：交给 LLM Agent 处理（本体模型查询、配置询问等）
@@ -141,7 +144,8 @@ public class AdminNode implements NodeAction {
 
     private String executeLLMAgent(String input) {
         StringBuilder resultBuilder = new StringBuilder();
-        tracingService.startToolCall("adminAgent", "LLMAgent", Map.of("input", input));
+        Map<String, Object> params = Map.of("input", input);
+        var context = tracingService.startToolCall("adminAgent", params);
 
         try {
             Flux<Message> messageFlux = adminAgent.streamMessages(input);
@@ -151,11 +155,11 @@ public class AdminNode implements NodeAction {
                     .blockLast();
 
             String result = resultBuilder.toString();
-            tracingService.endToolCall(true, Map.of("outputLength", result.length()));
+            tracingService.endToolCall(context, result.isEmpty() ? "(无返回内容)" : result);
             return result.isEmpty() ? "（无返回内容）" : result;
         } catch (Exception e) {
             log.error("AdminNode LLM 调用失败: {}", e.getMessage(), e);
-            tracingService.endToolCall(false, Map.of("error", e.getMessage()));
+            tracingService.failToolCall(context, e);
             return "处理请求时发生错误：" + e.getMessage();
         }
     }
