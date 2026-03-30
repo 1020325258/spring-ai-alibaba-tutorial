@@ -1,0 +1,96 @@
+# SRE-Agent 问答对评估集
+#
+# 用途：每次迭代后验证 Agent 输出符合预期
+# 维护方式：只修改 qa-pairs 列表，无需改代码
+#
+# 字段说明：
+#   id: 唯一标识（测试方法名会使用）
+#   question: 用户问题（输入给 Agent）
+#   expected:
+#     type: 评估类型
+#       - tool_call: 验证工具调用参数
+#       - json_output: 验证 JSON 输出字段
+#       - natural_language: 验证自然语言输出（LLM-as-Judge）
+#     tool: 期望调用的工具名（tool_call 类型）
+#     params: 期望的工具参数（tool_call 类型）
+#     queryEntity: 期望的查询实体（json_output 类型）
+#     mustContain: 输出必须包含的关键词（自然语言评估）
+#
+# 示例：
+#   - id: "query-contract-basic"
+#     question: "C1767173898135504的合同基本信息"
+#     expected:
+#       type: "tool_call"
+#       tool: "ontologyQuery"
+#       params:
+#         entity: "Contract"
+#         queryScope: null
+#     also:
+#       type: "json_output"
+#       queryEntity: "Contract"
+#
+#   - id: "investigate-missing-quote"
+#     question: "订单825123110000002753发起提示无定软电报价，帮我排查"
+#     expected:
+#       type: "natural_language"
+#       mustContain: ["分析", "结论"]
+
+qa-pairs:
+  # ─────────────────────────────────────────────────────────────
+  # 查询类场景
+  # ─────────────────────────────────────────────────────────────
+
+  - id: "query-contract-basic"
+    question: "C1767173898135504的合同基本信息"
+    expected:
+      type: "tool_call"
+      tool: "ontologyQuery"
+      params:
+        entity: "Contract"
+    also:
+      type: "json_output"
+      queryEntity: "Contract"
+
+  - id: "query-order-contracts"
+    question: "825123110000002753下的合同"
+    expected:
+      type: "tool_call"
+      tool: "ontologyQuery"
+      params:
+        entity: "Order"
+        queryScope: "Contract"
+
+  - id: "query-contract-nodes"
+    question: "C1767173898135504的节点"
+    expected:
+      type: "tool_call"
+      tool: "ontologyQuery"
+      params:
+        entity: "Contract"
+        queryScope: "ContractNode"
+
+  # ─────────────────────────────────────────────────────────────
+  # 排查类场景
+  # ─────────────────────────────────────────────────────────────
+
+  - id: "investigate-missing-personal-quote"
+    question: "订单825123110000002753发起提示无个性化报价，帮我排查原因"
+    expected:
+      type: "tool_call"
+      tool: "readSkill"
+      params:
+        skillName: "missing-personal-quote-diagnosis"
+    also:
+      type: "natural_language"
+      mustContain: ["分析", "结论"]
+
+  - id: "investigate-sign-dialog-no-quote"
+    question: "订单825123110000002753发起提示无定软电报价，帮我排查"
+    expected:
+      type: "tool_call"
+      tool: "readSkill"
+      params:
+        skillName: "sales-contract-sign-dialog-diagnosis"
+    also:
+      type: "natural_language"
+      mustContain: ["分析", "结论"]

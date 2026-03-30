@@ -149,6 +149,12 @@
             <optional>true</optional>
         </dependency>
 
+        <!-- Jackson YAML for ontology config and QaPair loading -->
+        <dependency>
+            <groupId>com.fasterxml.jackson.dataformat</groupId>
+            <artifactId>jackson-dataformat-yaml</artifactId>
+        </dependency>
+
         <!-- Testing -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
