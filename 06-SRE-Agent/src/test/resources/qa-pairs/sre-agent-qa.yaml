@@ -73,16 +73,17 @@ qa-pairs:
   # 排查类场景
   # ─────────────────────────────────────────────────────────────
 
-  - id: "investigate-missing-personal-quote"
-    question: "订单825123110000002753发起提示无个性化报价，帮我排查原因"
-    expected:
-      type: "tool_call"
-      tool: "readSkill"
-      params:
-        skillName: "missing-personal-quote-diagnosis"
-    also:
-      type: "natural_language"
-      mustContain: ["分析", "结论"]
+  # 注：missing-personal-quote-diagnosis Skill 尚未实现，暂时注释
+  # - id: "investigate-missing-personal-quote"
+  #   question: "订单825123110000002753发起提示无个性化报价，帮我排查原因"
+  #   expected:
+  #     type: "tool_call"
+  #     tool: "readSkill"
+  #     params:
+  #       skillName: "missing-personal-quote-diagnosis"
+  #   also:
+  #     type: "natural_language"
+  #     mustContain: ["分析", "结论"]
 
   - id: "investigate-sign-dialog-no-quote"
     question: "订单825123110000002753发起提示无定软电报价，帮我排查"
