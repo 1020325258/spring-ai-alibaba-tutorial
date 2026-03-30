@@ -54,12 +54,6 @@
                 <artifactId>spring-ai-alibaba-agent-framework</artifactId>
                 <version>${spring-ai-alibaba.version}</version>
             </dependency>
-            <!-- Spring AI Alibaba Studio (Chat UI) -->
-            <dependency>
-                <groupId>com.alibaba.cloud.ai</groupId>
-                <artifactId>spring-ai-alibaba-studio</artifactId>
-                <version>${spring-ai-alibaba.version}</version>
-            </dependency>
         </dependencies>
     </dependencyManagement>
 
@@ -87,12 +81,6 @@
         <dependency>
             <groupId>com.alibaba.cloud.ai</groupId>
             <artifactId>spring-ai-alibaba-agent-framework</artifactId>
-        </dependency>
-
-        <!-- Spring AI Alibaba Studio (Chat UI at /chatui/index.html) -->
-        <dependency>
-            <groupId>com.alibaba.cloud.ai</groupId>
-            <artifactId>spring-ai-alibaba-studio</artifactId>
         </dependency>
 
         <!-- MySQL -->
