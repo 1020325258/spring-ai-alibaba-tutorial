@@ -2,6 +2,8 @@ package com.yycome.sreagent.aspect;
 
 import com.yycome.sreagent.infrastructure.annotation.DataQueryTool;
 import com.yycome.sreagent.infrastructure.service.MetricsCollector;
+import com.yycome.sreagent.infrastructure.service.ThinkingContextHolder;
+import com.yycome.sreagent.infrastructure.service.ThinkingEventPublisher;
 import com.yycome.sreagent.infrastructure.service.TracingService;
 import com.yycome.sreagent.infrastructure.service.model.ToolCallContext;
 import com.yycome.sreagent.infrastructure.service.model.TracingContext;
@@ -34,6 +36,7 @@ public class ObservabilityAspect {
 
     private final TracingService tracingService;
     private final MetricsCollector metricsCollector;
+    private final ThinkingEventPublisher thinkingEventPublisher;
 
     /** 是否启用详细 LLM 日志（生产环境建议关闭） */
     private static final boolean DETAILED_LLM_LOG = false;
@@ -73,6 +76,9 @@ public class ObservabilityAspect {
             // 结束追踪
             tracingService.endToolCall(tracing, result);
 
+            // 发布 Thinking 事件
+            publishThinkingEvent(tracing);
+
             // 记录性能指标
             metricsCollector.recordToolCall(toolName, duration, true);
 
@@ -88,6 +94,9 @@ public class ObservabilityAspect {
 
             // 记录失败
             tracingService.failToolCall(tracing, e);
+
+            // 发布 Thinking 事件（失败时也输出）
+            publishThinkingEvent(tracing);
 
             // 记录性能指标
             metricsCollector.recordToolCall(toolName, duration, false);
@@ -140,5 +149,23 @@ public class ObservabilityAspect {
             return str.substring(0, 50) + "...";
         }
         return str;
+    }
+
+    /**
+     * 发布 Thinking 事件到 SSE
+     */
+    private void publishThinkingEvent(TracingContext tracing) {
+        if (tracing == null) {
+            return;
+        }
+        try {
+            ThinkingContextHolder.ThinkingContext ctx = ThinkingContextHolder.get();
+            if (ctx != null && ctx.getSink() != null) {
+                int stepNumber = ctx.nextStep();
+                thinkingEventPublisher.publishStepThinking(tracing, ctx.getSink(), stepNumber);
+            }
+        } catch (Exception e) {
+            log.warn("发布 Thinking 事件失败: {}", e.getMessage());
+        }
     }
 }

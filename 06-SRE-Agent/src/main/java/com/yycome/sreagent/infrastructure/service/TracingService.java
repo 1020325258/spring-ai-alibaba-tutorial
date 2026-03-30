@@ -55,9 +55,16 @@ public class TracingService {
     }
 
     /**
-     * 获取最近的工具调用记录
+     * 获取最近的工具调用记录（返回副本，防止并发修改）
      */
     public ConcurrentLinkedDeque<TracingContext> getRecentTraces() {
+        return new ConcurrentLinkedDeque<>(recentTraces);
+    }
+
+    /**
+     * 获取原始引用（用于内部遍历，由调用方保证不修改）
+     */
+    ConcurrentLinkedDeque<TracingContext> getRecentTracesRaw() {
         return recentTraces;
     }
 

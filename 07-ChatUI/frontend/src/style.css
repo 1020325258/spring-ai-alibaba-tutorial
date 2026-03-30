@@ -34,3 +34,9 @@ body {
   --markstream-code-fallback-fg: #374151;
   --markstream-code-border-color: #e5e7eb;
 }
+
+/* 保留 Markdown 输出的换行和空格 */
+.markstream-vue .prose {
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}

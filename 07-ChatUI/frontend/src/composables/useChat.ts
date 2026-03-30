@@ -7,6 +7,18 @@ export interface Message {
   content: string
   nodes: BaseNode[]
   streaming: boolean
+  thinkingBlocks?: ThinkingBlock[]
+  conclusion?: string
+}
+
+export interface ThinkingBlock {
+  stepNumber: number
+  title: string
+  toolName: string
+  params: Record<string, string>
+  summary: string
+  duration: number
+  success: boolean
 }
 
 export function useChat() {
@@ -36,6 +48,7 @@ export function useChat() {
       const decoder = new TextDecoder()
       let buffer = ''
       let chunkCount = 0
+      let pendingContent = ''
 
       while (true) {
         const { done, value } = await reader.read()
@@ -52,24 +65,66 @@ export function useChat() {
             ? line.slice(6)
             : line.slice(5)
           if (chunk === '[DONE]') continue
-          if (!chunk) continue
 
-          // 替换整个消息对象以触发 Vue 响应式更新
-          const msg = messages.value[assistantIdx]
-          const newContent = msg.content + chunk + '\n'
-          messages.value[assistantIdx] = {
-            ...msg,
-            content: newContent,
+          // 尝试解析 JSON 格式事件
+          try {
+            const jsonData = JSON.parse(chunk)
+            if (jsonData.type === 'thinking') {
+              // 处理 thinking 类型事件
+              const msg = messages.value[assistantIdx]
+              const thinkingBlocks = msg.thinkingBlocks || []
+              thinkingBlocks.push(parseThinkingContent(jsonData.content))
+              messages.value[assistantIdx] = {
+                ...msg,
+                thinkingBlocks,
+              }
+              continue
+            } else if (jsonData.type === 'conclusion') {
+              // 处理 conclusion 类型事件
+              const msg = messages.value[assistantIdx]
+              messages.value[assistantIdx] = {
+                ...msg,
+                conclusion: (msg.conclusion || '') + jsonData.content,
+              }
+              continue
+            }
+          } catch {
+            // 不是 JSON 格式，作为普通文本处理
           }
-          chunkCount++
-          if (chunkCount % 5 === 0) {
-            const updatedMsg = messages.value[assistantIdx]
-            const nodes = parseMarkdownToStructure(updatedMsg.content, md)
+
+          // 累积内容：每个 SSE data: 行对应原始内容的一行，必须加 \n 还原换行
+          // 空 chunk（来自原始内容中的空行）也要保留为 \n
+          pendingContent += chunk + '\n'
+
+          // 每累积 50 个字符或收到完整段落标记时解析一次
+          if (pendingContent.length >= 50 || pendingContent.endsWith('\n\n') || pendingContent.endsWith('```\n')) {
+            const msg = messages.value[assistantIdx]
             messages.value[assistantIdx] = {
-              ...updatedMsg,
-              nodes,
+              ...msg,
+              content: msg.content + pendingContent,
+            }
+            pendingContent = ''
+
+            // 减少解析频率，每 10 次累积再解析一次 nodes
+            chunkCount++
+            if (chunkCount % 10 === 0) {
+              const updatedMsg = messages.value[assistantIdx]
+              const nodes = parseMarkdownToStructure(updatedMsg.content, md)
+              messages.value[assistantIdx] = {
+                ...updatedMsg,
+                nodes,
+              }
             }
           }
+        }
+      }
+
+      // 处理剩余的 pending content
+      if (pendingContent) {
+        const msg = messages.value[assistantIdx]
+        messages.value[assistantIdx] = {
+          ...msg,
+          content: msg.content + pendingContent,
         }
       }
 
@@ -107,4 +162,59 @@ export function useChat() {
   }
 
   return { messages, isStreaming, sendMessage }
+}
+
+/**
+ * 解析 thinking 内容为 ThinkingBlock
+ * 格式：**步骤N - 标题**\n> 工具：`xxx`\n> 参数：\n> - key: `value`\n> 结果：x 条记录\n> 耗时：xms | 成功：✓
+ */
+function parseThinkingContent(content: string): ThinkingBlock {
+  const block: ThinkingBlock = {
+    stepNumber: 0,
+    title: '',
+    toolName: '',
+    params: {},
+    summary: '',
+    duration: 0,
+    success: true,
+  }
+
+  // 解析步骤号和标题：**步骤1 - 查询订单**
+  const stepMatch = content.match(/\*\*步骤(\d+) - (.+?)\*\*/)
+  if (stepMatch) {
+    block.stepNumber = parseInt(stepMatch[1])
+    block.title = stepMatch[2]
+  }
+
+  // 解析工具名：> 工具：`ontologyQuery`
+  const toolMatch = content.match(/> 工具：`(.+?)`/)
+  if (toolMatch) {
+    block.toolName = toolMatch[1]
+  }
+
+  // 解析参数：> - key: `value`
+  const paramMatches = content.matchAll(/> - (.+?): `([^`]+)`/g)
+  for (const match of paramMatches) {
+    block.params[match[1]] = match[2]
+  }
+
+  // 解析结果摘要：> 结果：xxx
+  const resultMatch = content.match(/> 结果：(.+)/)
+  if (resultMatch) {
+    block.summary = resultMatch[1]
+  }
+
+  // 解析耗时和状态：> 耗时：100ms | 成功：✓
+  const statusMatch = content.match(/> 耗时：(\d+)ms \| 成功：([✓✗])/)
+  if (statusMatch) {
+    block.duration = parseInt(statusMatch[1])
+    block.success = statusMatch[2] === '✓'
+  }
+
+  // 非结构化内容（如路由器消息）：将整个内容去除 Markdown 符号后作为标题
+  if (!block.title) {
+    block.title = content.replace(/\*\*/g, '').trim().split('\n')[0]
+  }
+
+  return block
 }

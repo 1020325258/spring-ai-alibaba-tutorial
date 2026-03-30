@@ -37,6 +37,15 @@ public class TracingContext {
     /** 结果数据 */
     private Object result;
 
+    /** 步骤序号 */
+    private Integer stepNumber;
+
+    /** 操作描述（中文） */
+    private String stepTitle;
+
+    /** 结果记录数 */
+    private Integer recordCount;
+
     public long getDuration() {
         if (endTime > 0 && startTime > 0) {
             return endTime - startTime;

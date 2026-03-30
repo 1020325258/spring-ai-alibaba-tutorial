@@ -21,13 +21,51 @@
         <template v-for="(msg, i) in messages" :key="i">
           <div v-if="msg.role === 'assistant'" class="message-row assistant">
             <div class="message-bubble">
+              <!-- Thinking blocks: collapsible step cards -->
+              <div v-if="msg.thinkingBlocks?.length" class="thinking-steps">
+                <details v-for="block in msg.thinkingBlocks" :key="block.stepNumber" class="thinking-step">
+                  <summary class="thinking-step-header">
+                    <span class="step-num" :class="{ 'step-num-router': block.stepNumber === 0 }">
+                      {{ block.stepNumber === 0 ? '→' : block.stepNumber }}
+                    </span>
+                    <span class="step-title">{{ block.title }}</span>
+                    <span v-if="block.duration > 0" class="step-meta">{{ block.duration }}ms</span>
+                    <span v-if="block.toolName" :class="['step-status', block.success ? 'success' : 'failure']">{{ block.success ? '✓' : '✗' }}</span>
+                  </summary>
+                  <div class="thinking-step-body">
+                    <div v-if="block.toolName" class="step-tool">工具: <code>{{ block.toolName }}</code></div>
+                    <div v-if="Object.keys(block.params).length" class="step-params">
+                      <div>参数:</div>
+                      <ul>
+                        <li v-for="(v, k) in block.params" :key="k"><code>{{ k }}</code>: {{ v }}</li>
+                      </ul>
+                    </div>
+                    <div v-if="block.summary" class="step-result">结果: {{ block.summary }}</div>
+                  </div>
+                </details>
+              </div>
+
+              <!-- Conclusion (JSON event) or regular streaming markdown -->
               <MarkdownRender
+                v-if="msg.conclusion"
+                :content="msg.conclusion"
+                :final="!msg.streaming"
+                :max-live-nodes="msg.streaming ? MAX_LIVE_NODES_STREAMING : MAX_LIVE_NODES_DONE"
+                :is-dark="false"
+                :code-block-props="{ showCopyButton: true }"
+                :themes="['vitesse-dark', 'vitesse-light']"
+                custom-id="chatui"
+              />
+              <MarkdownRender
+                v-else
                 :nodes="msg.nodes"
                 :final="!msg.streaming"
                 :max-live-nodes="msg.streaming ? MAX_LIVE_NODES_STREAMING : MAX_LIVE_NODES_DONE"
                 :is-dark="false"
                 :code-block-props="{ showCopyButton: true }"
                 :themes="['vitesse-dark', 'vitesse-light']"
+                custom-id="chatui"
+                :custom-html-tags="['thinking']"
               />
               <span v-if="msg.streaming" class="cursor-blink">▌</span>
             </div>
@@ -351,6 +389,111 @@ watch(() => messages.value.length, async () => {
 .chat-send-btn:disabled {
   opacity: 0.4;
   cursor: not-allowed;
+}
+
+/* 思考步骤 */
+.thinking-steps {
+  margin-bottom: 0.75rem;
+}
+
+.thinking-step {
+  border: 1px solid #e5e7eb;
+  border-radius: 0.5rem;
+  margin-bottom: 0.25rem;
+  background: #fff;
+  overflow: hidden;
+}
+
+.thinking-step-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  cursor: pointer;
+  font-size: 0.875rem;
+  color: #374151;
+  list-style: none;
+  user-select: none;
+}
+
+.thinking-step-header::-webkit-details-marker {
+  display: none;
+}
+
+.thinking-step-header::before {
+  content: '▶';
+  font-size: 0.625rem;
+  color: #9ca3af;
+  transition: transform 0.2s;
+  flex-shrink: 0;
+}
+
+details[open] .thinking-step-header::before {
+  transform: rotate(90deg);
+}
+
+.step-num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.25rem;
+  height: 1.25rem;
+  background: #3b82f6;
+  color: #fff;
+  border-radius: 50%;
+  font-size: 0.75rem;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.step-num-router {
+  background: #6b7280;
+}
+
+.step-title {
+  flex: 1;
+  font-weight: 500;
+}
+
+.step-meta {
+  color: #9ca3af;
+  font-size: 0.8125rem;
+}
+
+.step-status {
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.step-status.success {
+  color: #10b981;
+}
+
+.step-status.failure {
+  color: #ef4444;
+}
+
+.thinking-step-body {
+  padding: 0.5rem 0.75rem 0.75rem 2.25rem;
+  font-size: 0.8125rem;
+  color: #6b7280;
+  border-top: 1px solid #f3f4f6;
+}
+
+.step-tool,
+.step-params,
+.step-result {
+  margin-bottom: 0.25rem;
+}
+
+.step-params ul {
+  margin: 0.25rem 0 0 1rem;
+  padding: 0;
+}
+
+.step-params li {
+  list-style: disc;
+  margin-bottom: 0.125rem;
 }
 
 /* 滚动条样式 */
