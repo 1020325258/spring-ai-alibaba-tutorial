@@ -4,6 +4,7 @@ import com.alibaba.cloud.ai.graph.agent.ReactAgent;
 import com.alibaba.cloud.ai.graph.skills.registry.SkillRegistry;
 import com.yycome.sreagent.domain.ontology.service.EntityRegistry;
 import com.yycome.sreagent.trigger.agent.OntologyQueryTool;
+import com.yycome.sreagent.trigger.agent.ReadOntologyTool;
 import com.yycome.sreagent.trigger.agent.ReadSkillTool;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.model.ChatModel;
@@ -75,9 +76,38 @@ public class AgentConfiguration {
      */
     @Bean
     public ToolCallbackProvider sreTools(OntologyQueryTool ontologyQueryTool,
-                                          ReadSkillTool readSkillTool) {
+                                          ReadSkillTool readSkillTool,
+                                          ReadOntologyTool readOntologyTool) {
         return MethodToolCallbackProvider.builder()
-                .toolObjects(ontologyQueryTool, readSkillTool)
+                .toolObjects(ontologyQueryTool, readSkillTool, readOntologyTool)
+                .build();
+    }
+
+    /**
+     * Admin Agent - ReactAgent，使用 readOntology 和 readSkill 工具
+     * 处理用户对系统配置、本体模型等信息的询问
+     */
+    @Bean
+    public ReactAgent adminAgent(ChatModel chatModel,
+                                   ReadOntologyTool readOntologyTool,
+                                   ReadSkillTool readSkillTool,
+                                   EntityRegistry entityRegistry,
+                                   SkillRegistry skillRegistry) throws Exception {
+        String entitySummary = entityRegistry.getEntitySummaryForPrompt();
+        String skillsList = buildSkillsList(skillRegistry);
+        String systemPrompt = """
+            你是一个管理后台 Agent，负责回答用户关于系统配置和本体模型的问题。
+
+            ## 本体模型
+            当用户询问"本体模型有哪些"、"实体列表"等问题时，使用 readOntologyTool 工具查询。
+
+            """ + entitySummary + "\n\n" + skillsList;
+
+        return ReactAgent.builder()
+                .name("adminAgent")
+                .model(chatModel)
+                .systemPrompt(systemPrompt)
+                .methodTools(readOntologyTool, readSkillTool)
                 .build();
     }
 

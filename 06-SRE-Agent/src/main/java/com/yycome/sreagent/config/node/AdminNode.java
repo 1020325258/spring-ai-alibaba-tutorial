@@ -2,14 +2,22 @@ package com.yycome.sreagent.config.node;
 
 import com.alibaba.cloud.ai.graph.OverAllState;
 import com.alibaba.cloud.ai.graph.action.NodeAction;
+import com.alibaba.cloud.ai.graph.agent.ReactAgent;
 import com.yycome.sreagent.infrastructure.config.EnvironmentConfig;
+import com.yycome.sreagent.infrastructure.service.TracingService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.ai.chat.messages.AssistantMessage;
+import org.springframework.ai.chat.messages.Message;
+import reactor.core.publisher.Flux;
 
 import java.util.*;
 
 /**
  * 管理节点：处理环境查看/切换等系统命令（无 LLM 调用，纯代码逻辑）
+ *
+ * 注意：admin Agent 的 LLM 问答功能已在 AgentConfiguration 中通过 adminAgent ReactAgent 实现。
+ * AdminNode 仅处理纯代码逻辑（环境切换），不调用 LLM。
  *
  * 环境匹配策略（按优先级）：
  * 1. 精确匹配 key（如 "offline-beta"、"nrs-escrow"）
@@ -50,9 +58,15 @@ public class AdminNode implements NodeAction {
     }
 
     private final EnvironmentConfig environmentConfig;
+    private final ReactAgent adminAgent;
+    private final TracingService tracingService;
 
-    public AdminNode(EnvironmentConfig environmentConfig) {
+    public AdminNode(EnvironmentConfig environmentConfig,
+                     ReactAgent adminAgent,
+                     TracingService tracingService) {
         this.environmentConfig = environmentConfig;
+        this.adminAgent = adminAgent;
+        this.tracingService = tracingService;
     }
 
     @Override
@@ -68,6 +82,17 @@ public class AdminNode implements NodeAction {
         String lowerInput = input.toLowerCase();
         Map<String, String> envs = environmentConfig.getAvailableEnvironments();
 
+        // 环境切换命令：优先纯代码处理
+        if (lowerInput.contains("环境") || lowerInput.contains("switch") || lowerInput.contains("env")) {
+            String envResult = handleEnvSwitch(lowerInput, envs);
+            if (envResult != null) return envResult;
+        }
+
+        // 非环境命令：交给 LLM Agent 处理（本体模型查询、配置询问等）
+        return executeLLMAgent(input);
+    }
+
+    private String handleEnvSwitch(String lowerInput, Map<String, String> envs) {
         // 1. 精确匹配 key
         String targetEnv = null;
         for (String envKey : envs.keySet()) {
@@ -111,7 +136,33 @@ public class AdminNode implements NodeAction {
             }
         }
 
-        // 显示当前环境和可用列表
+        return null; // 未识别为环境切换命令
+    }
+
+    private String executeLLMAgent(String input) {
+        StringBuilder resultBuilder = new StringBuilder();
+        tracingService.startToolCall("adminAgent", "LLMAgent", Map.of("input", input));
+
+        try {
+            Flux<Message> messageFlux = adminAgent.streamMessages(input);
+            messageFlux
+                    .filter(msg -> msg instanceof AssistantMessage am && !am.getText().isEmpty())
+                    .doOnNext(msg -> resultBuilder.append(((AssistantMessage) msg).getText()))
+                    .blockLast();
+
+            String result = resultBuilder.toString();
+            tracingService.endToolCall(true, Map.of("outputLength", result.length()));
+            return result.isEmpty() ? "（无返回内容）" : result;
+        } catch (Exception e) {
+            log.error("AdminNode LLM 调用失败: {}", e.getMessage(), e);
+            tracingService.endToolCall(false, Map.of("error", e.getMessage()));
+            return "处理请求时发生错误：" + e.getMessage();
+        }
+    }
+
+    /** 显示当前环境和可用列表（回复用户咨询环境列表时使用） */
+    private String buildEnvListResponse() {
+        Map<String, String> envs = environmentConfig.getAvailableEnvironments();
         StringBuilder sb = new StringBuilder();
         sb.append("**当前环境**：").append(environmentConfig.getCurrentEnvDescription())
                 .append("（`").append(environmentConfig.getCurrentEnv()).append("`）\n\n");

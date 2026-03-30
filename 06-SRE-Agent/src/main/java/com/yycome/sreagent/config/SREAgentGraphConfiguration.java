@@ -54,6 +54,11 @@ public class SREAgentGraphConfiguration {
     @Qualifier("investigateAgent")
     private ReactAgent investigateAgent;
 
+    @Lazy
+    @Autowired
+    @Qualifier("adminAgent")
+    private ReactAgent adminAgent;
+
     @Autowired
     private ChatModel chatModel;
 
@@ -81,7 +86,7 @@ public class SREAgentGraphConfiguration {
         graph.addNode("router", node_async(new RouterNode(chatModel)))
              .addNode("queryAgent", node_async(new AgentNode(queryAgent, "queryAgent", tracingService)))
              .addNode("investigateAgent", node_async(new AgentNode(investigateAgent, "investigateAgent", tracingService)))
-             .addNode("admin", node_async(new AdminNode(environmentConfig)));
+             .addNode("admin", node_async(new AdminNode(environmentConfig, adminAgent, tracingService)));
 
         graph.addEdge(START, "router")
              .addConditionalEdges("router", edge_async(new RouterDispatcher()),
