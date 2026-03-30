@@ -130,8 +130,12 @@ export function useChat() {
 
       // Final parse to ensure all content is parsed
       const msg = messages.value[assistantIdx]
-      console.log('[sendMessage] 最终content:', JSON.stringify(msg.content).slice(0, 300))
-      const finalNodes = parseMarkdownToStructure(msg.content, md)
+      const finalContent = prettyPrintJsonBlocks(msg.content)
+      if (finalContent !== msg.content) {
+        messages.value[assistantIdx] = { ...msg, content: finalContent }
+      }
+      console.log('[sendMessage] 最终content:', JSON.stringify(finalContent).slice(0, 300))
+      const finalNodes = parseMarkdownToStructure(finalContent, md)
       // 统计各节点类型
       const typeCount: Record<string, number> = {}
       finalNodes.forEach(n => { typeCount[n.type] = (typeCount[n.type] || 0) + 1 })
@@ -162,6 +166,20 @@ export function useChat() {
   }
 
   return { messages, isStreaming, sendMessage }
+}
+
+/**
+ * 将 markdown 中所有 ```json 代码块的内容 pretty-print
+ */
+function prettyPrintJsonBlocks(content: string): string {
+  return content.replace(/```json\n([\s\S]*?)```/g, (match, jsonStr) => {
+    try {
+      const parsed = JSON.parse(jsonStr.trim())
+      return '```json\n' + JSON.stringify(parsed, null, 2) + '\n```'
+    } catch {
+      return match
+    }
+  })
 }
 
 /**
