@@ -11,6 +11,9 @@ import com.yycome.sreagent.config.node.AdminNode;
 import com.yycome.sreagent.config.node.AgentNode;
 import com.yycome.sreagent.config.node.RouterDispatcher;
 import com.yycome.sreagent.config.node.RouterNode;
+import com.yycome.sreagent.config.node.routing.LlmSkillRoutingStrategy;
+import com.yycome.sreagent.config.node.routing.SkillRoutingStrategy;
+import com.alibaba.cloud.ai.graph.skills.registry.SkillRegistry;
 import com.yycome.sreagent.infrastructure.config.EnvironmentConfig;
 import com.yycome.sreagent.infrastructure.service.TracingService;
 import org.slf4j.Logger;
@@ -63,10 +66,18 @@ public class SREAgentGraphConfiguration {
     private ChatModel chatModel;
 
     @Autowired
+    private SkillRegistry skillRegistry;
+
+    @Autowired
     private EnvironmentConfig environmentConfig;
 
     @Autowired
     private TracingService tracingService;
+
+    @Bean
+    public SkillRoutingStrategy skillRoutingStrategy() {
+        return new LlmSkillRoutingStrategy(chatModel, skillRegistry);
+    }
 
     @Bean
     public StateGraph stateGraph() throws GraphStateException {
@@ -75,6 +86,7 @@ public class SREAgentGraphConfiguration {
         KeyStrategyFactory keyStrategyFactory = () -> {
             HashMap<String, KeyStrategy> keyStrategyMap = new HashMap<>();
             keyStrategyMap.put("routingTarget", new ReplaceStrategy());
+            keyStrategyMap.put("selectedSkill", new ReplaceStrategy());
             keyStrategyMap.put("result", new ReplaceStrategy());
             keyStrategyMap.put(OverAllState.DEFAULT_INPUT_KEY, new ReplaceStrategy());
             return keyStrategyMap;
@@ -83,7 +95,7 @@ public class SREAgentGraphConfiguration {
         StateGraph graph = new StateGraph("sre-agent", keyStrategyFactory,
                 new SpringAIStateSerializer(OverAllState::new));
 
-        graph.addNode("router", node_async(new RouterNode(chatModel)))
+        graph.addNode("router", node_async(new RouterNode(skillRoutingStrategy())))
              .addNode("queryAgent", node_async(new AgentNode(queryAgent, "queryAgent", tracingService)))
              .addNode("investigateAgent", node_async(new AgentNode(investigateAgent, "investigateAgent", tracingService)))
              .addNode("admin", node_async(new AdminNode(environmentConfig, adminAgent, tracingService)));

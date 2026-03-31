@@ -35,6 +35,11 @@ public class AgentNode implements NodeAction {
     @Override
     public Map<String, Object> apply(OverAllState state) throws Exception {
         String input = state.value(OverAllState.DEFAULT_INPUT_KEY, "");
+        String selectedSkill = state.value("selectedSkill", "");
+        if (!selectedSkill.isEmpty()) {
+            input = input + "\n[selectedSkill: " + selectedSkill + "]";
+            log.info("AgentNode [{}] 注入 selectedSkill: {}", agentName, selectedSkill);
+        }
         log.info("AgentNode [{}] 收到 input: {}", agentName, input);
 
         StringBuilder resultBuilder = new StringBuilder();
