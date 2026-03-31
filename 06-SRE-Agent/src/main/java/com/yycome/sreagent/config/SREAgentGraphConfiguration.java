@@ -11,8 +11,6 @@ import com.yycome.sreagent.config.node.AdminNode;
 import com.yycome.sreagent.config.node.AgentNode;
 import com.yycome.sreagent.config.node.RouterDispatcher;
 import com.yycome.sreagent.config.node.RouterNode;
-import com.yycome.sreagent.config.node.routing.LlmSkillRoutingStrategy;
-import com.yycome.sreagent.config.node.routing.SkillRoutingStrategy;
 import com.alibaba.cloud.ai.graph.skills.registry.SkillRegistry;
 import com.yycome.sreagent.domain.ontology.service.EntityRegistry;
 import com.yycome.sreagent.infrastructure.config.EnvironmentConfig;
@@ -79,18 +77,12 @@ public class SREAgentGraphConfiguration {
     private TracingService tracingService;
 
     @Bean
-    public SkillRoutingStrategy skillRoutingStrategy() {
-        return new LlmSkillRoutingStrategy(chatModel, skillRegistry);
-    }
-
-    @Bean
     public StateGraph stateGraph() throws GraphStateException {
         log.info("构建 SRE-Agent StateGraph...");
 
         KeyStrategyFactory keyStrategyFactory = () -> {
             HashMap<String, KeyStrategy> keyStrategyMap = new HashMap<>();
             keyStrategyMap.put("routingTarget", new ReplaceStrategy());
-            keyStrategyMap.put("selectedSkill", new ReplaceStrategy());
             keyStrategyMap.put("result", new ReplaceStrategy());
             keyStrategyMap.put(OverAllState.DEFAULT_INPUT_KEY, new ReplaceStrategy());
             return keyStrategyMap;
@@ -99,7 +91,7 @@ public class SREAgentGraphConfiguration {
         StateGraph graph = new StateGraph("sre-agent", keyStrategyFactory,
                 new SpringAIStateSerializer(OverAllState::new));
 
-        graph.addNode("router", node_async(new RouterNode(skillRoutingStrategy())))
+        graph.addNode("router", node_async(new RouterNode(chatModel)))
              .addNode("queryAgent", node_async(new AgentNode(queryAgent, "queryAgent", tracingService)))
              .addNode("investigateAgent", node_async(new AgentNode(investigateAgent, "investigateAgent", tracingService)))
              .addNode("admin", node_async(new AdminNode(environmentConfig, adminAgent, tracingService, chatModel, skillRegistry, entityRegistry)));

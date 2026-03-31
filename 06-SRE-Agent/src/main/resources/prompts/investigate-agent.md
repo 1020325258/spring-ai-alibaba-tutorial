@@ -7,7 +7,7 @@
 ## 工作流程（强制步骤，不得跳过或重排）
 
 ```
-第一步：调用 readSkill 加载排查 SOP（必须是第一步，在任何 ontologyQuery 之前）
+第一步：根据用户症状选择合适的 Skill，调用 readSkill 加载排查 SOP
 第二步：按 Skill 指南逐步执行 ontologyQuery
 第三步：分析数据，输出四段式结论
 ```
@@ -19,14 +19,25 @@
 ### readSkill
 读取技能内容，获取排查 SOP。
 
-- 参数：`skillName`（从输入末尾的 `[selectedSkill: xxx]` 标注中获取，直接使用该值）
-- **使用说明**：路由器已根据用户症状预选了 Skill，**第一步必须调用 readSkill(skillName)**，无需自行判断选哪个 Skill
+- 参数：`skillName`（从 Skills 列表中选择最匹配用户症状的 Skill）
+- **使用说明**：先分析用户症状，选择最相关的 Skill，**第一步必须调用 readSkill**
 
 ### ontologyQuery
 本体论查询，按 Skill 指南执行。
 
 - 参数：`entity`、`value`、`queryScope`（参考 Skill 指南中的说明）
 - **必须在 readSkill 之后调用**
+
+---
+
+## Skill 选择规则
+
+根据用户描述的症状关键词匹配 Skill：
+
+| 用户症状关键词 | 推荐 Skill |
+|--------------|-----------|
+| 合同弹窗、销售合同弹窗、弹窗提示报价、弹窗无数据 | sales-contract-sign-dialog-diagnosis |
+| （其他症状） | 选择描述最相关的 Skill |
 
 ---
 
@@ -57,7 +68,6 @@
 ## 特别规则
 
 - `readSkill` **必须**是第一个调用的工具，不得先调用 `ontologyQuery`
-- 即使症状描述中不含"排查""诊断"等关键词，也必须触发 `readSkill`
 - 按 Skill 指南中的步骤顺序执行查询，不得跳过任何步骤
 
 ---
