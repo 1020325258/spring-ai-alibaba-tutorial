@@ -52,28 +52,11 @@ public final class QaPairLoader {
         }
     }
 
-    @SuppressWarnings("unchecked")
     private static QaPair toQaPair(Map<String, Object> raw) {
         String id = (String) raw.get("id");
         String question = (String) raw.get("question");
-        QaPair.Expected expected = toExpected((Map<String, Object>) raw.get("expected"));
-        QaPair.Expected also = raw.containsKey("also")
-                ? toExpected((Map<String, Object>) raw.get("also"))
-                : null;
+        String expected = (String) raw.get("expected");
 
-        return new QaPair(id, question, expected, also);
-    }
-
-    @SuppressWarnings("unchecked")
-    private static QaPair.Expected toExpected(Map<String, Object> raw) {
-        if (raw == null) return null;
-
-        return new QaPair.Expected(
-                (String) raw.get("type"),
-                (String) raw.get("tool"),
-                (Map<String, Object>) raw.get("params"),
-                (String) raw.get("queryEntity"),
-                (List<String>) raw.get("mustContain")
-        );
+        return new QaPair(id, question, expected);
     }
 }
