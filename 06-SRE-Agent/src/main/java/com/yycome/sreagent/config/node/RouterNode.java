@@ -72,10 +72,11 @@ public class RouterNode implements NodeAction {
         var response = chatModel.call(new Prompt(fullPrompt));
         String result = response.getResult().getOutput().getText().trim().toLowerCase();
 
-        // 校验返回值，默认走 admin
-        if (result.equals("query") || result.equals("investigate")) {
-            return result;
-        }
-        return "admin";
+        // 映射 LLM 输出到节点名
+        return switch (result) {
+            case "query" -> "queryAgent";
+            case "investigate" -> "investigateAgent";
+            default -> "admin";
+        };
     }
 }

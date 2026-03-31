@@ -96,24 +96,22 @@ export function useChat() {
           // 空 chunk（来自原始内容中的空行）也要保留为 \n
           pendingContent += chunk + '\n'
 
-          // 每累积 50 个字符或收到完整段落标记时解析一次
-          if (pendingContent.length >= 50 || pendingContent.endsWith('\n\n') || pendingContent.endsWith('```\n')) {
-            const msg = messages.value[assistantIdx]
-            messages.value[assistantIdx] = {
-              ...msg,
-              content: msg.content + pendingContent,
-            }
-            pendingContent = ''
+          // 立即更新 UI（真正的流式输出）
+          const msg = messages.value[assistantIdx]
+          messages.value[assistantIdx] = {
+            ...msg,
+            content: msg.content + pendingContent,
+          }
+          pendingContent = ''
 
-            // 减少解析频率，每 10 次累积再解析一次 nodes
-            chunkCount++
-            if (chunkCount % 10 === 0) {
-              const updatedMsg = messages.value[assistantIdx]
-              const nodes = parseMarkdownToStructure(updatedMsg.content, md)
-              messages.value[assistantIdx] = {
-                ...updatedMsg,
-                nodes,
-              }
+          // 减少解析频率，每 5 次更新再解析一次 nodes（避免频繁解析影响性能）
+          chunkCount++
+          if (chunkCount % 5 === 0) {
+            const updatedMsg = messages.value[assistantIdx]
+            const nodes = parseMarkdownToStructure(updatedMsg.content, md)
+            messages.value[assistantIdx] = {
+              ...updatedMsg,
+              nodes,
             }
           }
         }

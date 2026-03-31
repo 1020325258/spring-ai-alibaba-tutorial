@@ -39,3 +39,6 @@ build/
 
 ### Local config (sensitive credentials) ###
 **/application-local.yml
+
+### Log files ###
+log/

@@ -65,11 +65,19 @@ public class QaEvaluationReporter {
         String statusText = result.judgeResult().pass() ? "通过" : "失败";
 
         sb.append("### ").append(statusIcon).append(" ").append(result.qaPair().id()).append("\n\n");
-        sb.append("**输入:** ").append(result.qaPair().question()).append("\n\n");
-        sb.append("**预期:** ").append(result.qaPair().expected()).append("\n\n");
-        sb.append("**实际输出:**\n```\n").append(truncate(result.actualOutput(), 500)).append("\n```\n\n");
-        sb.append("**评估结果:** ").append(statusIcon).append(" ").append(statusText)
-          .append(" — ").append(result.judgeResult().reason()).append("\n\n");
+
+        // 完整输入
+        sb.append("**输入:**\n```\n").append(result.qaPair().question()).append("\n```\n\n");
+
+        // 完整预期
+        sb.append("**预期:**\n```\n").append(result.qaPair().expected()).append("\n```\n\n");
+
+        // 完整实际输出
+        sb.append("**实际输出:**\n```\n").append(result.actualOutput()).append("\n```\n\n");
+
+        // 评估结果和理由
+        sb.append("**评估结果:** ").append(statusIcon).append(" ").append(statusText).append("\n\n");
+        sb.append("**评估理由:**\n").append(result.judgeResult().reason()).append("\n\n");
         sb.append("---\n\n");
 
         return sb.toString();

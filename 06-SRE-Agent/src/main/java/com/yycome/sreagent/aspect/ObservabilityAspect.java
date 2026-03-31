@@ -162,7 +162,10 @@ public class ObservabilityAspect {
             ThinkingContextHolder.ThinkingContext ctx = ThinkingContextHolder.get();
             if (ctx != null && ctx.getSink() != null) {
                 int stepNumber = ctx.nextStep();
+                log.info("[THINKING] 发布步骤 {} - {}", stepNumber, tracing.getToolName());
                 thinkingEventPublisher.publishStepThinking(tracing, ctx.getSink(), stepNumber);
+            } else {
+                log.debug("[THINKING] 上下文未设置，跳过 thinking 事件发布 (tool={})", tracing.getToolName());
             }
         } catch (Exception e) {
             log.warn("发布 Thinking 事件失败: {}", e.getMessage());

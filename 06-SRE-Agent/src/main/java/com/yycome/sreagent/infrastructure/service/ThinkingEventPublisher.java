@@ -40,6 +40,7 @@ public class ThinkingEventPublisher {
      */
     public void publishStepThinking(TracingContext context, Sinks.Many<ServerSentEvent<String>> sink, int stepNumber) {
         if (context == null || sink == null) {
+            log.warn("[ThinkingEventPublisher] context 或 sink 为 null，跳过发布");
             return;
         }
 
@@ -47,7 +48,7 @@ public class ThinkingEventPublisher {
             String content = buildSingleStepContent(context, stepNumber);
             String json = objectMapper.writeValueAsString(Map.of("type", "thinking", "content", content));
             sink.tryEmitNext(ServerSentEvent.builder(json).build());
-            log.debug("Published thinking event for step {}", stepNumber);
+            log.info("[ThinkingEventPublisher] 发布 thinking 事件: 步骤{} - {}", stepNumber, context.getToolName());
         } catch (JsonProcessingException e) {
             log.error("Error building thinking JSON", e);
         }

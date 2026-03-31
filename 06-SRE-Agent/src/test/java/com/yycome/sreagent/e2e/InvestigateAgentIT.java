@@ -15,7 +15,6 @@ class InvestigateAgentIT extends BaseSREAgentIT {
      * 验证"排查XXX缺少定软电报价"能正确路由到 investigateAgent 并调用 readSkill。
      * 历史 bug：该描述因含"报价"被误路由到 queryAgent。
      *
-     * @see com.yycome.sreagent.config.node.routing.LlmSkillRoutingStrategy#route(String)
      */
     @Test
     void investigate_missing_personal_quote_with_investigate_prefix() {

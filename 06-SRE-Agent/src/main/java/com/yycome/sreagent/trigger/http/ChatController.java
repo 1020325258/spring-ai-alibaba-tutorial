@@ -1,6 +1,7 @@
 package com.yycome.sreagent.trigger.http;
 
 import com.yycome.sreagent.config.SREAgentGraphProcess;
+import com.yycome.sreagent.infrastructure.service.RequestLogService;
 import com.yycome.sreagent.infrastructure.service.ThinkingContextHolder;
 import com.alibaba.cloud.ai.graph.RunnableConfig;
 import org.slf4j.Logger;
@@ -17,6 +18,7 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Sinks;
 
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * Chat SSE 接口，参考 deepresearch/ChatController.java 实现
@@ -32,10 +34,21 @@ public class ChatController {
     @Autowired
     private SREAgentGraphProcess graphProcess;
 
+    @Autowired
+    private RequestLogService requestLogService;
+
     @PostMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public Flux<ServerSentEvent<String>> stream(@RequestBody ChatRequest req) {
         String sessionId = UUID.randomUUID().toString();
+        long startTime = System.currentTimeMillis();
+
         log.info("收到请求: {}, sessionId: {}", req.message(), sessionId);
+
+        // 记录请求开始
+        requestLogService.logRequestStart(sessionId, req.message());
+
+        // 用于收集完整响应
+        StringBuilder responseBuilder = new StringBuilder();
 
         try {
             // 创建 SSE sink
@@ -54,19 +67,32 @@ public class ChatController {
             graphProcess.processStream(sessionId, resultFuture, sink);
 
             return sink.asFlux()
+                    .doOnNext(event -> {
+                        // 收集响应内容
+                        if (event.data() != null) {
+                            responseBuilder.append(event.data());
+                        }
+                    })
                     .doOnCancel(() -> {
                         log.info("客户端断开: {}", sessionId);
                         ThinkingContextHolder.clear();
                     })
-                    .doOnComplete(() -> ThinkingContextHolder.clear())
+                    .doOnComplete(() -> {
+                        ThinkingContextHolder.clear();
+                        // 记录响应完成
+                        long duration = System.currentTimeMillis() - startTime;
+                        requestLogService.logResponseComplete(sessionId, responseBuilder.toString(), duration);
+                    })
                     .onErrorResume(e -> {
                         log.error("SSE 错误: {}", e.getMessage());
                         ThinkingContextHolder.clear();
+                        requestLogService.logError(sessionId, e.getMessage());
                         return Flux.just(ServerSentEvent.builder("{\"error\": \"" + e.getMessage() + "\"}").build());
                     });
         } catch (Exception e) {
             log.error("请求处理异常: {}", e.getMessage(), e);
             ThinkingContextHolder.clear();
+            requestLogService.logError(sessionId, e.getMessage());
             return Flux.just(ServerSentEvent.builder("{\"error\": \"" + e.getMessage() + "\"}").build());
         }
     }
