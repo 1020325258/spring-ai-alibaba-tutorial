@@ -13,10 +13,10 @@ description: 排查销售合同发起时弹窗或页面提示"请先完成报价
 
 ### 第一步：验证用户描述（查询弹窗数据）
 
-从 Order 出发，直接查询 SignableOrderInfo（弹窗可签约S单）：
+从 Order 出发，直接查询 PersonalSignableOrderInfo（销售合同弹窗可签约S单）：
 
 ```
-ontologyQuery(entity=Order, value={订单号}, queryScope=SignableOrderInfo)
+ontologyQuery(entity=Order, value={订单号}, queryScope=PersonalSignableOrderInfo)
 ```
 
 - 可签约S单属于订单维度，Gateway 直接以 `projectOrderId` 调用 `sign-order-list` 接口
@@ -55,7 +55,7 @@ ontologyQuery(entity=Order, value={订单号}, queryScope=SubOrder)
 ## 排查步骤
 
 1. 根据用户提供的订单号，确定查询起点（Order）
-2. 执行第一步：查询弹窗数据（SignableOrderInfo）
+2. 执行第一步：查询弹窗数据（PersonalSignableOrderInfo）
    - **若弹窗数据非空 → 用户描述不属实，排查结束**，告知用户系统弹窗数据正常
    - 若弹窗数据为空 → 用户描述属实，继续第二步
 3. 执行第二步：查询订单下所有 S 单（SubOrder）
@@ -78,7 +78,7 @@ ontologyQuery(entity=Order, value={订单号}, queryScope=SubOrder)
 用户: "订单 825123110000002753 的销售合同发起提示无定软电报价"
 
 Action:
-1. 查询订单 825123110000002753 下销售合同的可签约S单（SignableOrderInfo）
+1. 查询订单 825123110000002753 下销售合同的可签约S单（PersonalSignableOrderInfo）
    - 情形 A：结果非空（有可签约S单）→ **用户描述不属实，排查结束**
      - 结论：系统弹窗数据正常，存在 N 条可签约S单，用户所描述的问题在当前数据中不存在
    - 情形 B：结果为空 → 用户描述属实，继续

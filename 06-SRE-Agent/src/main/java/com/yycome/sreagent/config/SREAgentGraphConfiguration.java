@@ -14,6 +14,7 @@ import com.yycome.sreagent.config.node.RouterNode;
 import com.yycome.sreagent.config.node.routing.LlmSkillRoutingStrategy;
 import com.yycome.sreagent.config.node.routing.SkillRoutingStrategy;
 import com.alibaba.cloud.ai.graph.skills.registry.SkillRegistry;
+import com.yycome.sreagent.domain.ontology.service.EntityRegistry;
 import com.yycome.sreagent.infrastructure.config.EnvironmentConfig;
 import com.yycome.sreagent.infrastructure.service.TracingService;
 import org.slf4j.Logger;
@@ -69,6 +70,9 @@ public class SREAgentGraphConfiguration {
     private SkillRegistry skillRegistry;
 
     @Autowired
+    private EntityRegistry entityRegistry;
+
+    @Autowired
     private EnvironmentConfig environmentConfig;
 
     @Autowired
@@ -98,7 +102,7 @@ public class SREAgentGraphConfiguration {
         graph.addNode("router", node_async(new RouterNode(skillRoutingStrategy())))
              .addNode("queryAgent", node_async(new AgentNode(queryAgent, "queryAgent", tracingService)))
              .addNode("investigateAgent", node_async(new AgentNode(investigateAgent, "investigateAgent", tracingService)))
-             .addNode("admin", node_async(new AdminNode(environmentConfig, adminAgent, tracingService)));
+             .addNode("admin", node_async(new AdminNode(environmentConfig, adminAgent, tracingService, chatModel, skillRegistry, entityRegistry)));
 
         graph.addEdge(START, "router")
              .addConditionalEdges("router", edge_async(new RouterDispatcher()),

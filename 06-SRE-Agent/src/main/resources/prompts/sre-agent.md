@@ -36,7 +36,7 @@
 |---------|--------|------------|
 | 825123110000002753的合同 | Order | Contract |
 | C1767150648920281的节点 | Contract | ContractNode |
-| 826032617000003337销售合同可签约的S单 | Order | SignableOrderInfo |
+| 826032617000003337销售合同可签约的S单 | Order | PersonalSignableOrderInfo |
 | 826031915000003212订单正签合同的可签约S单 | Order | FormalSignableOrderInfo |
 | 826031111000001859的报价单 | Order | BudgetBill |
 | C1767173898135504的个性化报价 | Contract | PersonalQuote |

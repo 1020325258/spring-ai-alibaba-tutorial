@@ -109,9 +109,9 @@ entities:
       - { name: dueAmount,       type: string, description: "应付金额" }
       - { name: status,          type: string, description: "S单状态" }
 
-  - name: SignableOrderInfo
-    displayName: "弹窗可签约S单"
-    aliases: ["弹窗S单", "签约弹窗数据", "可签约S单"]
+  - name: PersonalSignableOrderInfo
+    displayName: "销售合同弹窗可签约S单"
+    aliases: ["弹窗S单", "签约弹窗数据", "可签约S单", "销售合同弹窗S单", "个人合同弹窗S单"]
     description: "订单下可签约的S单列表，通过 projectOrderId 直接调用 sign-order-list 接口查询"
     lookupStrategies:
       - field: projectOrderId
@@ -140,8 +140,8 @@ entities:
       - { name: formData,     type: object, description: "版式表单数据对象，包含 formId（版式模板ID）、cformData（表单字段内容）、cn（合同编号）、creator（创建人）、application（应用标识）等字段" }
 
   - name: FormalSignableOrderInfo
-    displayName: "正签可签约S单"
-    aliases: ["正签弹窗S单", "正签合同可签约S单"]
+    displayName: "正签合同弹窗可签约S单"
+    aliases: ["正签弹窗S单", "正签合同可签约S单", "正签合同弹窗S单"]
     description: "订单下正签合同（type=3）可签约的S单列表，通过 projectOrderId 调用 formalQuotation/list/v2 接口查询"
     lookupStrategies:
       - field: projectOrderId
@@ -227,7 +227,7 @@ relations:
     via: { source_field: projectOrderId, target_field: homeOrderNo }
 
   - from: Order
-    to: SignableOrderInfo
+    to: PersonalSignableOrderInfo
     domain: Order
     description: "订单下可签约的S单，直接通过 projectOrderId 查询"
     via: { source_field: projectOrderId, target_field: projectOrderId }

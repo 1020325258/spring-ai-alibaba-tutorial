@@ -109,9 +109,9 @@ entities:
       - { name: dueAmount,       type: string, description: "应付金额" }
       - { name: status,          type: string, description: "S单状态" }
 
-  - name: SignableOrderInfo
-    displayName: "弹窗可签约S单"
-    aliases: ["弹窗S单", "签约弹窗数据"]
+  - name: PersonalSignableOrderInfo
+    displayName: "销售合同弹窗可签约S单"
+    aliases: ["弹窗S单", "签约弹窗数据", "销售合同弹窗S单", "个人合同弹窗S单"]
     description: "合同弹窗可签约的S单列表，根据合同类型（type）路由到不同接口：type=8销售合同→sign-order-list，type=3正签合同→对应端点"
     lookupStrategies:
       - field: contractCode
@@ -189,7 +189,7 @@ relations:
     via: { source_field: contractCode, target_field: contractCode }
 
   - from: Contract
-    to: SignableOrderInfo
+    to: PersonalSignableOrderInfo
     domain: contract
     description: "合同弹窗可签约S单，根据合同type字段路由到不同接口"
     via: { source_field: contractCode, target_field: contractCode }

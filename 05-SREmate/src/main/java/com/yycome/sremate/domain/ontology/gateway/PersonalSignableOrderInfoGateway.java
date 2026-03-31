@@ -13,7 +13,7 @@ import org.springframework.stereotype.Component;
 import java.util.*;
 
 /**
- * SignableOrderInfo（弹窗可签约S单）实体的数据网关
+ * PersonalSignableOrderInfo（销售合同弹窗可签约S单）实体的数据网关
  * 从父记录（Contract）获取 type 和 projectOrderId，根据合同类型路由到不同接口：
  * - type=8（销售合同）→ sign-order-list 端点
  * - type=3（正签合同）→ 对应端点
@@ -21,7 +21,7 @@ import java.util.*;
 @Slf4j
 @Component
 @RequiredArgsConstructor
-public class SignableOrderInfoGateway implements EntityDataGateway {
+public class PersonalSignableOrderInfoGateway implements EntityDataGateway {
 
     private final HttpEndpointClient httpEndpointClient;
     private final ObjectMapper objectMapper;
@@ -38,23 +38,23 @@ public class SignableOrderInfoGateway implements EntityDataGateway {
 
     @Override
     public String getEntityName() {
-        return "SignableOrderInfo";
+        return "PersonalSignableOrderInfo";
     }
 
     @Override
     public List<Map<String, Object>> queryByField(String fieldName, Object value) {
         // 无父记录上下文时，无法查询（需要从 Contract 获取 type 和 projectOrderId）
-        log.warn("[SignableOrderInfoGateway] 缺少父记录上下文，无法查询弹窗S单");
+        log.warn("[PersonalSignableOrderInfoGateway] 缺少父记录上下文，无法查询弹窗S单");
         return Collections.emptyList();
     }
 
     @Override
     public List<Map<String, Object>> queryByFieldWithContext(String fieldName, Object value, Map<String, Object> parentRecord) {
-        log.debug("[SignableOrderInfoGateway] queryByFieldWithContext: fieldName={}, value={}, parentRecord keys={}",
+        log.debug("[PersonalSignableOrderInfoGateway] queryByFieldWithContext: fieldName={}, value={}, parentRecord keys={}",
                 fieldName, value, parentRecord != null ? parentRecord.keySet() : "null");
 
         if (parentRecord == null) {
-            log.warn("[SignableOrderInfoGateway] 父记录为空，无法查询弹窗S单");
+            log.warn("[PersonalSignableOrderInfoGateway] 父记录为空，无法查询弹窗S单");
             return Collections.emptyList();
         }
 
@@ -63,11 +63,11 @@ public class SignableOrderInfoGateway implements EntityDataGateway {
         String projectOrderId = String.valueOf(parentRecord.getOrDefault("projectOrderId", ""));
 
         if (projectOrderId.isEmpty() || "null".equals(projectOrderId)) {
-            log.warn("[SignableOrderInfoGateway] 父记录缺少 projectOrderId，无法查询弹窗S单");
+            log.warn("[PersonalSignableOrderInfoGateway] 父记录缺少 projectOrderId，无法查询弹窗S单");
             return Collections.emptyList();
         }
 
-        log.info("[SignableOrderInfoGateway] contractType={}, projectOrderId={}", contractType, projectOrderId);
+        log.info("[PersonalSignableOrderInfoGateway] contractType={}, projectOrderId={}", contractType, projectOrderId);
 
         // 根据合同类型路由到不同接口
         String endpointId;
@@ -76,11 +76,11 @@ public class SignableOrderInfoGateway implements EntityDataGateway {
             endpointId = "sign-order-list";
         } else if (CONTRACT_TYPE_FORMAL.equals(contractType)) {
             // 正签合同 type=3 → TODO: 需要确认具体端点，目前先返回空列表
-            log.warn("[SignableOrderInfoGateway] 正签合同(type=3)暂未配置对应端点");
+            log.warn("[PersonalSignableOrderInfoGateway] 正签合同(type=3)暂未配置对应端点");
             return Collections.emptyList();
         } else {
             // 未知合同类型
-            log.warn("[SignableOrderInfoGateway] 未知合同类型: {}, 返回空列表", contractType);
+            log.warn("[PersonalSignableOrderInfoGateway] 未知合同类型: {}, 返回空列表", contractType);
             return Collections.emptyList();
         }
 
@@ -89,13 +89,13 @@ public class SignableOrderInfoGateway implements EntityDataGateway {
                     Map.of("projectOrderId", projectOrderId));
 
             if (rawJson == null) {
-                log.warn("[SignableOrderInfoGateway] 接口无响应, projectOrderId={}", projectOrderId);
+                log.warn("[PersonalSignableOrderInfoGateway] 接口无响应, projectOrderId={}", projectOrderId);
                 return Collections.emptyList();
             }
 
             return parseSignableOrders(rawJson, projectOrderId, contractType);
         } catch (Exception e) {
-            log.warn("[SignableOrderInfoGateway] 查询弹窗S单失败: {}", e.getMessage());
+            log.warn("[PersonalSignableOrderInfoGateway] 查询弹窗S单失败: {}", e.getMessage());
             return Collections.emptyList();
         }
     }
@@ -118,7 +118,7 @@ public class SignableOrderInfoGateway implements EntityDataGateway {
                 }
             }
         } catch (Exception e) {
-            log.warn("[SignableOrderInfoGateway] 解析弹窗S单响应失败: {}", e.getMessage());
+            log.warn("[PersonalSignableOrderInfoGateway] 解析弹窗S单响应失败: {}", e.getMessage());
         }
         return result;
     }

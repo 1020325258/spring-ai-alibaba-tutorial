@@ -13,13 +13,13 @@ import org.springframework.stereotype.Component;
 import java.util.*;
 
 /**
- * SignableOrderInfo（弹窗可签约S单）实体的数据网关
+ * PersonalSignableOrderInfo（销售合同弹窗可签约S单）实体的数据网关
  * 可签约S单属于整个订单维度，直接通过 projectOrderId 调用 sign-order-list 接口查询
  */
 @Slf4j
 @Component
 @RequiredArgsConstructor
-public class SignableOrderInfoGateway implements EntityDataGateway {
+public class PersonalSignableOrderInfoGateway implements EntityDataGateway {
 
     private final HttpEndpointClient httpEndpointClient;
     private final ObjectMapper objectMapper;
@@ -32,22 +32,22 @@ public class SignableOrderInfoGateway implements EntityDataGateway {
 
     @Override
     public String getEntityName() {
-        return "SignableOrderInfo";
+        return "PersonalSignableOrderInfo";
     }
 
     @Override
     public List<Map<String, Object>> queryByField(String fieldName, Object value) {
         if (!"projectOrderId".equals(fieldName)) {
-            log.warn("[SignableOrderInfoGateway] 不支持的查询字段: {}", fieldName);
+            log.warn("[PersonalSignableOrderInfoGateway] 不支持的查询字段: {}", fieldName);
             return Collections.emptyList();
         }
         if (value == null) {
-            log.warn("[SignableOrderInfoGateway] projectOrderId 为 null，无法查询");
+            log.warn("[PersonalSignableOrderInfoGateway] projectOrderId 为 null，无法查询");
             return Collections.emptyList();
         }
         String projectOrderId = value.toString();
         if (projectOrderId.isEmpty() || "null".equals(projectOrderId)) {
-            log.warn("[SignableOrderInfoGateway] projectOrderId 为空，无法查询");
+            log.warn("[PersonalSignableOrderInfoGateway] projectOrderId 为空，无法查询");
             return Collections.emptyList();
         }
         return querySignableOrders(projectOrderId);
@@ -58,12 +58,12 @@ public class SignableOrderInfoGateway implements EntityDataGateway {
             String rawJson = httpEndpointClient.callPredefinedEndpointRaw("sign-order-list",
                     Map.of("projectOrderId", projectOrderId));
             if (rawJson == null) {
-                log.warn("[SignableOrderInfoGateway] 接口无响应, projectOrderId={}", projectOrderId);
+                log.warn("[PersonalSignableOrderInfoGateway] 接口无响应, projectOrderId={}", projectOrderId);
                 return Collections.emptyList();
             }
             return parseSignableOrders(rawJson, projectOrderId);
         } catch (Exception e) {
-            log.warn("[SignableOrderInfoGateway] 查询弹窗S单失败", e);
+            log.warn("[PersonalSignableOrderInfoGateway] 查询弹窗S单失败", e);
             return Collections.emptyList();
         }
     }
@@ -98,7 +98,7 @@ public class SignableOrderInfoGateway implements EntityDataGateway {
                 }
             }
         } catch (Exception e) {
-            log.warn("[SignableOrderInfoGateway] 解析弹窗S单响应失败", e);
+            log.warn("[PersonalSignableOrderInfoGateway] 解析弹窗S单响应失败", e);
         }
         return result;
     }

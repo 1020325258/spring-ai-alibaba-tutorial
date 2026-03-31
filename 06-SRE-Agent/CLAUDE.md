@@ -69,6 +69,38 @@
 
 ---
 
+## Admin 节点智能推荐
+
+当 RouterNode 无法识别用户意图时，请求会被路由到 admin 节点。AdminNode 会通过 LLM 分析用户输入和可用能力列表，输出语义相似的能力推荐。
+
+### 工作流程
+
+```
+用户输入 → RouterNode → admin（无法识别时）
+                         ↓
+              buildAvailableCapabilities()
+              (SkillRegistry + EntityRegistry)
+                         ↓
+              LLM 推荐相似能力
+                         ↓
+              "您可能想问：1. XXX 2. YYY"
+```
+
+### 能力列表来源
+
+- **Skills**：从 `SkillRegistry.listAll()` 获取 skillName + description
+- **实体**：从 `EntityRegistry` 获取 entityName + displayName + aliases
+
+### 输出规则
+
+| 场景 | 输出 |
+|------|------|
+| 有匹配能力 | "您可能想问：1. {能力描述} 2. {能力描述}" |
+| 无匹配能力 | "抱歉，我无法理解您的问题。请描述您的业务需求..." |
+| 输入太短（<5字符） | 直接返回默认帮助提示 |
+
+---
+
 ## 项目结构
 
 ```
