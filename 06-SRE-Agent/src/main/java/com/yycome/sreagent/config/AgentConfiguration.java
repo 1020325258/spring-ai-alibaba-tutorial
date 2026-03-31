@@ -142,9 +142,10 @@ public class AgentConfiguration {
     }
 
     private String buildSkillsList(SkillRegistry skillRegistry) {
-        StringBuilder sb = new StringBuilder();
-        sb.append("## Available Skills\n\n");
-        sb.append("- sales-contract-sign-dialog-diagnosis: 排查销售/正签合同弹窗提示\"请先完成报价\"的原因\n");
+        StringBuilder sb = new StringBuilder("## Available Skills\n\n");
+        skillRegistry.listAll().forEach(skill ->
+                sb.append("- ").append(skill.getName()).append(": ").append(skill.getDescription()).append("\n")
+        );
         return sb.toString();
     }
 }

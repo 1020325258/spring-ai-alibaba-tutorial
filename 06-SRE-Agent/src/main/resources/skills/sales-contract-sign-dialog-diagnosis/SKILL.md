@@ -1,6 +1,6 @@
 ---
 name: sales-contract-sign-dialog-diagnosis
-description: 排查销售合同发起时弹窗提示"请先完成报价"或"无定软电报价"的原因
+description: 排查销售合同发起时弹窗或页面提示"请先完成报价"、"无定软电报价"、"缺少定软电品类报价"等报价类异常的原因
 ---
 
 # 合同弹窗诊断

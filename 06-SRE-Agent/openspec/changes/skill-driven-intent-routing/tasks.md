@@ -20,14 +20,14 @@
 
 ## 5. 更新 investigate-agent.md
 
-- [ ] 5.1 删除 `investigate-agent.md` 中的 Skill 触发规则表章节
-- [ ] 5.2 新增说明：路由器已预选 Skill，第一步直接调用 `readSkill([selectedSkill] 标注中的 Skill name)`
+- [x] 5.1 删除 `investigate-agent.md` 中的 Skill 触发规则表章节
+- [x] 5.2 新增说明：路由器已预选 Skill，第一步直接调用 `readSkill([selectedSkill] 标注中的 Skill name)`
 
 ## 6. 修复 buildSkillsList 动态化
 
-- [ ] 6.1 `AgentConfiguration.buildSkillsList()` 改为遍历 `skillRegistry.listAll()`，用 `skill.getName()` 和 `skill.getDescription()` 构建列表，删除硬编码字符串
+- [x] 6.1 `AgentConfiguration.buildSkillsList()` 改为遍历 `skillRegistry.listAll()`，用 `skill.getName()` 和 `skill.getDescription()` 构建列表，删除硬编码字符串
 
 ## 7. 测试验证
 
-- [ ] 7.1 新增端到端测试用例（`sre-agent-qa.yaml` 或 `InvestigateAgentIT`）：输入"826033014000004927缺少定软电品类报价"，断言路由到 investigateAgent 且 `readSkill` 被调用
-- [ ] 7.2 运行集成测试 `./run-integration-tests.sh`，确保原有排查和查询用例全部通过
+- [x] 7.1 新增端到端测试用例（`sre-agent-qa.yaml` 或 `InvestigateAgentIT`）：输入"826033014000004927缺少定软电品类报价"，断言路由到 investigateAgent 且 `readSkill` 被调用
+- [x] 7.2 运行集成测试 `./run-integration-tests.sh`，确保原有排查和查询用例全部通过

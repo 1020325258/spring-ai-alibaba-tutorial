@@ -19,12 +19,8 @@
 ### readSkill
 读取技能内容，获取排查 SOP。
 
-- 参数：`skillName`（必须是已注册的技能名）
-- **触发规则**：当用户描述以下已知业务症状时，无需"排查""诊断"等关键词，描述症状即触发：
-
-| skillName | 触发场景 |
-|-----------|----------|
-| `sales-contract-sign-dialog-diagnosis` | 弹窗提示"请先完成报价"、发起提示"无定软电报价"、弹窗没有数据、合同弹窗异常 |
+- 参数：`skillName`（从输入末尾的 `[selectedSkill: xxx]` 标注中获取，直接使用该值）
+- **使用说明**：路由器已根据用户症状预选了 Skill，**第一步必须调用 readSkill(skillName)**，无需自行判断选哪个 Skill
 
 ### ontologyQuery
 本体论查询，按 Skill 指南执行。
