@@ -2,12 +2,14 @@ package com.yycome.sreagent.config;
 
 import com.alibaba.cloud.ai.graph.agent.ReactAgent;
 import com.alibaba.cloud.ai.graph.skills.registry.SkillRegistry;
+import com.yycome.sreagent.config.node.QueryAgentNode;
 import com.yycome.sreagent.domain.ontology.service.EntityRegistry;
 import com.yycome.sreagent.trigger.agent.OntologyQueryTool;
 import com.yycome.sreagent.trigger.agent.ReadOntologyTool;
 import com.yycome.sreagent.trigger.agent.ReadSkillTool;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.model.ChatModel;
+import org.springframework.ai.tool.ToolCallback;
 import org.springframework.ai.tool.ToolCallbackProvider;
 import org.springframework.ai.tool.method.MethodToolCallbackProvider;
 import org.springframework.beans.factory.annotation.Value;
@@ -17,6 +19,7 @@ import org.springframework.context.annotation.Primary;
 import org.springframework.core.io.Resource;
 
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 
 /**
  * SRE-Agent 配置类
@@ -31,6 +34,23 @@ public class AgentConfiguration {
 
     @Value("classpath:prompts/investigate-agent.md")
     private Resource investigateAgentPrompt;
+
+    /**
+     * QueryAgentNode - 替代 AgentNode(queryAgent)，单次 LLM 调用 + 手动工具执行，跳过 ReAct 二次处理
+     */
+    @Bean
+    public QueryAgentNode queryAgentNode(ChatModel chatModel,
+                                          OntologyQueryTool ontologyQueryTool,
+                                          EntityRegistry entityRegistry) throws Exception {
+        String promptContent = sreAgentPrompt.getContentAsString(StandardCharsets.UTF_8);
+        String entitySummary = entityRegistry.getEntitySummaryForPrompt();
+        String systemPrompt = promptContent.replace("{{entity_summary}}", entitySummary);
+        ToolCallback[] callbacks = MethodToolCallbackProvider.builder()
+                .toolObjects(ontologyQueryTool)
+                .build()
+                .getToolCallbacks();
+        return new QueryAgentNode(chatModel, systemPrompt, List.of(callbacks));
+    }
 
     /**
      * Query Agent - ReactAgent，仅使用 ontologyQuery 工具

@@ -3,8 +3,8 @@ package com.yycome.sreagent.config;
 import com.alibaba.cloud.ai.graph.CompiledGraph;
 import com.alibaba.cloud.ai.graph.NodeOutput;
 import com.alibaba.cloud.ai.graph.RunnableConfig;
+import com.alibaba.cloud.ai.graph.StateGraph;
 import com.alibaba.cloud.ai.graph.state.StateSnapshot;
-import com.alibaba.cloud.ai.graph.streaming.StreamingOutput;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.yycome.sreagent.infrastructure.service.ThinkingContextHolder;
@@ -23,11 +23,13 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * SRE-Agent 图执行处理器
- * 参考 deepresearch/GraphProcess 实现：
- * - 使用 CompiledGraph.fluxStream() 获取节点输出流
- * - 区分 StreamingOutput（LLM token 流式输出）和普通 NodeOutput
- * - 将输出转换为 SSE 格式发送给前端
- * - 支持 JSON 格式的 thinking/conclusion 事件类型
+ *
+ * <p>参考 04-AnalysisAgent/GraphProcessor.java 的设计：直接按 nodeName 从 state 读取结果，
+ * 不做 instanceof StreamingOutput 判断。
+ *
+ * <p>原因：框架的 GraphRunnerContext.buildNodeOutput() 无论节点类型都包装成 StreamingOutput，
+ * 且本图所有节点（AgentNode 内部 blockLast、QueryAgentNode 同步调用）的 chunk 始终为 null，
+ * instanceof 判断无实际意义。
  */
 public class SREAgentGraphProcess {
 
@@ -35,7 +37,6 @@ public class SREAgentGraphProcess {
 
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
-    /** 步骤计数器，用于生成步骤序号 */
     private final AtomicInteger stepCounter = new AtomicInteger(0);
 
     private final ConcurrentHashMap<String, Future<?>> graphTaskFutureMap = new ConcurrentHashMap<>();
@@ -53,24 +54,16 @@ public class SREAgentGraphProcess {
     }
 
     /**
-     * 处理图执行流，将 NodeOutput 转换为 SSE 事件
+     * 处理图执行流，将 NodeOutput 转换为 SSE 事件。
+     * 直接按 nodeName 从 state 读取结果，参考 04-AnalysisAgent/GraphProcessor.java。
      */
     public void processStream(String sessionId, Flux<NodeOutput> generator,
                               Sinks.Many<ServerSentEvent<String>> sink) {
         final String sessionIdStr = sessionId;
         Future<?> future = executor.submit(() -> {
-            // 在 executor 线程上设置 ThinkingContextHolder，供 ObservabilityAspect 使用
             ThinkingContextHolder.set(sink);
             generator.doOnNext(output -> {
-                String nodeName = output.node();
-                String content;
-                if (output instanceof StreamingOutput streamingOutput) {
-                    logger.debug("Streaming output from node {}: {}", nodeName, sessionId);
-                    content = buildStreamingContent(nodeName, streamingOutput, output);
-                } else {
-                    logger.debug("Normal output from node {}", nodeName);
-                    content = buildNormalContent(nodeName, output);
-                }
+                String content = resolveContent(output);
                 if (content != null && !content.isEmpty()) {
                     sink.tryEmitNext(ServerSentEvent.builder(content).build());
                 }
@@ -93,49 +86,45 @@ public class SREAgentGraphProcess {
     }
 
     /**
-     * 处理 LLM 流式输出（token 级别）
+     * 按 nodeName 将节点输出转换为 SSE 内容字符串（公开，供测试使用）。
+     *
+     * <ul>
+     *   <li>router     → thinking 事件（路由决策）</li>
+     *   <li>queryAgent → conclusion 事件（JSON 代码块，来自 QueryAgentNode 写入的 state["result"]）</li>
+     *   <li>investigateAgent / admin → 直接返回 state["result"]（LLM 生成的 Markdown 文本）</li>
+     *   <li>START / END 及其他节点 → null（不输出）</li>
+     * </ul>
      */
-    private String buildStreamingContent(String nodeName, StreamingOutput streamingOutput, NodeOutput output) {
-        if (streamingOutput == null) return null;
-        String textContent = streamingOutput.chunk();
-        // chunk 为空时，fallback 到 state
-        if (textContent == null || textContent.isEmpty()) {
-            // router 节点：输出路由决策
-            if ("router".equals(nodeName)) {
-                Object routingTarget = output.state().value("routingTarget").orElse("queryAgent");
-                return buildThinkingJson("**[路由器]** 路由至 **" + routingTarget + "**");
-            }
-            // Agent 节点：AgentNode 写入了完整结果
-            if ("queryAgent".equals(nodeName) || "investigateAgent".equals(nodeName) || "admin".equals(nodeName)) {
-                Object stateResult = output.state().value("result").orElse(null);
-                if (stateResult != null && !stateResult.toString().isEmpty()) {
-                    return stateResult.toString();
-                }
-            }
-            return null;
-        }
-        return textContent;
-    }
+    public String resolveContent(NodeOutput output) {
+        String nodeName = output.node();
 
-    /**
-     * 处理普通节点输出（公开，供测试使用）
-     */
-    public String buildNormalContent(String nodeName, NodeOutput output) {
-        // 跳过 START 和 END 节点
-        if ("__start__".equals(nodeName) || "__end__".equals(nodeName)) {
+        if (StateGraph.START.equals(nodeName) || StateGraph.END.equals(nodeName)) {
             return null;
         }
-        // router 和 Agent 节点由 buildStreamingContent 处理（StreamingOutput 包裹）
-        if ("router".equals(nodeName) || "queryAgent".equals(nodeName)
-                || "investigateAgent".equals(nodeName) || "admin".equals(nodeName)) {
-            return null;
+
+        if ("router".equals(nodeName)) {
+            Object routingTarget = output.state().value("routingTarget").orElse("queryAgent");
+            return buildThinkingJson("**[路由器]** 路由至 **" + routingTarget + "**");
         }
+
+        if ("queryAgent".equals(nodeName)) {
+            Object stateResult = output.state().value("result").orElse(null);
+            if (stateResult == null || stateResult.toString().isEmpty()) return null;
+            return buildConclusionJson("```json\n" + prettyPrintJson(stateResult.toString()) + "\n```");
+        }
+
+        if ("investigateAgent".equals(nodeName) || "admin".equals(nodeName)) {
+            Object stateResult = output.state().value("result").orElse(null);
+            if (stateResult != null && !stateResult.toString().isEmpty()) {
+                return stateResult.toString();
+            }
+        }
+
         return null;
     }
 
     /**
      * 构建 JSON 格式的 thinking 事件
-     * 用于实时输出排查过程
      */
     public String buildThinkingJson(String content) {
         try {
@@ -148,7 +137,6 @@ public class SREAgentGraphProcess {
 
     /**
      * 构建 JSON 格式的 conclusion 事件
-     * 用于输出最终结论
      */
     public String buildConclusionJson(String content) {
         try {
@@ -159,57 +147,43 @@ public class SREAgentGraphProcess {
         }
     }
 
-    /**
-     * 获取下一个步骤序号
-     */
+    private String prettyPrintJson(String raw) {
+        try {
+            Object node = OBJECT_MAPPER.readValue(raw, Object.class);
+            return OBJECT_MAPPER.writerWithDefaultPrettyPrinter().writeValueAsString(node);
+        } catch (Exception e) {
+            return raw;
+        }
+    }
+
     public int nextStepNumber() {
         return stepCounter.incrementAndGet();
     }
 
-    /**
-     * 重置步骤计数器（每个新会话调用）
-     */
     public void resetStepCounter() {
         stepCounter.set(0);
     }
 
-    /**
-     * 终止运行中的图
-     */
     public boolean stopGraph(String sessionId) {
         Future<?> future = this.graphTaskFutureMap.remove(sessionId);
-        if (future == null) {
-            return false;
-        }
-        if (future.isDone()) {
-            return true;
-        }
+        if (future == null) return false;
+        if (future.isDone()) return true;
         return future.cancel(true);
     }
 
-    /**
-     * 获取图的当前状态
-     */
     public StateSnapshot getState(RunnableConfig runnableConfig) {
         return compiledGraph.getState(runnableConfig);
     }
 
     /**
-     * 同步执行图，返回累积的文本内容
-     * 供测试和简单调用场景使用
+     * 同步执行图，返回累积的文本内容（供测试使用）
      */
     public String streamAndCollect(String input) {
         Map<String, Object> inputs = Map.of("input", input);
         StringBuilder sb = new StringBuilder();
         compiledGraph.stream(inputs, RunnableConfig.builder().build())
                 .doOnNext(output -> {
-                    String nodeName = output.node();
-                    String content;
-                    if (output instanceof StreamingOutput so) {
-                        content = buildStreamingContent(nodeName, so, output);
-                    } else {
-                        content = buildNormalContent(nodeName, output);
-                    }
+                    String content = resolveContent(output);
                     if (content != null && !content.isEmpty()) {
                         sb.append(content);
                     }

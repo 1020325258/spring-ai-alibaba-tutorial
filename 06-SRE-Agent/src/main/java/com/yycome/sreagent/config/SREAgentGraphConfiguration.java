@@ -9,6 +9,7 @@ import com.alibaba.cloud.ai.graph.serializer.std.SpringAIStateSerializer;
 import com.alibaba.cloud.ai.graph.state.strategy.ReplaceStrategy;
 import com.yycome.sreagent.config.node.AdminNode;
 import com.yycome.sreagent.config.node.AgentNode;
+import com.yycome.sreagent.config.node.QueryAgentNode;
 import com.yycome.sreagent.config.node.RouterDispatcher;
 import com.yycome.sreagent.config.node.RouterNode;
 import com.alibaba.cloud.ai.graph.skills.registry.SkillRegistry;
@@ -46,10 +47,8 @@ public class SREAgentGraphConfiguration {
 
     private static final Logger log = LoggerFactory.getLogger(SREAgentGraphConfiguration.class);
 
-    @Lazy
     @Autowired
-    @Qualifier("queryAgent")
-    private ReactAgent queryAgent;
+    private QueryAgentNode queryAgentNode;
 
     @Lazy
     @Autowired
@@ -92,7 +91,7 @@ public class SREAgentGraphConfiguration {
                 new SpringAIStateSerializer(OverAllState::new));
 
         graph.addNode("router", node_async(new RouterNode(chatModel)))
-             .addNode("queryAgent", node_async(new AgentNode(queryAgent, "queryAgent", tracingService)))
+             .addNode("queryAgent", node_async(queryAgentNode))
              .addNode("investigateAgent", node_async(new AgentNode(investigateAgent, "investigateAgent", tracingService)))
              .addNode("admin", node_async(new AdminNode(environmentConfig, adminAgent, tracingService, chatModel, skillRegistry, entityRegistry)));
 

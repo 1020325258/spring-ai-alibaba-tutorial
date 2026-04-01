@@ -18,6 +18,12 @@
      -Dsurefire.failIfNoSpecifiedTests=false
    ```
 
+   **集成测试脚本**（修改 Gateway / Domain / Trigger / 提示词 / 节点配置后必须运行，需真实外部环境）：
+   ```bash
+   ./run-integration-tests.sh
+   ```
+   > **重要**：集成测试的核心是 `QaPairEvaluationIT`，它从 `src/test/resources/qa-pairs/sre-agent-qa.yaml` 加载问答对，通过 LLM-as-Judge 语义评估每条问答的输出是否符合预期。每次修改代码逻辑后**必须**运行此测试，不能仅依赖单元测试。
+
    - **特别注意**：修改 Java 代码逻辑时，必须同步检查 `sre-agent.md` 提示词是否与代码保持一致（见下方反思记录）。
    - **git commit 前**：pre-commit hook 会自动检测 src/ 变更并运行 `./run-integration-tests.sh`，无需手动触发。
 
@@ -37,6 +43,7 @@
 | 文件 | 职责 | 说明 |
 |------|------|------|
 | `BaseSREAgentIT` | 端到端测试基类 | 提供 `ask()` 方法发起自然语言请求 |
+| **`QaPairEvaluationIT`** | **核心集成测试（必跑）** | 从 `qa-pairs/sre-agent-qa.yaml` 加载问答对，LLM-as-Judge 语义评估，生成测试报告 |
 | `InvestigateAgentIT` | 问题排查测试 | 验证 read_skill + ontologyQuery 能力 |
 | `QueryAgentIT` | 数据查询测试 | 验证 ontologyQuery 参数正确性 |
 | `SkillMechanismIT` | Skill 机制测试 | 验证 SkillRegistry + read_skill 工具 |
