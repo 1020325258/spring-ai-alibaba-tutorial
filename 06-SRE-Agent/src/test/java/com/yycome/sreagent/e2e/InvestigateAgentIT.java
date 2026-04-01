@@ -30,7 +30,6 @@ class InvestigateAgentIT extends BaseSREAgentIT {
     /**
      * 验证无"排查"关键词、仅描述症状时也能正确路由到 investigateAgent。
      *
-     * @see com.yycome.sreagent.config.node.routing.LlmSkillRoutingStrategy#route(String)
      */
     @Test
     void investigate_missing_personal_quote_symptom_only() {
@@ -45,7 +44,6 @@ class InvestigateAgentIT extends BaseSREAgentIT {
     /**
      * 验证弹窗提示"请先完成报价"的经典排查场景。
      *
-     * @see com.yycome.sreagent.config.node.routing.LlmSkillRoutingStrategy#route(String)
      */
     @Test
     void investigate_dialog_please_complete_quote() {

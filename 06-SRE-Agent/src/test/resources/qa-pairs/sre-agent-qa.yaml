@@ -20,3 +20,6 @@ qa-pairs:
     question: "排查825123110000002753缺少定软电报价"
     expected: "给出排查分析结论，说明该订单是否缺少个性化报价，并给出判断依据"
 
+  - id: "03"
+    question: "查询825123110000002753正签弹窗可签约S单"
+    expected: "路由至 queryAgent 节点，执行工具调用，queryScope 为 FormalSignableOrderInfo"
