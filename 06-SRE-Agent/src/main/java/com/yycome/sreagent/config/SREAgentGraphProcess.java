@@ -8,6 +8,7 @@ import com.alibaba.cloud.ai.graph.state.StateSnapshot;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.yycome.sreagent.infrastructure.service.ThinkingContextHolder;
+import com.yycome.sreagent.infrastructure.service.model.ThinkingEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.codec.ServerSentEvent;
@@ -104,7 +105,24 @@ public class SREAgentGraphProcess {
 
         if ("router".equals(nodeName)) {
             Object routingTarget = output.state().value("routingTarget").orElse("queryAgent");
-            return buildThinkingJson("**[路由器]** 路由至 **" + routingTarget + "**");
+            // 使用结构化 ThinkingEvent 格式
+            ThinkingEvent event = ThinkingEvent.builder()
+                    .type("thinking")
+                    .stepNumber(0)
+                    .stepTitle("路由至 " + routingTarget)
+                    .toolName("router")
+                    .params(Map.of("target", routingTarget.toString()))
+                    .paramsDescription(Map.of("target", routingTarget.toString()))
+                    .resultSummary("路由成功")
+                    .duration(0L)
+                    .success(true)
+                    .build();
+            try {
+                return OBJECT_MAPPER.writeValueAsString(event);
+            } catch (JsonProcessingException e) {
+                logger.error("Error building router thinking JSON", e);
+                return null;
+            }
         }
 
         if ("queryAgent".equals(nodeName)) {

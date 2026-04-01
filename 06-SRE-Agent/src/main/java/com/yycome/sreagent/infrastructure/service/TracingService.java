@@ -35,6 +35,8 @@ public class TracingService {
         context.setEndTime(System.currentTimeMillis());
         context.setSuccess(true);
         context.setResult(result);
+        // 计算结果记录数
+        context.setRecordCount(computeRecordCount(result));
         addTrace(context);
     }
 
@@ -99,5 +101,52 @@ public class TracingService {
      */
     public int getTraceCount() {
         return traceCount.get();
+    }
+
+    /**
+     * 计算结果记录数
+     */
+    private Integer computeRecordCount(Object result) {
+        if (result == null) {
+            return 0;
+        }
+        try {
+            // 如果是字符串，尝试解析为 JSON
+            if (result instanceof String str) {
+                if (str.startsWith("{")) {
+                    com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+                    Map<?, ?> map = mapper.readValue(str, Map.class);
+                    return extractRecordCount(map);
+                }
+            }
+            // 如果是 Map，直接提取
+            if (result instanceof Map<?, ?> map) {
+                return extractRecordCount(map);
+            }
+        } catch (Exception e) {
+            log.debug("计算记录数失败: {}", e.getMessage());
+        }
+        return null;
+    }
+
+    /**
+     * 从 Map 中提取记录数
+     */
+    private Integer extractRecordCount(Map<?, ?> map) {
+        // 优先查找 records 字段
+        Object records = map.get("records");
+        if (records instanceof java.util.List<?> list) {
+            return list.size();
+        }
+        // 查找 total 或 count 字段
+        Object total = map.get("total");
+        if (total instanceof Integer) {
+            return (Integer) total;
+        }
+        Object count = map.get("count");
+        if (count instanceof Integer) {
+            return (Integer) count;
+        }
+        return null;
     }
 }

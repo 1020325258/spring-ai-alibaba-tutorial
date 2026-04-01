@@ -28,9 +28,11 @@
                     <span class="step-num" :class="{ 'step-num-router': block.stepNumber === 0 }">
                       {{ block.stepNumber === 0 ? '→' : block.stepNumber }}
                     </span>
-                    <span class="step-title">{{ block.title }}</span>
+                    <span class="step-title">{{ block.stepTitle }}</span>
                     <span v-if="block.duration > 0" class="step-meta">{{ block.duration }}ms</span>
-                    <span v-if="block.toolName" :class="['step-status', block.success ? 'success' : 'failure']">{{ block.success ? '✓' : '✗' }}</span>
+                    <span v-if="block.toolName" :class="['step-status', block.success ? 'success' : 'failure']">
+                      {{ block.success ? '✓' : '✗' }}
+                    </span>
                   </summary>
                   <div class="thinking-step-body">
                     <div v-if="block.toolName" class="step-tool">工具: <code>{{ block.toolName }}</code></div>
@@ -40,7 +42,20 @@
                         <li v-for="(v, k) in block.params" :key="k"><code>{{ k }}</code>: {{ v }}</li>
                       </ul>
                     </div>
-                    <div v-if="block.summary" class="step-result">结果: {{ block.summary }}</div>
+                    <div v-if="block.resultSummary" class="step-result">结果: {{ block.resultSummary }}</div>
+                    <div v-if="block.resultData" class="step-data">
+                      <div>数据:</div>
+                      <MarkdownRender
+                        :content="'```json\n' + JSON.stringify(block.resultData, null, 2) + '\n```'"
+                        :is-dark="false"
+                        :final="true"
+                        :max-live-nodes="320"
+                        :themes="['vitesse-dark', 'vitesse-light']"
+                        custom-id="chatui-thinking"
+                        class="step-data-md"
+                      />
+                    </div>
+                    <div v-if="block.errorMessage" class="step-error">错误: {{ block.errorMessage }}</div>
                   </div>
                 </details>
               </div>
@@ -482,8 +497,28 @@ details[open] .thinking-step-header::before {
 
 .step-tool,
 .step-params,
-.step-result {
+.step-result,
+.step-data {
   margin-bottom: 0.25rem;
+}
+
+.step-data-content {
+  background: #f3f4f6;
+  padding: 0.5rem;
+  border-radius: 0.25rem;
+  font-size: 0.75rem;
+  overflow-x: auto;
+  max-height: 200px;
+  margin-top: 0.25rem;
+}
+
+.step-data-md {
+  margin-top: 0.25rem;
+}
+
+.step-data-md :deep(.code-block-container) {
+  max-height: 200px;
+  overflow: auto;
 }
 
 .step-params ul {

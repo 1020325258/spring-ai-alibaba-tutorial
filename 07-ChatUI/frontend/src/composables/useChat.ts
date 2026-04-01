@@ -13,12 +13,15 @@ export interface Message {
 
 export interface ThinkingBlock {
   stepNumber: number
-  title: string
+  stepTitle: string
   toolName: string
   params: Record<string, string>
-  summary: string
+  resultSummary: string
+  recordCount?: number
+  resultData?: unknown
   duration: number
   success: boolean
+  errorMessage?: string
 }
 
 export function useChat() {
@@ -70,10 +73,22 @@ export function useChat() {
           try {
             const jsonData = JSON.parse(chunk)
             if (jsonData.type === 'thinking') {
-              // 处理 thinking 类型事件
+              // 处理 thinking 类型事件（结构化数据）
               const msg = messages.value[assistantIdx]
               const thinkingBlocks = msg.thinkingBlocks || []
-              thinkingBlocks.push(parseThinkingContent(jsonData.content))
+              const block: ThinkingBlock = {
+                stepNumber: jsonData.stepNumber ?? 0,
+                stepTitle: jsonData.stepTitle ?? jsonData.toolName ?? '',
+                toolName: jsonData.toolName ?? '',
+                params: jsonData.paramsDescription ?? {},
+                resultSummary: jsonData.resultSummary ?? '',
+                recordCount: jsonData.recordCount,
+                resultData: jsonData.resultData,
+                duration: jsonData.duration ?? 0,
+                success: jsonData.success ?? true,
+                errorMessage: jsonData.errorMessage,
+              }
+              thinkingBlocks.push(block)
               messages.value[assistantIdx] = {
                 ...msg,
                 thinkingBlocks,
@@ -178,59 +193,4 @@ function prettyPrintJsonBlocks(content: string): string {
       return match
     }
   })
-}
-
-/**
- * 解析 thinking 内容为 ThinkingBlock
- * 格式：**步骤N - 标题**\n> 工具：`xxx`\n> 参数：\n> - key: `value`\n> 结果：x 条记录\n> 耗时：xms | 成功：✓
- */
-function parseThinkingContent(content: string): ThinkingBlock {
-  const block: ThinkingBlock = {
-    stepNumber: 0,
-    title: '',
-    toolName: '',
-    params: {},
-    summary: '',
-    duration: 0,
-    success: true,
-  }
-
-  // 解析步骤号和标题：**步骤1 - 查询订单**
-  const stepMatch = content.match(/\*\*步骤(\d+) - (.+?)\*\*/)
-  if (stepMatch) {
-    block.stepNumber = parseInt(stepMatch[1])
-    block.title = stepMatch[2]
-  }
-
-  // 解析工具名：> 工具：`ontologyQuery`
-  const toolMatch = content.match(/> 工具：`(.+?)`/)
-  if (toolMatch) {
-    block.toolName = toolMatch[1]
-  }
-
-  // 解析参数：> - key: `value`
-  const paramMatches = content.matchAll(/> - (.+?): `([^`]+)`/g)
-  for (const match of paramMatches) {
-    block.params[match[1]] = match[2]
-  }
-
-  // 解析结果摘要：> 结果：xxx
-  const resultMatch = content.match(/> 结果：(.+)/)
-  if (resultMatch) {
-    block.summary = resultMatch[1]
-  }
-
-  // 解析耗时和状态：> 耗时：100ms | 成功：✓
-  const statusMatch = content.match(/> 耗时：(\d+)ms \| 成功：([✓✗])/)
-  if (statusMatch) {
-    block.duration = parseInt(statusMatch[1])
-    block.success = statusMatch[2] === '✓'
-  }
-
-  // 非结构化内容（如路由器消息）：将整个内容去除 Markdown 符号后作为标题
-  if (!block.title) {
-    block.title = content.replace(/\*\*/g, '').trim().split('\n')[0]
-  }
-
-  return block
 }
