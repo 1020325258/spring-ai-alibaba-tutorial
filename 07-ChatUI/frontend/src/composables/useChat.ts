@@ -12,7 +12,8 @@ export interface Message {
 }
 
 export interface ThinkingBlock {
-  stepNumber: number
+  nodeName: string
+  displayTitle: string
   stepTitle: string
   toolName: string
   params: Record<string, string>
@@ -22,6 +23,74 @@ export interface ThinkingBlock {
   duration: number
   success: boolean
   errorMessage?: string
+}
+
+/**
+ * 查找指定 nodeName 的节点
+ */
+function findNode<T>(jsonArray: T[], nodeName: string): T | undefined {
+  return jsonArray.find((item: any) => item.nodeName === nodeName)
+}
+
+/**
+ * 解析结构化事件（基于 nodeName）
+ */
+function parseStructuredEvent(jsonData: any, msg: Message): { thinkingBlocks?: ThinkingBlock[], conclusion?: string } | null {
+  const nodeName = jsonData.nodeName
+  if (!nodeName) return null
+
+  switch (nodeName) {
+    case 'router':
+      // 路由决策事件
+      return {
+        thinkingBlocks: [{
+          nodeName: 'router',
+          displayTitle: jsonData.displayTitle || '意图识别',
+          stepTitle: jsonData.stepTitle || '路由决策',
+          toolName: jsonData.toolName || 'router',
+          params: jsonData.params || {},
+          paramsDescription: jsonData.paramsDescription || {},
+          resultSummary: jsonData.resultSummary || '路由成功',
+          duration: jsonData.duration ?? 0,
+          success: jsonData.success ?? true,
+        }]
+      }
+
+    case 'tool_call':
+      // 工具调用事件
+      return {
+        thinkingBlocks: [{
+          nodeName: 'tool_call',
+          displayTitle: jsonData.displayTitle || '工具调用',
+          stepTitle: jsonData.stepTitle || jsonData.toolName || '',
+          toolName: jsonData.toolName || '',
+          params: jsonData.params || {},
+          paramsDescription: jsonData.paramsDescription || {},
+          resultSummary: jsonData.resultSummary || '',
+          recordCount: jsonData.recordCount,
+          resultData: jsonData.resultData,
+          duration: jsonData.duration ?? 0,
+          success: jsonData.success ?? true,
+          errorMessage: jsonData.errorMessage,
+        }]
+      }
+
+    case 'queryAgent':
+      // 数据查询结论事件
+      return {
+        conclusion: jsonData.content || ''
+      }
+
+    case 'investigateAgent':
+    case 'admin':
+      // 问题排查/智能推荐 - 作为普通文本处理
+      return {
+        conclusion: jsonData.content || ''
+      }
+
+    default:
+      return null
+  }
 }
 
 export function useChat() {
@@ -69,39 +138,25 @@ export function useChat() {
             : line.slice(5)
           if (chunk === '[DONE]') continue
 
-          // 尝试解析 JSON 格式事件
+          // 尝试解析 JSON 格式事件（基于 nodeName）
           try {
             const jsonData = JSON.parse(chunk)
-            if (jsonData.type === 'thinking') {
-              // 处理 thinking 类型事件（结构化数据）
-              const msg = messages.value[assistantIdx]
-              const thinkingBlocks = msg.thinkingBlocks || []
-              const block: ThinkingBlock = {
-                stepNumber: jsonData.stepNumber ?? 0,
-                stepTitle: jsonData.stepTitle ?? jsonData.toolName ?? '',
-                toolName: jsonData.toolName ?? '',
-                params: jsonData.paramsDescription ?? {},
-                resultSummary: jsonData.resultSummary ?? '',
-                recordCount: jsonData.recordCount,
-                resultData: jsonData.resultData,
-                duration: jsonData.duration ?? 0,
-                success: jsonData.success ?? true,
-                errorMessage: jsonData.errorMessage,
+            if (jsonData.nodeName) {
+              const result = parseStructuredEvent(jsonData, messages.value[assistantIdx])
+              if (result) {
+                const msg = messages.value[assistantIdx]
+                if (result.thinkingBlocks) {
+                  const thinkingBlocks = [...(msg.thinkingBlocks || []), ...result.thinkingBlocks]
+                  messages.value[assistantIdx] = { ...msg, thinkingBlocks }
+                }
+                if (result.conclusion !== undefined) {
+                  messages.value[assistantIdx] = {
+                    ...msg,
+                    conclusion: (msg.conclusion || '') + result.conclusion,
+                  }
+                }
+                continue
               }
-              thinkingBlocks.push(block)
-              messages.value[assistantIdx] = {
-                ...msg,
-                thinkingBlocks,
-              }
-              continue
-            } else if (jsonData.type === 'conclusion') {
-              // 处理 conclusion 类型事件
-              const msg = messages.value[assistantIdx]
-              messages.value[assistantIdx] = {
-                ...msg,
-                conclusion: (msg.conclusion || '') + jsonData.content,
-              }
-              continue
             }
           } catch {
             // 不是 JSON 格式，作为普通文本处理

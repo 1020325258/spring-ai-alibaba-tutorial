@@ -23,10 +23,10 @@
             <div class="message-bubble">
               <!-- Thinking blocks: collapsible step cards -->
               <div v-if="msg.thinkingBlocks?.length" class="thinking-steps">
-                <details v-for="block in msg.thinkingBlocks" :key="block.stepNumber" class="thinking-step">
+                <details v-for="block in msg.thinkingBlocks" :key="block.nodeName + block.stepTitle" class="thinking-step">
                   <summary class="thinking-step-header">
-                    <span class="step-num" :class="{ 'step-num-router': block.stepNumber === 0 }">
-                      {{ block.stepNumber === 0 ? '→' : block.stepNumber }}
+                    <span class="step-badge" :class="{ 'badge-router': block.nodeName === 'router' }">
+                      {{ block.displayTitle || '步骤' }}
                     </span>
                     <span class="step-title">{{ block.stepTitle }}</span>
                     <span v-if="block.duration > 0" class="step-meta">{{ block.duration }}ms</span>
@@ -447,21 +447,22 @@ details[open] .thinking-step-header::before {
   transform: rotate(90deg);
 }
 
-.step-num {
+.step-badge {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 1.25rem;
-  height: 1.25rem;
+  padding: 0.125rem 0.375rem;
   background: #3b82f6;
   color: #fff;
-  border-radius: 50%;
-  font-size: 0.75rem;
+  border-radius: 0.25rem;
+  font-size: 0.6875rem;
   font-weight: 600;
   flex-shrink: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.025em;
 }
 
-.step-num-router {
+.badge-router {
   background: #6b7280;
 }
 

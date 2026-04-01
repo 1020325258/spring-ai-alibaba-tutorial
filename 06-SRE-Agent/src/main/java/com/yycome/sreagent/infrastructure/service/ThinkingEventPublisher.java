@@ -25,9 +25,9 @@ public class ThinkingEventPublisher {
      * 发布结构化 Thinking 事件
      * @param context 工具调用追踪上下文
      * @param sink SSE sink 用于发送事件
-     * @param stepNumber 步骤序号
+     * @param displayTitle 步骤标题
      */
-    public void publishStepThinking(TracingContext context, Sinks.Many<ServerSentEvent<String>> sink, int stepNumber) {
+    public void publishStepThinking(TracingContext context, Sinks.Many<ServerSentEvent<String>> sink, String displayTitle) {
         if (context == null || sink == null) {
             log.warn("[ThinkingEventPublisher] context 或 sink 为 null，跳过发布");
             return;
@@ -35,10 +35,10 @@ public class ThinkingEventPublisher {
 
         try {
             // 使用结构化对象
-            ThinkingEvent event = ThinkingEvent.fromTracingContext(context, stepNumber);
+            ThinkingEvent event = ThinkingEvent.fromTracingContext(context, displayTitle);
             String json = objectMapper.writeValueAsString(event);
             sink.tryEmitNext(ServerSentEvent.builder(json).build());
-            log.info("[ThinkingEventPublisher] 发布 thinking 事件: 步骤{} - {} - {}", stepNumber, context.getToolName(), json);
+            log.info("[ThinkingEventPublisher] 发布 thinking 事件: {} - {} - {}", displayTitle, context.getToolName(), json);
         } catch (JsonProcessingException e) {
             log.error("Error building thinking JSON", e);
         }

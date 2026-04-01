@@ -574,3 +574,68 @@ openspec list --json
 openspec status --change "<name>" --json
 /opsx:archive <change-name>
 ```
+
+**变更文件存放位置**：
+- 针对特定项目的变更（如 06-SRE-Agent），应将 openspec 变更文件创建在对应项目目录下（如 `06-SRE-Agent/openspec/changes/`）
+- **禁止**先在根目录创建变更，再移动到项目目录
+- 原因：避免变更文件散落在根目录，保持项目目录的完整性
+
+---
+
+## 统一事件分发机制（2026-04-01）
+
+### 背景
+
+重构前 SSE 事件发送逻辑分散在 3 处：
+1. **Router 节点**（SREAgentGraphProcess.resolveContent）：发送路由决策的 thinking 事件
+2. **ObservabilityAspect**：在 @Tool 方法调用后直接发送 thinking 事件
+3. **QueryAgent 节点**（SREAgentGraphProcess.resolveContent）：发送 conclusion 事件
+
+### 设计原则
+
+参考 DeepResearch 项目，采用 **nodeName 驱动** 的统一事件分发：
+- 后端：基于 `nodeName` 差异化构建 SSE 事件
+- 前端：使用 `findNode(nodeName)` 差异化解析
+
+### 核心组件
+
+| 组件 | 职责 |
+|------|------|
+| `SREAgentNodeName` 枚举 | 定义所有 Agent 节点名称和 displayTitle 映射 |
+| `SREAgentEventDispatcher` | 统一事件分发器，基于 nodeName 构建差异化事件 |
+| `ThinkingContextHolder` | 线程无关的上下文持有者，支持工具事件列表收集 |
+| `ThinkingEvent` | 事件数据结构，移除 stepNumber，使用 nodeName/displayTitle |
+
+### 事件结构
+
+```json
+// router 节点
+{"nodeName": "router", "displayTitle": "意图识别", "stepTitle": "路由至 queryAgent", ...}
+
+// 工具调用
+{"nodeName": "tool_call", "displayTitle": "工具调用", "stepTitle": "ontologyQuery", ...}
+
+// queryAgent
+{"nodeName": "queryAgent", "displayTitle": "数据查询", "content": "..."}
+
+// investigateAgent / admin
+{"nodeName": "investigateAgent", "displayTitle": "问题排查", "content": "..."}
+```
+
+### 事件发送流程
+
+```
+@Tool 方法执行 → ObservabilityAspect 收集到 ThinkingContextHolder 
+            → Agent 节点完成 → SREAgentEventDispatcher 统一发送
+```
+
+### 前端解析
+
+```typescript
+// 基于 nodeName 差异化解析
+if (jsonData.nodeName === 'tool_call') {
+  // 处理工具调用事件
+} else if (jsonData.nodeName === 'queryAgent') {
+  // 处理结论事件
+}
+```

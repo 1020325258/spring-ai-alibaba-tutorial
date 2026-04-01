@@ -1,10 +1,13 @@
 package com.yycome.sreagent.infrastructure.service;
 
+import com.yycome.sreagent.infrastructure.service.model.ThinkingEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.codec.ServerSentEvent;
 import reactor.core.publisher.Sinks;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
@@ -24,6 +27,7 @@ public class ThinkingContextHolder {
         private final Sinks.Many<ServerSentEvent<String>> sink;
         private int stepNumber;
         private final String threadName;
+        private final List<ThinkingEvent> toolEvents = new ArrayList<>();
 
         public ThinkingContext(Sinks.Many<ServerSentEvent<String>> sink, int startStep) {
             this.sink = sink;
@@ -45,6 +49,18 @@ public class ThinkingContextHolder {
 
         public String getThreadName() {
             return threadName;
+        }
+
+        public void addToolEvent(ThinkingEvent event) {
+            this.toolEvents.add(event);
+        }
+
+        public List<ThinkingEvent> getToolEvents() {
+            return toolEvents;
+        }
+
+        public void clearToolEvents() {
+            this.toolEvents.clear();
         }
     }
 

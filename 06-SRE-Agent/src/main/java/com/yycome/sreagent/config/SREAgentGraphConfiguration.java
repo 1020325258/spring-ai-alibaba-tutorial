@@ -16,6 +16,7 @@ import com.alibaba.cloud.ai.graph.skills.registry.SkillRegistry;
 import com.yycome.sreagent.domain.ontology.service.EntityRegistry;
 import com.yycome.sreagent.infrastructure.config.EnvironmentConfig;
 import com.yycome.sreagent.infrastructure.service.TracingService;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.messages.AssistantMessage;
@@ -106,9 +107,11 @@ public class SREAgentGraphConfiguration {
     }
 
     @Bean
-    public SREAgentGraphProcess sreAgentGraphProcess(@Qualifier("stateGraph") StateGraph stateGraph) throws com.alibaba.cloud.ai.graph.exception.GraphStateException {
+    public SREAgentGraphProcess sreAgentGraphProcess(
+            @Qualifier("stateGraph") StateGraph stateGraph,
+            ObjectMapper objectMapper) throws com.alibaba.cloud.ai.graph.exception.GraphStateException {
         CompileConfig compileConfig = CompileConfig.builder().build();
         CompiledGraph compiledGraph = stateGraph.compile(compileConfig);
-        return new SREAgentGraphProcess(compiledGraph);
+        return new SREAgentGraphProcess(compiledGraph, objectMapper);
     }
 }

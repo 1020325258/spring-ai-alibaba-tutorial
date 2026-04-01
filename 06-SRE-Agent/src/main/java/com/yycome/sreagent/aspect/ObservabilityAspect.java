@@ -1,10 +1,12 @@
 package com.yycome.sreagent.aspect;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.yycome.sreagent.infrastructure.annotation.DataQueryTool;
 import com.yycome.sreagent.infrastructure.service.MetricsCollector;
 import com.yycome.sreagent.infrastructure.service.ThinkingContextHolder;
-import com.yycome.sreagent.infrastructure.service.ThinkingEventPublisher;
 import com.yycome.sreagent.infrastructure.service.TracingService;
+import com.yycome.sreagent.infrastructure.service.model.ThinkingEvent;
 import com.yycome.sreagent.infrastructure.service.model.ToolCallContext;
 import com.yycome.sreagent.infrastructure.service.model.TracingContext;
 import lombok.RequiredArgsConstructor;
@@ -13,7 +15,9 @@ import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
 import org.aspectj.lang.annotation.Aspect;
 import org.aspectj.lang.reflect.MethodSignature;
+import org.springframework.http.codec.ServerSentEvent;
 import org.springframework.stereotype.Component;
+import reactor.core.publisher.Sinks;
 
 import java.lang.reflect.Method;
 import java.util.HashMap;
@@ -36,7 +40,7 @@ public class ObservabilityAspect {
 
     private final TracingService tracingService;
     private final MetricsCollector metricsCollector;
-    private final ThinkingEventPublisher thinkingEventPublisher;
+    private final ObjectMapper objectMapper;
 
     /** 是否启用详细 LLM 日志（生产环境建议关闭） */
     private static final boolean DETAILED_LLM_LOG = false;
@@ -152,7 +156,7 @@ public class ObservabilityAspect {
     }
 
     /**
-     * 发布 Thinking 事件到 SSE
+     * 实时发送 Thinking 事件到 SSE（逐个工具调用立即展示）
      */
     private void publishThinkingEvent(TracingContext tracing) {
         if (tracing == null) {
@@ -161,14 +165,16 @@ public class ObservabilityAspect {
         try {
             ThinkingContextHolder.ThinkingContext ctx = ThinkingContextHolder.get();
             if (ctx != null && ctx.getSink() != null) {
-                int stepNumber = ctx.nextStep();
-                log.info("[THINKING] 发布步骤 {} - {}", stepNumber, tracing.getToolName());
-                thinkingEventPublisher.publishStepThinking(tracing, ctx.getSink(), stepNumber);
+                // 实时发送事件，而非收集到上下文
+                ThinkingEvent event = ThinkingEvent.fromTracingContext(tracing, "工具调用");
+                String json = objectMapper.writeValueAsString(event);
+                ctx.getSink().tryEmitNext(ServerSentEvent.builder(json).build());
+                log.info("[THINKING] 实时发送工具事件 {} - {}", tracing.getToolName(), event.getStepTitle());
             } else {
-                log.debug("[THINKING] 上下文未设置，跳过 thinking 事件发布 (tool={})", tracing.getToolName());
+                log.debug("[THINKING] 上下文未设置，跳过事件发送 (tool={})", tracing.getToolName());
             }
-        } catch (Exception e) {
-            log.warn("发布 Thinking 事件失败: {}", e.getMessage());
+        } catch (JsonProcessingException e) {
+            log.warn("发送 Thinking 事件失败: {}", e.getMessage());
         }
     }
 }

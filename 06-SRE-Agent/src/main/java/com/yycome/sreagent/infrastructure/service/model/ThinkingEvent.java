@@ -6,7 +6,6 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.util.List;
 import java.util.Map;
 
 /**
@@ -20,11 +19,11 @@ import java.util.Map;
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class ThinkingEvent {
 
-    /** 事件类型 */
-    private String type;
+    /** 节点名称（统一标识） */
+    private String nodeName;
 
-    /** 步骤序号（0表示路由步骤） */
-    private Integer stepNumber;
+    /** 显示标题（中文） */
+    private String displayTitle;
 
     /** 步骤标题 */
     private String stepTitle;
@@ -59,15 +58,15 @@ public class ThinkingEvent {
     /**
      * 从 TracingContext 构建 ThinkingEvent
      */
-    public static ThinkingEvent fromTracingContext(TracingContext context, int stepNumber) {
+    public static ThinkingEvent fromTracingContext(TracingContext context, String displayTitle) {
         String toolName = context.getToolName();
 
         // 仅 ontologyQuery 工具需要传递 resultData 给前端展示
         boolean includeResultData = "ontologyQuery".equals(toolName);
 
         return ThinkingEvent.builder()
-                .type("thinking")
-                .stepNumber(stepNumber)
+                .nodeName("tool_call")
+                .displayTitle("工具调用")
                 .stepTitle(context.getStepTitle() != null ? context.getStepTitle() : toolName)
                 .toolName(toolName)
                 .params(context.getParams())

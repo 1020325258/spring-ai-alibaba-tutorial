@@ -54,9 +54,6 @@ public class ChatController {
             // 创建 SSE sink
             Sinks.Many<ServerSentEvent<String>> sink = Sinks.many().unicast().onBackpressureBuffer();
 
-            // 重置步骤计数器
-            graphProcess.resetStepCounter();
-
             // 构建输入
             java.util.Map<String, Object> inputs = java.util.Map.of("input", req.message());
 
