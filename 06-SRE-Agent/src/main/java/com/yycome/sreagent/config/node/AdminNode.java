@@ -163,28 +163,6 @@ public class AdminNode implements NodeAction {
         return null; // 未识别为环境切换命令
     }
 
-    private String executeLLMAgent(String input) {
-        StringBuilder resultBuilder = new StringBuilder();
-        Map<String, Object> params = Map.of("input", input);
-        var context = tracingService.startToolCall("adminAgent", params);
-
-        try {
-            Flux<Message> messageFlux = adminAgent.streamMessages(input);
-            messageFlux
-                    .filter(msg -> msg instanceof AssistantMessage am && !am.getText().isEmpty())
-                    .doOnNext(msg -> resultBuilder.append(((AssistantMessage) msg).getText()))
-                    .blockLast();
-
-            String result = resultBuilder.toString();
-            tracingService.endToolCall(context, result.isEmpty() ? "(无返回内容)" : result);
-            return result.isEmpty() ? "（无返回内容）" : result;
-        } catch (Exception e) {
-            log.error("AdminNode LLM 调用失败: {}", e.getMessage(), e);
-            tracingService.failToolCall(context, e);
-            return "处理请求时发生错误：" + e.getMessage();
-        }
-    }
-
     /** 显示当前环境和可用列表（回复用户咨询环境列表时使用） */
     private String buildEnvListResponse() {
         Map<String, String> envs = environmentConfig.getAvailableEnvironments();

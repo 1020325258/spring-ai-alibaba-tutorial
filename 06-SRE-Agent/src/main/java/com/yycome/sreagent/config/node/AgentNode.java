@@ -5,8 +5,6 @@ import com.alibaba.cloud.ai.graph.action.NodeAction;
 import com.alibaba.cloud.ai.graph.agent.ReactAgent;
 import com.yycome.sreagent.infrastructure.service.TracingService;
 import lombok.extern.slf4j.Slf4j;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.Message;
 import reactor.core.publisher.Flux;
@@ -19,8 +17,6 @@ import java.util.Map;
  */
 @Slf4j
 public class AgentNode implements NodeAction {
-
-    private static final Logger log = LoggerFactory.getLogger(AgentNode.class);
 
     private final ReactAgent agent;
     private final String agentName;

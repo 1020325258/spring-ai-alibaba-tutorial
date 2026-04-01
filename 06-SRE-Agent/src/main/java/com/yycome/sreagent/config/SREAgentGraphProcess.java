@@ -218,12 +218,4 @@ public class SREAgentGraphProcess {
         return sb.toString();
     }
 
-    private String safeObjectToJson(Object object) {
-        try {
-            return OBJECT_MAPPER.writeValueAsString(object);
-        } catch (JsonProcessingException e) {
-            logger.error("JSON processing error: {}", e.getMessage());
-            return "{}";
-        }
-    }
 }
