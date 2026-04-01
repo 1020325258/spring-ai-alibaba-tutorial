@@ -45,6 +45,10 @@ spring:
 
 # 日志配置
 logging:
+  file:
+    # 显式配置日志目录，logback-spring.xml 通过 springProperty 读取此值
+    # 可通过环境变量 -Dlogging.file.path=/absolute/path 覆盖
+    path: log
   level:
     root: INFO
     com.yycome.sremate: DEBUG

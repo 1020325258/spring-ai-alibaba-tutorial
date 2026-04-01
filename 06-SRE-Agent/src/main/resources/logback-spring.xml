@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <configuration>
-    <!-- 日志目录 -->
-    <property name="LOG_DIR" value="log"/>
+    <!-- 日志目录：优先读 application.yml 中的 logging.file.path，未配置则相对 ${user.dir} -->
+    <springProperty scope="context" name="LOG_DIR" source="logging.file.path" defaultValue="${user.dir}/log"/>
 
     <!-- 控制台输出 -->
     <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">

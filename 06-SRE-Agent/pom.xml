@@ -222,6 +222,9 @@
                     </execution>
                 </executions>
                 <configuration>
+                    <!-- 确保 spring-boot:run 无论从哪个目录调用，JVM 工作目录都是模块根目录 -->
+                    <!-- 这样 logback-spring.xml 中的相对路径 log/ 始终解析为 06-SRE-Agent/log/ -->
+                    <workingDirectory>${project.basedir}</workingDirectory>
                     <excludes>
                         <exclude>
                             <groupId>org.projectlombok</groupId>
