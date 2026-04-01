@@ -13,6 +13,9 @@ public class OntologyEntity {
     private List<String> aliases;                   // 中文别名列表
     private String description;
     private String table;
+    private String sourceType;                      // 数据源类型：db / http
+    private String endpoint;                         // HTTP 接口 ID（当 sourceType=http 时使用）
+    private String flattenPath;                       // 数组展平路径，如 "data[].items[]"
     private List<OntologyAttribute> attributes;
     private List<LookupStrategy> lookupStrategies;  // 替换原 lookupField，支持多格式入口
 }

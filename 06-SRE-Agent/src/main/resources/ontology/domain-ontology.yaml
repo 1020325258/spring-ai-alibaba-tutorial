@@ -72,13 +72,20 @@ entities:
   - name: BudgetBill
     displayName: "报价单"
     aliases: ["报价", "预算单"]
-    description: "报价单，挂在订单下"
+    description: "报价单，挂在订单下，通过 projectOrderId 调用 budget-bill-list 接口查询"
+    sourceType: http
+    endpoint: budget-bill-list
+    flattenPath: "decorateBudgetList,personalBudgetList"
     lookupStrategies:
       - field: projectOrderId
         pattern: "^\\d{15,}$"
     attributes:
-      - { name: billCode,       type: string, description: "报价单编号" }
-      - { name: projectOrderId, type: string, description: "所属订单号" }
+      - { name: projectOrderId, source: "$param.projectOrderId" }
+      - { name: billCode, source: "billCode" }
+      - { name: billType, source: "billType" }
+      - { name: billTypeDesc, source: "billTypeDesc" }
+      - { name: statusDesc, source: "statusDesc" }
+      - { name: originalBillCode, source: "originalBillCode" }
 
   - name: PersonalQuote
     displayName: "个性化报价"
@@ -113,20 +120,23 @@ entities:
     displayName: "销售合同弹窗可签约S单"
     aliases: ["弹窗S单", "签约弹窗数据", "可签约S单", "销售合同弹窗S单", "个人合同弹窗S单"]
     description: "订单下可签约的S单列表，通过 projectOrderId 直接调用 sign-order-list 接口查询"
+    sourceType: http
+    endpoint: sign-order-list
+    flattenPath: "data[].signableOrderInfos[]"
     lookupStrategies:
       - field: projectOrderId
         pattern: "^\\d{15,}$"
     attributes:
-      - { name: projectOrderId,      type: string,  description: "订单号" }
-      - { name: companyName,         type: string,  description: "公司名称" }
-      - { name: companyCode,         type: string,  description: "公司编码" }
-      - { name: goodsInfo,           type: string,  description: "商品信息/套餐名称" }
-      - { name: orderAmount,         type: number,  description: "订单金额" }
-      - { name: orderCreateTime,     type: string,  description: "下单时间" }
-      - { name: bindType,            type: number,  description: "绑定类型" }
-      - { name: bindCode,            type: string,  description: "绑定的S单编号，逗号分隔" }
-      - { name: packageInstanceName, type: string,  description: "套餐实例名称" }
-      - { name: mustSelect,          type: boolean, description: "是否必选" }
+      - { name: projectOrderId, source: "$param.projectOrderId" }
+      - { name: companyName, source: "companyName" }
+      - { name: companyCode, source: "companyCode" }
+      - { name: goodsInfo, source: "goodsInfo" }
+      - { name: orderAmount, source: "orderAmount" }
+      - { name: orderCreateTime, source: "orderCreateTime" }
+      - { name: bindType, source: "bindType" }
+      - { name: bindCode, source: "bindCode" }
+      - { name: packageInstanceName, source: "packageInstanceName" }
+      - { name: mustSelect, source: "mustSelect" }
 
   - name: ContractInstance
     displayName: "合同实例"
@@ -143,20 +153,23 @@ entities:
     displayName: "正签合同弹窗可签约S单"
     aliases: ["正签弹窗S单", "正签合同可签约S单", "正签合同弹窗S单"]
     description: "订单下正签合同（type=3）可签约的S单列表，通过 projectOrderId 调用 formalQuotation/list/v2 接口查询"
+    sourceType: http
+    endpoint: formal-sign-order-list
+    flattenPath: "data[].signableOrderInfos[]"
     lookupStrategies:
       - field: projectOrderId
         pattern: "^\\d{15,}$"
     attributes:
-      - { name: projectOrderId,      type: string,  description: "订单号" }
-      - { name: companyName,         type: string,  description: "公司名称" }
-      - { name: companyCode,         type: string,  description: "公司编码" }
-      - { name: goodsInfo,           type: string,  description: "商品信息/套餐名称" }
-      - { name: orderAmount,         type: number,  description: "订单金额" }
-      - { name: orderCreateTime,     type: string,  description: "下单时间" }
-      - { name: bindType,            type: number,  description: "绑定类型" }
-      - { name: bindCode,            type: string,  description: "绑定的S单编号，逗号分隔" }
-      - { name: packageInstanceName, type: string,  description: "套餐实例名称" }
-      - { name: mustSelect,          type: boolean, description: "是否必选" }
+      - { name: projectOrderId, source: "$param.projectOrderId" }
+      - { name: companyName, source: "companyName" }
+      - { name: companyCode, source: "companyCode" }
+      - { name: goodsInfo, source: "goodsInfo" }
+      - { name: orderAmount, source: "orderAmount" }
+      - { name: orderCreateTime, source: "orderCreateTime" }
+      - { name: bindType, source: "bindType" }
+      - { name: bindCode, source: "bindCode" }
+      - { name: packageInstanceName, source: "packageInstanceName" }
+      - { name: mustSelect, source: "mustSelect" }
 
   - name: ContractConfig
     displayName: "配置表"

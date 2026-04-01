@@ -23,3 +23,19 @@ qa-pairs:
   - id: "03"
     question: "查询825123110000002753正签弹窗可签约S单"
     expected: "路由至 queryAgent 节点，执行工具调用，queryScope 为 FormalSignableOrderInfo"
+
+  - id: "04"
+    question: "查询825123110000002753销售弹窗可签约S单"
+    expected: "路由至 queryAgent 节点，执行工具调用，queryScope 为 PersonalSignableOrderInfo"
+
+  - id: "05"
+    question: "查询825123110000002753合同列表"
+    expected: "路由至 queryAgent 节点，执行工具调用，queryScope 为 Contract"
+
+  - id: "06"
+    question: "查询825123110000002753签约单据"
+    expected: "路由至 queryAgent 节点，执行工具调用，queryScope 为 ContractQuotationRelation"
+
+  - id: "07"
+    question: "查询825123110000002753合同字段"
+    expected: "路由至 queryAgent 节点，执行工具调用，queryScope 为 ContractField"

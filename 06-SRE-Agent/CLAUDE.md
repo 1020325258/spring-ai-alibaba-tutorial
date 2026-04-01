@@ -10,6 +10,11 @@
    | 修改 Gateway / Domain / Trigger / 提示词 | `./run-integration-tests.sh`（单元+集成） |
    | 仅修改文档、YAML 配置、注释 | 无需运行测试 |
 
+3. **运行测试后必须检查日志**：每次运行测试后，检查 `/log/sre-agent.log` 是否存在 ERROR 或异常日志，特别是：
+   - 一致性校验失败日志（"新旧方法输出一致性校验失败"）
+   - 上下文未设置日志（"上下文未设置，跳过事件发送"）
+   - 其他 ERROR 级别日志
+
    **单元测试脚本**（按需单独运行，无需外部环境）：
    ```bash
    JAVA_HOME=/Library/Java/JavaVirtualMachines/jdk-21.jdk/Contents/Home \
