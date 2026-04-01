@@ -1,12 +1,16 @@
 package com.yycome.sreagent.e2e;
 
+import com.yycome.sreagent.trigger.http.ChatController;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.DynamicTest;
 import org.junit.jupiter.api.TestFactory;
+import org.junit.jupiter.api.TestInstance;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.context.ActiveProfiles;
 
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -40,7 +44,10 @@ import static org.junit.jupiter.api.DynamicTest.dynamicTest;
  * </pre>
  */
 @DisplayName("问答对评估测试")
-public class QaPairEvaluationIT extends BaseSREAgentIT {
+@SpringBootTest(properties = "sre.console.enabled=false")
+@ActiveProfiles("local")
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
+public class QaPairEvaluationIT {
 
     private static final Path REPORT_PATH = Path.of("docs/test-execution-report.md");
 
@@ -49,6 +56,9 @@ public class QaPairEvaluationIT extends BaseSREAgentIT {
 
     @Autowired
     private ChatModel chatModel;
+
+    @Autowired
+    private ChatController chatController;
 
     @BeforeAll
     static void setUp() {
@@ -78,11 +88,12 @@ public class QaPairEvaluationIT extends BaseSREAgentIT {
     }
 
     /**
-     * 评估单个 QA pair
+     * 评估单个 QA pair - 直接调用 ChatController.streamAndCollect()
+     * 重构源代码，使其可测：直接调用方法而非 HTTP 调用
      */
     private void evaluateQaPair(QaPair qa) {
-        // 1. 调用 Agent 获取实际输出
-        String actualOutput = ask(qa.question());
+        // 1. 直接调用 ChatController 方法获取输出
+        String actualOutput = chatController.streamAndCollect(qa.question());
 
         // 2. 使用 Judge 进行语义评估
         EvaluationJudge judge = new EvaluationJudge(chatModel);

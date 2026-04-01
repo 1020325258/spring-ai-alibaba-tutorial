@@ -37,15 +37,27 @@ public class ChatController {
     @Autowired
     private RequestLogService requestLogService;
 
+    /**
+     * 流式处理入口（SSE 接口）
+     * 返回 Flux<ServerSentEvent<String>> 用于 SSE 推送
+     */
     @PostMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public Flux<ServerSentEvent<String>> stream(@RequestBody ChatRequest req) {
+        return streamFlux(req.message());
+    }
+
+    /**
+     * 流式处理核心逻辑（返回 Flux，用于 SSE 接口）
+     * 封装为独立方法，便于单元测试 mock
+     */
+    public Flux<ServerSentEvent<String>> streamFlux(String message) {
         String sessionId = UUID.randomUUID().toString();
         long startTime = System.currentTimeMillis();
 
-        log.info("收到请求: {}, sessionId: {}", req.message(), sessionId);
+        log.info("收到请求: {}, sessionId: {}", message, sessionId);
 
         // 记录请求开始
-        requestLogService.logRequestStart(sessionId, req.message());
+        requestLogService.logRequestStart(sessionId, message);
 
         // 用于收集完整响应
         StringBuilder responseBuilder = new StringBuilder();
@@ -55,7 +67,7 @@ public class ChatController {
             Sinks.Many<ServerSentEvent<String>> sink = Sinks.many().unicast().onBackpressureBuffer();
 
             // 构建输入
-            java.util.Map<String, Object> inputs = java.util.Map.of("input", req.message());
+            java.util.Map<String, Object> inputs = java.util.Map.of("input", message);
 
             // 使用 CompiledGraph.stream() 获取节点输出流
             var resultFuture = graphProcess.compiledGraph().stream(inputs, RunnableConfig.builder().build());
@@ -92,6 +104,23 @@ public class ChatController {
             requestLogService.logError(sessionId, e.getMessage());
             return Flux.just(ServerSentEvent.builder("{\"error\": \"" + e.getMessage() + "\"}").build());
         }
+    }
+
+    /**
+     * 同步执行并收集完整输出（用于测试）
+     * 将 Flux 流式输出同步收集为字符串返回
+     *
+     * @param message 用户输入消息
+     * @return 累积的完整响应文本
+     */
+    public String streamAndCollect(String message) {
+        return streamFlux(message).collectList()
+                .block()
+                .stream()
+                .map(ServerSentEvent::data)
+                .filter(data -> data != null && !data.isEmpty())
+                .reduce(String::concat)
+                .orElse("");
     }
 
     public record ChatRequest(String message) {}

@@ -102,14 +102,19 @@ public class SREAgentGraphProcess {
 
     /**
      * 同步执行图，返回累积的文本内容（供测试使用）
+     * 简化逻辑：只调用 stream 获取输出，不处理工具事件发送
      */
     public String streamAndCollect(String input) {
         Map<String, Object> inputs = Map.of("input", input);
         StringBuilder sb = new StringBuilder();
 
-        // 创建一个模拟的 sink 用于测试
-        Sinks.Many<ServerSentEvent<String>> testSink = Sinks.many().replay().all(0);
+        // 创建一个 sink 用于收集输出
+        Sinks.Many<ServerSentEvent<String>> sink = Sinks.many().unicast().onBackpressureBuffer();
 
+        // 设置上下文，确保 ObservabilityAspect 能正常发送工具事件
+        ThinkingContextHolder.set(sink);
+
+        // 调用 stream 获取输出
         compiledGraph.stream(inputs, RunnableConfig.builder().build())
                 .doOnNext(output -> {
                     String nodeName = output.node();
@@ -119,17 +124,22 @@ public class SREAgentGraphProcess {
                         return;
                     }
 
-                    // 发送工具事件
-                    eventDispatcher.publishToolEvents(testSink);
-
                     // 发送节点事件
-                    eventDispatcher.dispatch(output, testSink);
+                    eventDispatcher.dispatch(output, sink);
+                })
+                .doOnComplete(ThinkingContextHolder::clear)
+                .doOnError(e -> {
+                    ThinkingContextHolder.clear();
                 })
                 .blockLast();
 
-        // 收集所有发送的事件
-        testSink.asFlux()
-                .doOnNext(event -> sb.append(event.data()))
+        // 收集输出
+        sink.asFlux()
+                .doOnNext(event -> {
+                    if (event.data() != null) {
+                        sb.append(event.data());
+                    }
+                })
                 .blockLast();
 
         return sb.toString();
