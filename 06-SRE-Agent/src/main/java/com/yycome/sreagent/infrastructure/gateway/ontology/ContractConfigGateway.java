@@ -1,4 +1,4 @@
-package com.yycome.sreagent.domain.ontology.gateway;
+package com.yycome.sreagent.infrastructure.gateway.ontology;
 
 import com.yycome.sreagent.domain.ontology.engine.EntityDataGateway;
 import com.yycome.sreagent.domain.ontology.engine.EntityGatewayRegistry;

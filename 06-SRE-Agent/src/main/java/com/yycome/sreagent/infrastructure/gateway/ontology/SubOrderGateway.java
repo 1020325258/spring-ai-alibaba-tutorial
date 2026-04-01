@@ -1,4 +1,4 @@
-package com.yycome.sreagent.domain.ontology.gateway;
+package com.yycome.sreagent.infrastructure.gateway.ontology;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;

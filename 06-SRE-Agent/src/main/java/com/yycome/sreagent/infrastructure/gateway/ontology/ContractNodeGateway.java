@@ -1,4 +1,4 @@
-package com.yycome.sreagent.domain.ontology.gateway;
+package com.yycome.sreagent.infrastructure.gateway.ontology;
 
 import com.yycome.sreagent.domain.ontology.engine.EntityDataGateway;
 import com.yycome.sreagent.domain.ontology.engine.EntityGatewayRegistry;
@@ -12,12 +12,12 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * ContractField 实体的数据网关
+ * ContractNode 实体的数据网关
  */
 @Slf4j
 @Component
 @RequiredArgsConstructor
-public class ContractFieldGateway implements EntityDataGateway {
+public class ContractNodeGateway implements EntityDataGateway {
 
     private final ContractDao contractDao;
     private final EntityGatewayRegistry registry;
@@ -29,17 +29,15 @@ public class ContractFieldGateway implements EntityDataGateway {
 
     @Override
     public String getEntityName() {
-        return "ContractField";
+        return "ContractNode";
     }
 
     @Override
     public List<Map<String, Object>> queryByField(String fieldName, Object value) {
-        log.debug("[ContractFieldGateway] queryByField: {} = {}", fieldName, value);
+        log.debug("[ContractNodeGateway] queryByField: {} = {}", fieldName, value);
         if (!"contractCode".equals(fieldName)) {
-            throw new IllegalArgumentException("ContractField 不支持字段: " + fieldName);
+            throw new IllegalArgumentException("ContractNode 不支持字段: " + fieldName);
         }
-        // 返回字段数据（作为 Map 包装在 List 中）
-        Map<String, Object> fields = contractDao.fetchFields((String) value);
-        return List.of(fields);
+        return contractDao.fetchNodes((String) value);
     }
 }

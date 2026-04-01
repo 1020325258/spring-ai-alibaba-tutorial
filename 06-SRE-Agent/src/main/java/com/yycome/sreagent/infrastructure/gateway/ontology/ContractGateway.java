@@ -1,4 +1,4 @@
-package com.yycome.sreagent.domain.ontology.gateway;
+package com.yycome.sreagent.infrastructure.gateway.ontology;
 
 import com.yycome.sreagent.domain.ontology.engine.EntityDataGateway;
 import com.yycome.sreagent.domain.ontology.engine.EntityGatewayRegistry;
@@ -12,12 +12,12 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * ContractNode 实体的数据网关
+ * Contract 实体的数据网关
  */
 @Slf4j
 @Component
 @RequiredArgsConstructor
-public class ContractNodeGateway implements EntityDataGateway {
+public class ContractGateway implements EntityDataGateway {
 
     private final ContractDao contractDao;
     private final EntityGatewayRegistry registry;
@@ -29,15 +29,19 @@ public class ContractNodeGateway implements EntityDataGateway {
 
     @Override
     public String getEntityName() {
-        return "ContractNode";
+        return "Contract";
     }
 
     @Override
     public List<Map<String, Object>> queryByField(String fieldName, Object value) {
-        log.debug("[ContractNodeGateway] queryByField: {} = {}", fieldName, value);
-        if (!"contractCode".equals(fieldName)) {
-            throw new IllegalArgumentException("ContractNode 不支持字段: " + fieldName);
-        }
-        return contractDao.fetchNodes((String) value);
+        log.debug("[ContractGateway] queryByField: {} = {}", fieldName, value);
+        return switch (fieldName) {
+            case "projectOrderId" -> contractDao.fetchContractsByOrderId((String) value);
+            case "contractCode" -> {
+                Map<String, Object> contract = contractDao.fetchContractBase((String) value);
+                yield contract != null ? List.of(contract) : List.of();
+            }
+            default -> throw new IllegalArgumentException("Contract 不支持字段: " + fieldName);
+        };
     }
 }
