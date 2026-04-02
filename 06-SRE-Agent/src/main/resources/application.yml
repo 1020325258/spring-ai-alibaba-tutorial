@@ -60,3 +60,11 @@ management:
     web:
       exposure:
         include: health,info,metrics
+
+# SRE-Agent 会话记忆配置
+sreagent:
+  session:
+    # 保留最近对话轮次数（每轮包含 user + assistant 各一条消息）
+    max-recent-turns: 5
+    # 意图识别置信度阈值：低于此值路由到 admin
+    confidence-threshold: 0.6

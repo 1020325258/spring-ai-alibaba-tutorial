@@ -59,9 +59,15 @@ public class QueryAgentNode implements NodeAction {
 
         AssistantMessage assistantMessage = response.getResult().getOutput();
 
+        // 记录 LLM 响应详情
+        String textPreview = assistantMessage.getText();
+        log.info("[QueryAgentNode] LLM 响应: hasToolCalls={}, text={}",
+                assistantMessage.hasToolCalls(),
+                textPreview != null ? textPreview.substring(0, Math.min(200, textPreview.length())) : "(无文本)");
+
         if (!assistantMessage.hasToolCalls()) {
             // LLM 直接回答（无需工具），透传文本
-            log.info("[QueryAgentNode] LLM 无工具调用，直接返回文本");
+            log.warn("[QueryAgentNode] ⚠️ LLM 无工具调用，直接返回文本: {}", assistantMessage.getText());
             return Map.of("result", assistantMessage.getText());
         }
 

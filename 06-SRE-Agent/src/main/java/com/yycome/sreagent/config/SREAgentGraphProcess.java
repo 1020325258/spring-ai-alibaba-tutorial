@@ -2,6 +2,7 @@ package com.yycome.sreagent.config;
 
 import com.alibaba.cloud.ai.graph.CompiledGraph;
 import com.alibaba.cloud.ai.graph.NodeOutput;
+import com.alibaba.cloud.ai.graph.OverAllState;
 import com.alibaba.cloud.ai.graph.RunnableConfig;
 import com.alibaba.cloud.ai.graph.StateGraph;
 import com.alibaba.cloud.ai.graph.state.StateSnapshot;
@@ -10,15 +11,20 @@ import com.yycome.sreagent.config.node.SREAgentNodeName;
 import com.yycome.sreagent.infrastructure.service.ThinkingContextHolder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.ai.chat.memory.MessageWindowChatMemory;
+import org.springframework.ai.chat.messages.AssistantMessage;
+import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.http.codec.ServerSentEvent;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Sinks;
 
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * SRE-Agent 图执行处理器
@@ -33,6 +39,7 @@ public class SREAgentGraphProcess {
 
     private final ObjectMapper objectMapper;
     private final SREAgentEventDispatcher eventDispatcher;
+    private final MessageWindowChatMemory memory;
 
     private final ConcurrentHashMap<String, Future<?>> graphTaskFutureMap = new ConcurrentHashMap<>();
 
@@ -40,10 +47,12 @@ public class SREAgentGraphProcess {
 
     private final CompiledGraph compiledGraph;
 
-    public SREAgentGraphProcess(CompiledGraph compiledGraph, ObjectMapper objectMapper) {
+    public SREAgentGraphProcess(CompiledGraph compiledGraph, ObjectMapper objectMapper,
+                                 MessageWindowChatMemory memory) {
         this.compiledGraph = compiledGraph;
         this.objectMapper = objectMapper;
         this.eventDispatcher = new SREAgentEventDispatcher(objectMapper);
+        this.memory = memory;
     }
 
     public CompiledGraph compiledGraph() {
@@ -58,6 +67,7 @@ public class SREAgentGraphProcess {
     public void processStream(String sessionId, Flux<NodeOutput> generator,
                               Sinks.Many<ServerSentEvent<String>> sink) {
         final String sessionIdStr = sessionId;
+        final AtomicReference<OverAllState> finalStateRef = new AtomicReference<>();
         Future<?> future = executor.submit(() -> {
             ThinkingContextHolder.set(sink);
             generator.doOnNext(output -> {
@@ -70,8 +80,10 @@ public class SREAgentGraphProcess {
 
                 // 发送节点事件
                 eventDispatcher.dispatch(output, sink);
+                finalStateRef.set(output.state());
 
             }).doOnComplete(() -> {
+                writeBackToMemory(sessionIdStr, finalStateRef.get());
                 logger.info("Stream processing completed for session: {}", sessionIdStr);
                 ThinkingContextHolder.clear();
                 sink.tryEmitComplete();
@@ -98,6 +110,23 @@ public class SREAgentGraphProcess {
 
     public StateSnapshot getState(RunnableConfig runnableConfig) {
         return compiledGraph.getState(runnableConfig);
+    }
+
+    /**
+     * 将本轮对话写回 MessageWindowChatMemory
+     * sessionId 为空时跳过（集成测试中 SREAgentGraphProcess.streamAndCollect 不传 sessionId）
+     */
+    private void writeBackToMemory(String sessionId, OverAllState state) {
+        if (sessionId == null || sessionId.isEmpty() || state == null) {
+            return;
+        }
+        String input = state.value("input", "");
+        String result = state.value("result", "");
+        if (!input.isEmpty() && !result.isEmpty()) {
+            memory.add(sessionId, List.of(new UserMessage(input), new AssistantMessage(result)));
+            logger.info("[Memory] write-back sessionId={}, input_len={}, result_len={}",
+                    sessionId, input.length(), result.length());
+        }
     }
 
     /**

@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RestController;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Sinks;
@@ -42,19 +43,37 @@ public class ChatController {
      * 返回 Flux<ServerSentEvent<String>> 用于 SSE 推送
      */
     @PostMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public Flux<ServerSentEvent<String>> stream(@RequestBody ChatRequest req) {
-        return streamFlux(req.message());
+    public Flux<ServerSentEvent<String>> stream(
+            @RequestBody ChatRequest req,
+            @RequestHeader(value = "X-Session-Id", required = false) String xSessionId,
+            @RequestHeader(value = "X-User-Id", required = false) String xUserId) {
+
+        // 生成 sessionId，优先级：X-Session-Id > X-User-Id + timestamp > UUID
+        String sessionId = generateSessionId(xSessionId, xUserId);
+        return streamFlux(req.message(), sessionId, xUserId);
+    }
+
+    /**
+     * 生成 sessionId
+     */
+    private String generateSessionId(String xSessionId, String xUserId) {
+        if (xSessionId != null && !xSessionId.isEmpty()) {
+            return xSessionId;
+        }
+        if (xUserId != null && !xUserId.isEmpty()) {
+            return xUserId + "_" + System.currentTimeMillis();
+        }
+        return "temp_" + UUID.randomUUID().toString().substring(0, 8);
     }
 
     /**
      * 流式处理核心逻辑（返回 Flux，用于 SSE 接口）
      * 封装为独立方法，便于单元测试 mock
      */
-    public Flux<ServerSentEvent<String>> streamFlux(String message) {
-        String sessionId = UUID.randomUUID().toString();
+    public Flux<ServerSentEvent<String>> streamFlux(String message, String sessionId, String userId) {
         long startTime = System.currentTimeMillis();
 
-        log.info("收到请求: {}, sessionId: {}", message, sessionId);
+        log.info("收到请求: {}, sessionId: {}, userId: {}", message, sessionId, userId);
 
         // 记录请求开始
         requestLogService.logRequestStart(sessionId, message);
@@ -66,8 +85,12 @@ public class ChatController {
             // 创建 SSE sink
             Sinks.Many<ServerSentEvent<String>> sink = Sinks.many().unicast().onBackpressureBuffer();
 
-            // 构建输入
-            java.util.Map<String, Object> inputs = java.util.Map.of("input", message);
+            // 构建输入（包含 sessionId 和 userId）
+            java.util.Map<String, Object> inputs = java.util.Map.of(
+                    "input", message,
+                    "sessionId", sessionId,
+                    "userId", userId != null ? userId : ""
+            );
 
             // 使用 CompiledGraph.stream() 获取节点输出流
             var resultFuture = graphProcess.compiledGraph().stream(inputs, RunnableConfig.builder().build());
@@ -114,7 +137,8 @@ public class ChatController {
      * @return 累积的完整响应文本
      */
     public String streamAndCollect(String message) {
-        return streamFlux(message).collectList()
+        String sessionId = generateSessionId(null, null);
+        return streamFlux(message, sessionId, null).collectList()
                 .block()
                 .stream()
                 .map(ServerSentEvent::data)

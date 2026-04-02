@@ -17,6 +17,8 @@ import com.yycome.sreagent.domain.ontology.service.EntityRegistry;
 import com.yycome.sreagent.infrastructure.config.EnvironmentConfig;
 import com.yycome.sreagent.infrastructure.service.TracingService;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.ai.chat.memory.MessageWindowChatMemory;
+import com.yycome.sreagent.infrastructure.config.SessionProperties;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.messages.AssistantMessage;
@@ -76,6 +78,12 @@ public class SREAgentGraphConfiguration {
     @Autowired
     private TracingService tracingService;
 
+    @Autowired
+    private MessageWindowChatMemory messageWindowChatMemory;
+
+    @Autowired
+    private SessionProperties sessionProperties;
+
     @Bean
     public StateGraph stateGraph() throws GraphStateException {
         log.info("构建 SRE-Agent StateGraph...");
@@ -91,7 +99,7 @@ public class SREAgentGraphConfiguration {
         StateGraph graph = new StateGraph("sre-agent", keyStrategyFactory,
                 new SpringAIStateSerializer(OverAllState::new));
 
-        graph.addNode("router", node_async(new RouterNode(chatModel)))
+        graph.addNode("router", node_async(new RouterNode(chatModel, messageWindowChatMemory, sessionProperties)))
              .addNode("queryAgent", node_async(queryAgentNode))
              .addNode("investigateAgent", node_async(new AgentNode(investigateAgent, "investigateAgent", tracingService)))
              .addNode("admin", node_async(new AdminNode(environmentConfig, adminAgent, tracingService, chatModel, skillRegistry, entityRegistry)));
@@ -109,9 +117,11 @@ public class SREAgentGraphConfiguration {
     @Bean
     public SREAgentGraphProcess sreAgentGraphProcess(
             @Qualifier("stateGraph") StateGraph stateGraph,
-            ObjectMapper objectMapper) throws com.alibaba.cloud.ai.graph.exception.GraphStateException {
+            ObjectMapper objectMapper,
+            MessageWindowChatMemory messageWindowChatMemory)
+            throws com.alibaba.cloud.ai.graph.exception.GraphStateException {
         CompileConfig compileConfig = CompileConfig.builder().build();
         CompiledGraph compiledGraph = stateGraph.compile(compileConfig);
-        return new SREAgentGraphProcess(compiledGraph, objectMapper);
+        return new SREAgentGraphProcess(compiledGraph, objectMapper, messageWindowChatMemory);
     }
 }
