@@ -29,7 +29,7 @@
    ```
    > **重要**：集成测试的核心是 `QaPairEvaluationIT`，它从 `src/test/resources/qa-pairs/sre-agent-qa.yaml` 加载问答对，通过 LLM-as-Judge 语义评估每条问答的输出是否符合预期。每次修改代码逻辑后**必须**运行此测试，不能仅依赖单元测试。
 
-   - **特别注意**：修改 Java 代码逻辑时，必须同步检查 `sre-agent.md` 提示词是否与代码保持一致（见下方反思记录）。
+   - **特别注意**：修改 Java 代码逻辑时，必须同步检查 `query-agent.md` 提示词是否与代码保持一致（见下方反思记录）。
    - **git commit 前**：pre-commit hook 会自动检测 src/ 变更并运行 `./run-integration-tests.sh`，无需手动触发。
 
 ---
@@ -233,7 +233,7 @@ public class NewEntityGateway implements EntityDataGateway {
 
 #### 第三步：更新 LLM 提示词
 
-在 `prompts/sre-agent.md` 更新场景表、queryScope 参数说明和调用示例。
+在 `prompts/query-agent.md` 更新场景表、queryScope 参数说明和调用示例。
 
 #### 第四步：添加集成测试
 
@@ -353,7 +353,7 @@ private String resolveFieldShardingTable(String contractCode) {
 
 ## 更新 LLM 系统提示词
 
-新增工具后，同步更新 `prompts/sre-agent.md`：
+新增工具后，同步更新 `prompts/query-agent.md`：
 1. 在"可用工具"章节补充专用工具说明
 2. 在决策表中明确：关键词 → 专用工具名
 3. 不要暴露 `endpointId`
@@ -464,15 +464,15 @@ void newFeature_shouldUseCorrectTool() {
 
 **现象**：测试失败。LLM 传递 `queryScope=form`，但代码已删除 `SCOPE_ALIAS` 简写映射。
 
-**根本原因**：删除 `SCOPE_ALIAS` 时，只更新了 Java 代码，未同步更新 `sre-agent.md` 提示词。
+**根本原因**：删除 `SCOPE_ALIAS` 时，只更新了 Java 代码，未同步更新 `query-agent.md` 提示词。
 
-**教训**：凡是修改工具参数的合法取值范围（增删枚举值、删除简写别名、重命名参数），必须同步检查并更新 `sre-agent.md`，然后运行 `ContractOntologyIT` 集成测试验证。
+**教训**：凡是修改工具参数的合法取值范围（增删枚举值、删除简写别名、重命名参数），必须同步检查并更新 `query-agent.md`，然后运行 `ContractOntologyIT` 集成测试验证。
 
 ### 问题复盘（2026-03-27）
 
 **现象**：测试失败。`InvestigateAgentIT#investigate_missing_personal_quote` 断言 `readSkill` 被调用，但实际 LLM 只调用了 `ontologyQuery`，完全跳过了 `readSkill`。
 
-**根本原因**：`readSkill` 工具已通过 `@Tool` 注解注册并绑定到 `ChatClient`，但 `sre-agent.md` 的"可用工具"章节从未描述该工具（只有一个不存在的 `querySkills` 引用）。LLM 看不到 `readSkill`，自然不会调用它。
+**根本原因**：`readSkill` 工具已通过 `@Tool` 注解注册并绑定到 `ChatClient`，但 `query-agent.md` 的"可用工具"章节从未描述该工具（只有一个不存在的 `querySkills` 引用）。LLM 看不到 `readSkill`，自然不会调用它。
 
 **教训**：**工具的存在本身也必须同步到提示词。** 新增 `@Tool` 方法后，除了在"新增专用工具"章节说明用法，还必须在"可用工具"列表中补充该工具的描述（包括使用时机、参数说明和可用值列表）。缺少描述 ≈ 工具不存在。
 
@@ -480,9 +480,9 @@ void newFeature_shouldUseCorrectTool() {
 
 **现象**：`InvestigateAgentIT#investigate_sales_contract_sign_dialog_no_quote_keyword` 测试失败。用户描述"发起提示无定软电报价"，LLM 却调用了 `ontologyQuery(queryScope=PersonalQuote)` 而非 `readSkill`。
 
-**根本原因**：`sre-agent.md` 的 `readSkill` 使用时机写的是"当用户意图是'排查/诊断'时触发"，但用户描述中没有"排查""诊断"等明确关键词。同时，`sales-contract-sign-dialog-diagnosis` 的触发描述只写了"请先完成报价"，没有"无定软电报价"。LLM 看到"报价"二字，将其识别为个性化报价查询。
+**根本原因**：`query-agent.md` 的 `readSkill` 使用时机写的是"当用户意图是'排查/诊断'时触发"，但用户描述中没有"排查""诊断"等明确关键词。同时，`sales-contract-sign-dialog-diagnosis` 的触发描述只写了"请先完成报价"，没有"无定软电报价"。LLM 看到"报价"二字，将其识别为个性化报价查询。
 
-**教训**：**`readSkill` 的触发不能依赖"排查/诊断"等元关键词。** 症状描述（如"弹窗提示XXX""发起提示XXX"）也应触发对应技能。在 `sre-agent.md` 的 `readSkill` 章节中，必须为每个技能明确列出触发场景（包括症状短语），并说明"描述已知业务症状即触发，无需排查等关键词"。
+**教训**：**`readSkill` 的触发不能依赖"排查/诊断"等元关键词。** 症状描述（如"弹窗提示XXX""发起提示XXX"）也应触发对应技能。在 `query-agent.md` 的 `readSkill` 章节中，必须为每个技能明确列出触发场景（包括症状短语），并说明"描述已知业务症状即触发，无需排查等关键词"。
 
 ### 问题复盘（2026-03-27 第四次）
 
@@ -518,7 +518,7 @@ void newFeature_shouldUseCorrectTool() {
 
 **现象二**：改完提示词后，QueryAgentIT 测试全量失败（工具调用为零），但排查路径正常。
 
-**根本原因**：`sre-agent.md` 输出规则中加入了带 `{工具返回的原始 JSON}` 占位符的代码块模板。LLM 把这个 `{...}` 解读为"填空题"，直接生成 JSON 文本而不调用 `ontologyQuery` 工具。
+**根本原因**：`query-agent.md` 输出规则中加入了带 `{工具返回的原始 JSON}` 占位符的代码块模板。LLM 把这个 `{...}` 解读为"填空题"，直接生成 JSON 文本而不调用 `ontologyQuery` 工具。
 
 **教训**：**系统提示词中禁止使用 `{占位符}` 形式的模板示例来说明输出格式。** 应使用纯文字描述（如"用 \`\`\`json 代码块包裹"），不要用含花括号的模板变量，否则 LLM 会尝试自己填充而跳过工具调用。
 
@@ -540,7 +540,7 @@ void newFeature_shouldUseCorrectTool() {
 
 ### 触发条件
 
-在 `sre-agent.md` 的 `readSkill` 章节中，每个技能必须：
+在 `query-agent.md` 的 `readSkill` 章节中，每个技能必须：
 - 列出触发词/触发场景（包括**症状短语**，不只是"排查XXX"类措辞）
 - 说明"描述已知业务症状即触发，无需排查、诊断等关键词"
 

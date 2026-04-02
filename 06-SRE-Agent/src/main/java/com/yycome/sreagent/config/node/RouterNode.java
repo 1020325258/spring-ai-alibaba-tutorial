@@ -6,7 +6,7 @@ import com.alibaba.cloud.ai.graph.skills.SkillMetadata;
 import com.alibaba.cloud.ai.graph.skills.registry.SkillRegistry;
 import com.yycome.sreagent.domain.ontology.model.OntologyEntity;
 import com.yycome.sreagent.domain.ontology.service.EntityRegistry;
-import com.yycome.sreagent.infrastructure.config.SessionProperties;
+import com.yycome.sreagent.config.infra.SessionProperties;
 import org.springframework.ai.chat.memory.MessageWindowChatMemory;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.Message;

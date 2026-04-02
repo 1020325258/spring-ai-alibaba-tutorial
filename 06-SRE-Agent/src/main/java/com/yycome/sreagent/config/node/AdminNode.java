@@ -2,7 +2,7 @@ package com.yycome.sreagent.config.node;
 
 import com.alibaba.cloud.ai.graph.OverAllState;
 import com.alibaba.cloud.ai.graph.action.NodeAction;
-import com.yycome.sreagent.infrastructure.config.EnvironmentConfig;
+import com.yycome.sreagent.config.infra.EnvironmentConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

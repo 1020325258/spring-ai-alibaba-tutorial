@@ -1,4 +1,4 @@
-package com.yycome.sreagent.infrastructure.config;
+package com.yycome.sreagent.config.infra;
 
 import lombok.extern.slf4j.Slf4j;
 import org.apache.catalina.connector.Connector;

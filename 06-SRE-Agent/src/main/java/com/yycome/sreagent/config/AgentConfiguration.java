@@ -29,8 +29,8 @@ import java.util.List;
 @Configuration
 public class AgentConfiguration {
 
-    @Value("classpath:prompts/sre-agent.md")
-    private Resource sreAgentPrompt;
+    @Value("classpath:prompts/query-agent.md")
+    private Resource queryAgentPrompt;
 
     @Value("classpath:prompts/investigate-agent.md")
     private Resource investigateAgentPrompt;
@@ -42,7 +42,7 @@ public class AgentConfiguration {
     public QueryAgentNode queryAgentNode(ChatModel chatModel,
                                           OntologyQueryTool ontologyQueryTool,
                                           EntityRegistry entityRegistry) throws Exception {
-        String promptContent = sreAgentPrompt.getContentAsString(StandardCharsets.UTF_8);
+        String promptContent = queryAgentPrompt.getContentAsString(StandardCharsets.UTF_8);
         String entitySummary = entityRegistry.getEntitySummaryForPrompt();
         String systemPrompt = promptContent.replace("{{entity_summary}}", entitySummary);
         ToolCallback[] callbacks = MethodToolCallbackProvider.builder()
@@ -59,7 +59,7 @@ public class AgentConfiguration {
     public ReactAgent queryAgent(ChatModel chatModel,
                                   OntologyQueryTool ontologyQueryTool,
                                   EntityRegistry entityRegistry) throws Exception {
-        String promptContent = sreAgentPrompt.getContentAsString(StandardCharsets.UTF_8);
+        String promptContent = queryAgentPrompt.getContentAsString(StandardCharsets.UTF_8);
         String entitySummary = entityRegistry.getEntitySummaryForPrompt();
         String systemPrompt = promptContent.replace("{{entity_summary}}", entitySummary);
 
@@ -149,7 +149,7 @@ public class AgentConfiguration {
                                       ToolCallbackProvider tools,
                                       SkillRegistry skillRegistry,
                                       EntityRegistry entityRegistry) throws Exception {
-        String promptContent = sreAgentPrompt.getContentAsString(StandardCharsets.UTF_8);
+        String promptContent = queryAgentPrompt.getContentAsString(StandardCharsets.UTF_8);
         String entitySummary = entityRegistry.getEntitySummaryForPrompt();
         String promptWithEntities = promptContent.replace("{{entity_summary}}", entitySummary);
         String skillsList = buildSkillsList(skillRegistry);

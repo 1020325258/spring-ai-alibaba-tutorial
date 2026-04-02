@@ -1,4 +1,4 @@
-package com.yycome.sreagent.infrastructure.config;
+package com.yycome.sreagent.config.infra;
 
 import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;

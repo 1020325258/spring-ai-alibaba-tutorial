@@ -1,4 +1,4 @@
-package com.yycome.sreagent.infrastructure.config;
+package com.yycome.sreagent.config.infra;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.jdbc.DataSourceBuilder;

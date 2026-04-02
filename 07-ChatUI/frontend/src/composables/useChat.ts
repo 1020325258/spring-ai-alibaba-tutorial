@@ -98,6 +98,9 @@ export function useChat() {
   const isStreaming = ref(false)
   const md = getMarkdown()
 
+  // 生成并保持 sessionId（会话窗口内一致）
+  const sessionId = ref<string>(`session_${Date.now()}_${Math.random().toString(36).substring(2, 10)}`)
+
   async function sendMessage(text: string) {
     messages.value.push({ role: 'user', content: text, nodes: [], streaming: false })
     isStreaming.value = true
@@ -110,7 +113,10 @@ export function useChat() {
     try {
       const res = await fetch('/api/chat/stream', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Session-Id': sessionId.value,
+        },
         body: JSON.stringify({ message: text }),
       })
 
@@ -233,7 +239,7 @@ export function useChat() {
     }
   }
 
-  return { messages, isStreaming, sendMessage }
+  return { messages, isStreaming, sendMessage, sessionId }
 }
 
 /**

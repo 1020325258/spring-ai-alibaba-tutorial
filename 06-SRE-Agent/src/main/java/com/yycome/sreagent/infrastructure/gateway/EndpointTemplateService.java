@@ -1,6 +1,6 @@
 package com.yycome.sreagent.infrastructure.gateway;
 
-import com.yycome.sreagent.infrastructure.config.EnvironmentConfig;
+import com.yycome.sreagent.config.infra.EnvironmentConfig;
 import com.yycome.sreagent.infrastructure.gateway.model.EndpointParameter;
 import com.yycome.sreagent.infrastructure.gateway.model.EndpointTemplate;
 import lombok.RequiredArgsConstructor;

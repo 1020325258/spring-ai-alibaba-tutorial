@@ -1,6 +1,6 @@
 package com.yycome.sreagent.infrastructure.memory;
 
-import com.yycome.sreagent.infrastructure.config.SessionProperties;
+import com.yycome.sreagent.config.infra.SessionProperties;
 import org.springframework.ai.chat.memory.InMemoryChatMemoryRepository;
 import org.springframework.ai.chat.memory.MessageWindowChatMemory;
 import org.springframework.context.annotation.Bean;
