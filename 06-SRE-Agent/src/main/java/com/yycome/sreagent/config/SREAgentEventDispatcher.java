@@ -48,7 +48,10 @@ public class SREAgentEventDispatcher {
         String eventJson = null;
         try {
             eventJson = switch (node) {
-                case ROUTER -> buildRoutingEvent(output);
+                case ROUTER -> {
+                    Object routingTarget = output.state().value("routingTarget").orElse("");
+                    yield "done".equals(routingTarget) ? buildMarkdownEvent(output) : buildRoutingEvent(output);
+                }
                 case TOOL_CALL -> buildToolCallEvent(output);
                 case QUERY_AGENT -> buildConclusionEvent(output);
                 case INVESTIGATE_AGENT, ADMIN -> buildMarkdownEvent(output);

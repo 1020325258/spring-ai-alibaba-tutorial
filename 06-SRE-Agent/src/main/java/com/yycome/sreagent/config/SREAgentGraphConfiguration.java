@@ -58,11 +58,6 @@ public class SREAgentGraphConfiguration {
     @Qualifier("investigateAgent")
     private ReactAgent investigateAgent;
 
-    @Lazy
-    @Autowired
-    @Qualifier("adminAgent")
-    private ReactAgent adminAgent;
-
     @Autowired
     private ChatModel chatModel;
 
@@ -99,14 +94,14 @@ public class SREAgentGraphConfiguration {
         StateGraph graph = new StateGraph("sre-agent", keyStrategyFactory,
                 new SpringAIStateSerializer(OverAllState::new));
 
-        graph.addNode("router", node_async(new RouterNode(chatModel, messageWindowChatMemory, sessionProperties)))
+        graph.addNode("router", node_async(new RouterNode(chatModel, messageWindowChatMemory, sessionProperties, skillRegistry, entityRegistry)))
              .addNode("queryAgent", node_async(queryAgentNode))
              .addNode("investigateAgent", node_async(new AgentNode(investigateAgent, "investigateAgent", tracingService)))
-             .addNode("admin", node_async(new AdminNode(environmentConfig, adminAgent, tracingService, chatModel, skillRegistry, entityRegistry)));
+             .addNode("admin", node_async(new AdminNode(environmentConfig)));
 
         graph.addEdge(START, "router")
              .addConditionalEdges("router", edge_async(new RouterDispatcher()),
-                     Map.of("queryAgent", "queryAgent", "investigateAgent", "investigateAgent", "admin", "admin"))
+                     Map.of("queryAgent", "queryAgent", "investigateAgent", "investigateAgent", "admin", "admin", "done", END))
              .addEdge("queryAgent", END)
              .addEdge("investigateAgent", END)
              .addEdge("admin", END);

@@ -9,7 +9,7 @@ public enum SREAgentNodeName {
     ROUTER("router", "意图识别"),
     QUERY_AGENT("queryAgent", "数据查询"),
     INVESTIGATE_AGENT("investigateAgent", "问题排查"),
-    ADMIN("admin", "智能推荐"),
+    ADMIN("admin", "后台管理"),
     TOOL_CALL("tool_call", "工具调用"),
     START("__START__", "开始"),
     END("__END__", "结束");
