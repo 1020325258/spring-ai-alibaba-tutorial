@@ -3,6 +3,9 @@ package com.yycome.sreagent.infrastructure.gateway.ontology;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.yycome.sreagent.domain.ontology.engine.EntityDataGateway;
 import com.yycome.sreagent.domain.ontology.engine.EntityGatewayRegistry;
+import com.yycome.sreagent.domain.ontology.engine.EntitySchemaMapper;
+import com.yycome.sreagent.domain.ontology.model.OntologyEntity;
+import com.yycome.sreagent.domain.ontology.service.EntityRegistry;
 import com.yycome.sreagent.infrastructure.client.HttpEndpointClient;
 import com.yycome.sreagent.infrastructure.dao.ContractDao;
 import jakarta.annotation.PostConstruct;
@@ -29,6 +32,8 @@ public class PersonalQuoteGateway implements EntityDataGateway {
     private final EntityGatewayRegistry registry;
     private final ContractDao contractDao;
     private final ObjectMapper objectMapper;
+    private final EntitySchemaMapper schemaMapper;
+    private final EntityRegistry entityRegistry;
 
     @PostConstruct
     public void init() {
@@ -42,7 +47,6 @@ public class PersonalQuoteGateway implements EntityDataGateway {
 
     @Override
     public List<Map<String, Object>> queryByField(String fieldName, Object value) {
-        // PersonalQuote 必须提供额外参数，直接调用会返回提示信息
         log.warn("[PersonalQuoteGateway] queryByField 被调用，但需要父记录上下文或额外参数");
         Map<String, Object> hintRecord = new LinkedHashMap<>();
         hintRecord.put("_hint", "PersonalQuote 需要通过签约单据(ContractQuotationRelation)查询，" +
@@ -67,7 +71,6 @@ public class PersonalQuoteGateway implements EntityDataGateway {
             return Collections.emptyList();
         }
 
-        // 从父记录提取参数
         String billCode = String.valueOf(parentRecord.getOrDefault("billCode", ""));
         String bindType = String.valueOf(parentRecord.getOrDefault("bindType", ""));
         String contractCode = String.valueOf(parentRecord.getOrDefault("contractCode", ""));
@@ -77,14 +80,12 @@ public class PersonalQuoteGateway implements EntityDataGateway {
             return Collections.emptyList();
         }
 
-        // 通过 contractCode 查询 Contract 获取 projectOrderId
         String projectOrderId = resolveProjectOrderId(contractCode);
         if (isBlank(projectOrderId)) {
             log.warn("[PersonalQuoteGateway] 无法从合同 {} 获取 projectOrderId", contractCode);
             return Collections.emptyList();
         }
 
-        // 根据 bindType 映射到正确的参数名
         Map<String, String> extraParams = mapBindTypeToParams(bindType, billCode);
 
         if (extraParams.isEmpty()) {
@@ -108,7 +109,6 @@ public class PersonalQuoteGateway implements EntityDataGateway {
 
         String projectOrderId = String.valueOf(value);
 
-        // 检查额外参数是否至少有一个
         String subOrderNoList = extraParams != null ? extraParams.getOrDefault("subOrderNoList", "") : "";
         String billCodeList = extraParams != null ? extraParams.getOrDefault("billCodeList", "") : "";
         String changeOrderId = extraParams != null ? extraParams.getOrDefault("changeOrderId", "") : "";
@@ -133,19 +133,15 @@ public class PersonalQuoteGateway implements EntityDataGateway {
 
         switch (bindType) {
             case "1":
-                // 报价单
                 params.put("billCodeList", billCode);
                 break;
             case "2":
-                // 变更单
                 params.put("changeOrderId", billCode);
                 break;
             case "3":
-                // S单号
                 params.put("subOrderNoList", billCode);
                 break;
             default:
-                // 无效的 bindType
                 log.warn("[PersonalQuoteGateway] 无效的 bindType={}，应为 1/2/3", bindType);
                 return Collections.emptyMap();
         }
@@ -191,22 +187,72 @@ public class PersonalQuoteGateway implements EntityDataGateway {
                 return Collections.emptyList();
             }
 
-            return parsePersonalQuote(resultJson, projectOrderId, extraParams);
+            // YAML 驱动的新解析方法
+            List<Map<String, Object>> newResult = parsePersonalQuoteNew(resultJson, projectOrderId);
+
+            // 一致性校验
+            consistencyCheck(newResult, resultJson, projectOrderId);
+
+            return newResult;
         } catch (Exception e) {
             log.warn("[PersonalQuoteGateway] 查询个性化报价失败: {}", e.getMessage());
             return Collections.emptyList();
         }
     }
 
+    /**
+     * YAML 驱动的新解析方法
+     */
+    private List<Map<String, Object>> parsePersonalQuoteNew(String rawJson, String projectOrderId) {
+        OntologyEntity entity = entityRegistry.getEntity("PersonalQuote");
+        if (entity == null || entity.getAttributes() == null) {
+            log.warn("[PersonalQuoteGateway] 未找到实体定义，使用旧方法");
+            return parsePersonalQuoteOld(rawJson, projectOrderId);
+        }
+
+        boolean hasSourceConfig = entity.getAttributes().stream()
+                .anyMatch(attr -> attr.getSource() != null && !attr.getSource().isEmpty());
+
+        if (!hasSourceConfig) {
+            return parsePersonalQuoteOld(rawJson, projectOrderId);
+        }
+
+        Map<String, Object> queryParams = new HashMap<>();
+        queryParams.put("projectOrderId", projectOrderId);
+        return schemaMapper.map(entity, rawJson, queryParams);
+    }
+
+    /**
+     * 一致性校验
+     */
+    private void consistencyCheck(List<Map<String, Object>> newResult, String rawJson, String projectOrderId) {
+        OntologyEntity entity = entityRegistry.getEntity("PersonalQuote");
+        if (entity != null && entity.getAttributes() != null) {
+            boolean hasSourceConfig = entity.getAttributes().stream()
+                    .anyMatch(attr -> attr.getSource() != null && !attr.getSource().isEmpty());
+
+            if (hasSourceConfig) {
+                List<Map<String, Object>> oldResult = parsePersonalQuoteOld(rawJson, projectOrderId);
+                if (!equals(newResult, oldResult)) {
+                    log.error("[PersonalQuoteGateway] 新旧方法输出一致性校验失败! newResult={}, oldResult={}",
+                            newResult, oldResult);
+                }
+            }
+        }
+    }
+
+    /**
+     * 旧解析方法（保留用于一致性校验）
+     * @deprecated 使用 parsePersonalQuoteNew 代替
+     */
+    @Deprecated
     @SuppressWarnings("unchecked")
-    private List<Map<String, Object>> parsePersonalQuote(String json, String projectOrderId,
-                                                          Map<String, String> extraParams) {
+    private List<Map<String, Object>> parsePersonalQuoteOld(String json, String projectOrderId) {
         List<Map<String, Object>> result = new ArrayList<>();
 
         try {
             Map<String, Object> response = objectMapper.readValue(json, Map.class);
 
-            // 检查响应状态
             Integer code = (Integer) response.get("code");
             if (code == null || code != 2000) {
                 log.warn("[PersonalQuoteGateway] 接口返回非成功状态: code={}, message={}",
@@ -214,7 +260,6 @@ public class PersonalQuoteGateway implements EntityDataGateway {
                 return result;
             }
 
-            // 提取 data.personalContractDataList
             Map<String, Object> data = (Map<String, Object>) response.get("data");
             if (data == null) {
                 log.warn("[PersonalQuoteGateway] 响应缺少 data 字段");
@@ -229,7 +274,6 @@ public class PersonalQuoteGateway implements EntityDataGateway {
                 return result;
             }
 
-            // 转换每条报价数据
             for (Map<String, Object> quoteData : personalContractDataList) {
                 Map<String, Object> record = new LinkedHashMap<>();
                 record.put("projectOrderId", projectOrderId);
@@ -239,7 +283,6 @@ public class PersonalQuoteGateway implements EntityDataGateway {
                 record.put("organizationName", quoteData.get("organizationName"));
                 record.put("createTime", quoteData.get("createTime"));
 
-                // quoteInfo 包含文件 URL
                 Map<String, Object> quoteInfo = (Map<String, Object>) quoteData.get("quoteInfo");
                 if (quoteInfo != null) {
                     record.put("quoteFileUrl", quoteInfo.get("fileUrl"));
@@ -252,7 +295,6 @@ public class PersonalQuoteGateway implements EntityDataGateway {
             log.debug("[PersonalQuoteGateway] 解析成功，返回 {} 条报价数据", result.size());
         } catch (Exception e) {
             log.warn("[PersonalQuoteGateway] 解析 JSON 失败: {}", e.getMessage());
-            // 解析失败时返回包含原始数据的记录
             Map<String, Object> fallbackRecord = new LinkedHashMap<>();
             fallbackRecord.put("projectOrderId", projectOrderId);
             fallbackRecord.put("_rawData", json);
@@ -261,6 +303,39 @@ public class PersonalQuoteGateway implements EntityDataGateway {
         }
 
         return result;
+    }
+
+    /**
+     * 比较两个结果列表是否相等
+     */
+    private boolean equals(List<Map<String, Object>> list1, List<Map<String, Object>> list2) {
+        if (list1 == null && list2 == null) return true;
+        if (list1 == null || list2 == null) return false;
+        if (list1.size() != list2.size()) return false;
+
+        for (int i = 0; i < list1.size(); i++) {
+            Map<String, Object> map1 = list1.get(i);
+            Map<String, Object> map2 = list2.get(i);
+
+            if (map1.size() != map2.size()) return false;
+
+            for (String key : map1.keySet()) {
+                Object val1 = map1.get(key);
+                Object val2 = map2.get(key);
+
+                if (val1 == null && val2 == null) continue;
+                if (val1 == null || val2 == null) return false;
+
+                if (val1 instanceof Number && val2 instanceof Number) {
+                    if (((Number) val1).doubleValue() != ((Number) val2).doubleValue()) {
+                        return false;
+                    }
+                } else if (!val1.equals(val2)) {
+                    return false;
+                }
+            }
+        }
+        return true;
     }
 
     private static boolean isBlank(String s) {

@@ -61,17 +61,20 @@ public class EntitySchemaMapper {
     private List<Map<String, Object>> mapWithSource(OntologyEntity entity, JsonPathResolver resolver) {
         List<OntologyAttribute> attributes = entity.getAttributes();
 
-        // 分离：需要数组展平的字段和其他字段
+        // 分离：需要数组展平的字段、查询参数字段、普通字段（互斥）
         List<OntologyAttribute> flattenAttributes = attributes.stream()
                 .filter(attr -> attr.getSource() != null && attr.getSource().endsWith("[]"))
                 .collect(Collectors.toList());
 
-        List<OntologyAttribute> normalAttributes = attributes.stream()
-                .filter(attr -> attr.getSource() != null && !attr.getSource().endsWith("[]"))
-                .collect(Collectors.toList());
-
         List<OntologyAttribute> paramAttributes = attributes.stream()
                 .filter(attr -> attr.getSource() != null && attr.getSource().startsWith("$param."))
+                .collect(Collectors.toList());
+
+        // 普通字段：非数组展平、非查询参数
+        List<OntologyAttribute> normalAttributes = attributes.stream()
+                .filter(attr -> attr.getSource() != null
+                        && !attr.getSource().endsWith("[]")
+                        && !attr.getSource().startsWith("$param."))
                 .collect(Collectors.toList());
 
         // 判断是否需要展平：有展平字段配置 OR entity 配置了 flattenPath
@@ -135,7 +138,51 @@ public class EntitySchemaMapper {
             }
         }
 
+        // 处理普通字段的 source 映射（支持嵌套字段如 quoteInfo.fileUrl）
+        if (!normalAttrs.isEmpty()) {
+            for (Map<String, Object> record : result) {
+                for (OntologyAttribute attr : normalAttrs) {
+                    String source = attr.getSource();
+                    if (source != null && !source.isEmpty()) {
+                        Object value = extractValueFromRecord(record, source);
+                        record.put(attr.getName(), value);
+                    }
+                }
+            }
+        }
+
         return result;
+    }
+
+    /**
+     * 从已展平的记录中提取值（支持嵌套路径如 quoteInfo.fileUrl）
+     */
+    @SuppressWarnings("unchecked")
+    private Object extractValueFromRecord(Map<String, Object> record, String source) {
+        if (source == null || source.isEmpty()) {
+            return null;
+        }
+
+        // 不处理查询参数
+        if (source.startsWith("$param.")) {
+            return null;
+        }
+
+        String[] parts = source.split("\\.");
+        Object current = record;
+
+        for (String part : parts) {
+            if (current == null) {
+                return null;
+            }
+            if (current instanceof Map) {
+                current = ((Map<String, Object>) current).get(part);
+            } else {
+                return null;
+            }
+        }
+
+        return current;
     }
 
     /**

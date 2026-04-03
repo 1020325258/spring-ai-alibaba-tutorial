@@ -4,6 +4,9 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.yycome.sreagent.domain.ontology.engine.EntityDataGateway;
 import com.yycome.sreagent.domain.ontology.engine.EntityGatewayRegistry;
+import com.yycome.sreagent.domain.ontology.engine.EntitySchemaMapper;
+import com.yycome.sreagent.domain.ontology.model.OntologyEntity;
+import com.yycome.sreagent.domain.ontology.service.EntityRegistry;
 import com.yycome.sreagent.infrastructure.client.HttpEndpointClient;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
@@ -15,8 +18,8 @@ import java.util.*;
 /**
  * SubOrder（S单）实体的数据网关
  * 支持两种查询路径：
- * 1. BudgetBill → SubOrder：从父记录（BudgetBill）获取 homeOrderNo + quotationOrderNo
- * 2. Order → SubOrder：直接按订单号查询（fieldName=homeOrderNo）
+ * 1. BudgetBill → SubOrder：从父记录获取 homeOrderNo + quotationOrderNo
+ * 2. Order → SubOrder：直接按订单号查询
  */
 @Slf4j
 @Component
@@ -26,6 +29,8 @@ public class SubOrderGateway implements EntityDataGateway {
     private final HttpEndpointClient httpEndpointClient;
     private final ObjectMapper objectMapper;
     private final EntityGatewayRegistry registry;
+    private final EntitySchemaMapper schemaMapper;
+    private final EntityRegistry entityRegistry;
 
     @PostConstruct
     public void init() {
@@ -39,7 +44,6 @@ public class SubOrderGateway implements EntityDataGateway {
 
     @Override
     public List<Map<String, Object>> queryByField(String fieldName, Object value) {
-        // 无父记录上下文时，无法查询（homeOrderNo 是必填参数）
         log.warn("[SubOrderGateway] 缺少父记录上下文，无法查询S单");
         return Collections.emptyList();
     }
@@ -49,19 +53,15 @@ public class SubOrderGateway implements EntityDataGateway {
         log.debug("[SubOrderGateway] queryByFieldWithContext: {} = {}, parentRecord keys: {}",
                 fieldName, value, parentRecord != null ? parentRecord.keySet() : "null");
 
-        // 支持两种查询路径：
-        // 1. fieldName=homeOrderNo：从 Order 直查（parentRecord 来自 Order）
-        // 2. fieldName=quotationOrderNo：从 BudgetBill 查（parentRecord 来自 BudgetBill）
         if ("homeOrderNo".equals(fieldName)) {
             return queryByHomeOrderNo(fieldName, value, parentRecord);
         } else {
-            // 原有逻辑：从 BudgetBill 获取参数
             return queryFromBudgetBill(fieldName, value, parentRecord);
         }
     }
 
     /**
-     * 从 Order 直查 S 单（fieldName=homeOrderNo）
+     * 从 Order 直查 S 单
      */
     private List<Map<String, Object>> queryByHomeOrderNo(String fieldName, Object value, Map<String, Object> parentRecord) {
         String homeOrderNo = String.valueOf(value);
@@ -72,7 +72,6 @@ public class SubOrderGateway implements EntityDataGateway {
         }
 
         try {
-            // 仅传 homeOrderNo，quotationOrderNo 和 projectChangeNo 为空
             String rawJson = httpEndpointClient.callPredefinedEndpointRaw("sub-order-info",
                     Map.of("homeOrderNo", homeOrderNo,
                            "quotationOrderNo", "",
@@ -83,7 +82,12 @@ public class SubOrderGateway implements EntityDataGateway {
                 return Collections.emptyList();
             }
 
-            return parseSubOrders(rawJson);
+            List<Map<String, Object>> newResult = parseSubOrdersNew(rawJson);
+
+            // 一致性校验
+            consistencyCheck(newResult, rawJson);
+
+            return newResult;
         } catch (Exception e) {
             log.warn("[SubOrderGateway] 查询S单失败 homeOrderNo={}: {}", homeOrderNo, e.getMessage());
             return Collections.emptyList();
@@ -91,11 +95,10 @@ public class SubOrderGateway implements EntityDataGateway {
     }
 
     /**
-     * 从 BudgetBill 查 S 单（fieldName=quotationOrderNo）
+     * 从 BudgetBill 查 S 单
      */
     private List<Map<String, Object>> queryFromBudgetBill(String fieldName, Object value, Map<String, Object> parentRecord) {
-        // 从父记录（BudgetBill）获取参数
-        String quotationOrderNo = String.valueOf(value);  // billCode -> quotationOrderNo
+        String quotationOrderNo = String.valueOf(value);
         String homeOrderNo = parentRecord != null
                 ? String.valueOf(parentRecord.getOrDefault("projectOrderId", ""))
                 : "";
@@ -116,7 +119,12 @@ public class SubOrderGateway implements EntityDataGateway {
                 return Collections.emptyList();
             }
 
-            return parseSubOrders(rawJson);
+            List<Map<String, Object>> newResult = parseSubOrdersNew(rawJson);
+
+            // 一致性校验
+            consistencyCheck(newResult, rawJson);
+
+            return newResult;
         } catch (Exception e) {
             log.warn("[SubOrderGateway] 查询S单失败 homeOrderNo={}, quotationOrderNo={}: {}",
                     homeOrderNo, quotationOrderNo, e.getMessage());
@@ -124,7 +132,51 @@ public class SubOrderGateway implements EntityDataGateway {
         }
     }
 
-    private List<Map<String, Object>> parseSubOrders(String rawJson) {
+    /**
+     * YAML 驱动的新解析方法
+     */
+    private List<Map<String, Object>> parseSubOrdersNew(String rawJson) {
+        OntologyEntity entity = entityRegistry.getEntity("SubOrder");
+        if (entity == null || entity.getAttributes() == null) {
+            log.warn("[SubOrderGateway] 未找到实体定义，使用旧方法");
+            return parseSubOrdersOld(rawJson);
+        }
+
+        boolean hasSourceConfig = entity.getAttributes().stream()
+                .anyMatch(attr -> attr.getSource() != null && !attr.getSource().isEmpty());
+
+        if (!hasSourceConfig) {
+            return parseSubOrdersOld(rawJson);
+        }
+
+        return schemaMapper.map(entity, rawJson, Collections.emptyMap());
+    }
+
+    /**
+     * 一致性校验
+     */
+    private void consistencyCheck(List<Map<String, Object>> newResult, String rawJson) {
+        OntologyEntity entity = entityRegistry.getEntity("SubOrder");
+        if (entity != null && entity.getAttributes() != null) {
+            boolean hasSourceConfig = entity.getAttributes().stream()
+                    .anyMatch(attr -> attr.getSource() != null && !attr.getSource().isEmpty());
+
+            if (hasSourceConfig) {
+                List<Map<String, Object>> oldResult = parseSubOrdersOld(rawJson);
+                if (!equals(newResult, oldResult)) {
+                    log.error("[SubOrderGateway] 新旧方法输出一致性校验失败! newResult={}, oldResult={}",
+                            newResult, oldResult);
+                }
+            }
+        }
+    }
+
+    /**
+     * 旧解析方法（保留用于一致性校验）
+     * @deprecated 使用 parseSubOrdersNew 代替
+     */
+    @Deprecated
+    private List<Map<String, Object>> parseSubOrdersOld(String rawJson) {
         List<Map<String, Object>> result = new ArrayList<>();
         try {
             JsonNode root = objectMapper.readTree(rawJson);
@@ -145,5 +197,38 @@ public class SubOrderGateway implements EntityDataGateway {
             log.warn("[SubOrderGateway] 解析S单响应失败: {}", e.getMessage());
         }
         return result;
+    }
+
+    /**
+     * 比较两个结果列表是否相等
+     */
+    private boolean equals(List<Map<String, Object>> list1, List<Map<String, Object>> list2) {
+        if (list1 == null && list2 == null) return true;
+        if (list1 == null || list2 == null) return false;
+        if (list1.size() != list2.size()) return false;
+
+        for (int i = 0; i < list1.size(); i++) {
+            Map<String, Object> map1 = list1.get(i);
+            Map<String, Object> map2 = list2.get(i);
+
+            if (map1.size() != map2.size()) return false;
+
+            for (String key : map1.keySet()) {
+                Object val1 = map1.get(key);
+                Object val2 = map2.get(key);
+
+                if (val1 == null && val2 == null) continue;
+                if (val1 == null || val2 == null) return false;
+
+                if (val1 instanceof Number && val2 instanceof Number) {
+                    if (((Number) val1).doubleValue() != ((Number) val2).doubleValue()) {
+                        return false;
+                    }
+                } else if (!val1.equals(val2)) {
+                    return false;
+                }
+            }
+        }
+        return true;
     }
 }

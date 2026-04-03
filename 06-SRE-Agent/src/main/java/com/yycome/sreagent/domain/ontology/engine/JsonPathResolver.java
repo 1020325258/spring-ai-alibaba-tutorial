@@ -138,9 +138,10 @@ public class JsonPathResolver {
      * 带继承的数组展平
      * 用于展平内层数组，同时继承外层的字段
      *
-     * 支持两种模式：
-     * 1. 双路径模式：传入外层路径和展平路径，如 "data[].companyName" + "data[].signableOrderInfos[]"
-     * 2. 单路径模式：只传入展平路径，如 "data[].signableOrderInfos[]"，自动从外层数组提取所有字段
+     * 支持三种格式：
+     * 1. 单层数组：`data[]` - 直接展平数组元素
+     * 2. 对象路径数组：`data.personalContractDataList[]` - 沿路径找到数组后展平
+     * 3. 嵌套数组：`data[].signableOrderInfos[]` - 展平内层数组，继承外层字段
      */
     public List<Map<String, Object>> flattenWithInheritance(String... paths) {
         if (paths == null || paths.length == 0) {
@@ -163,39 +164,71 @@ public class JsonPathResolver {
             return Collections.emptyList();
         }
 
-        // 解析内层路径：data[].signableOrderInfos[] → outerBase = "data", innerField = "signableOrderInfos"
-        String innerWithoutBrackets = innerPath.substring(0, innerPath.length() - 2);
+        // 去掉末尾的 []
+        String pathWithoutTrailingBrackets = innerPath.substring(0, innerPath.length() - 2);
 
-        // 找到第一个 [] 的位置（外层数组标记）
-        int firstBracketStart = innerWithoutBrackets.indexOf("[]");
+        // 判断格式类型
+        int firstBracketPos = pathWithoutTrailingBrackets.indexOf("[]");
 
-        if (firstBracketStart < 0) {
+        if (firstBracketPos < 0) {
+            // 格式 1 或 2：没有中间的 []，说明是单层数组或对象路径数组
+            // data[] → pathWithoutTrailingBrackets = "data"
+            // data.personalContractDataList[] → pathWithoutTrailingBrackets = "data.personalContractDataList"
+            return flattenSimpleArray(pathWithoutTrailingBrackets);
+        }
+
+        // 格式 3：嵌套数组 data[].signableOrderInfos[]
+        return flattenNestedArray(pathWithoutTrailingBrackets, firstBracketPos, outerPaths);
+    }
+
+    /**
+     * 展平单层数组或对象路径中的数组
+     * 支持: `data[]` 或 `data.personalContractDataList[]`
+     */
+    private List<Map<String, Object>> flattenSimpleArray(String arrayPath) {
+        JsonNode arrayNode = findNode(arrayPath);
+        if (arrayNode == null || !arrayNode.isArray()) {
+            log.debug("[flattenSimpleArray] path={} is not an array", arrayPath);
             return Collections.emptyList();
         }
 
-        String outerBase = innerWithoutBrackets.substring(0, firstBracketStart);
-        String innerField = innerWithoutBrackets.substring(firstBracketStart + 2);
-        // 去掉 innerField 前面的点（如果有）
+        List<Map<String, Object>> result = new ArrayList<>();
+        for (JsonNode item : arrayNode) {
+            if (item.isObject()) {
+                result.add(convertValue(item));
+            }
+        }
+        log.debug("[flattenSimpleArray] path={} returned {} items", arrayPath, result.size());
+        return result;
+    }
+
+    /**
+     * 展平嵌套数组（外层数组元素包含内层数组）
+     * 支持: `data[].signableOrderInfos[]`
+     */
+    private List<Map<String, Object>> flattenNestedArray(String pathWithoutTrailingBrackets,
+                                                          int firstBracketPos,
+                                                          List<String> outerPaths) {
+        String outerBase = pathWithoutTrailingBrackets.substring(0, firstBracketPos);
+        String innerField = pathWithoutTrailingBrackets.substring(firstBracketPos + 2);
         if (innerField.startsWith(".")) {
             innerField = innerField.substring(1);
         }
 
         // 获取外层数组
         JsonNode outerArray = findNode(outerBase);
-        log.debug("[flattenWithInheritance] outerBase={}, outerArray isArray={}", outerBase, outerArray != null && outerArray.isArray());
+        log.debug("[flattenNestedArray] outerBase={}, isArray={}", outerBase, outerArray != null && outerArray.isArray());
         if (outerArray == null || !outerArray.isArray()) {
             return Collections.emptyList();
         }
-        log.debug("[flattenWithInheritance] outerArray size={}", outerArray.size());
 
         // 提取外层字段
         Map<String, List<String>> outerFieldValues = new LinkedHashMap<>();
         if (outerPaths.isEmpty()) {
-            // 单路径模式：自动从外层数组的第一个元素提取所有字段名作为外层字段
+            // 自动从外层数组的第一个元素提取所有字段名作为外层字段
             if (outerArray.size() > 0) {
                 JsonNode firstItem = outerArray.get(0);
                 if (firstItem.isObject()) {
-                    // 获取外层所有基本类型字段（排除数组类型）
                     firstItem.fields().forEachRemaining(entry -> {
                         JsonNode value = entry.getValue();
                         if (value != null && !value.isArray() && !value.isObject()) {
@@ -207,7 +240,6 @@ public class JsonPathResolver {
                 }
             }
         } else {
-            // 双路径模式：使用指定的外层路径
             for (String outerPath : outerPaths) {
                 String fieldName = extractFieldName(outerPath);
                 List<String> values = extractFieldFromArray(outerArray, fieldName);
