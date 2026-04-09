@@ -26,7 +26,7 @@ public class ContractDao {
     public Map<String, Object> fetchContractBase(String contractCode) {
         List<Map<String, Object>> rows = jdbcTemplate.queryForList(
                 "SELECT contract_code, type, status, platform_instance_id, amount, project_order_id, ctime " +
-                "FROM contract WHERE contract_code = ? AND del_status = 0 AND status != 9 LIMIT 1",
+                "FROM contract WHERE contract_code = ? AND del_status = 0 LIMIT 1",
                 contractCode);
         if (rows.isEmpty()) return null;
         Map<String, Object> row = rows.get(0);
@@ -84,7 +84,7 @@ public class ContractDao {
      */
     public List<Map<String, Object>> fetchUsers(String contractCode) {
         return jdbcTemplate.queryForList(
-                "SELECT role_type, name, phone, is_sign, is_auth " +
+                "SELECT role_type, name, phone, is_sign, is_auth, ctime, mtime " +
                 "FROM contract_user WHERE contract_code = ? AND del_status = 0",
                 contractCode);
     }

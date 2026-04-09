@@ -21,6 +21,7 @@ public enum QueryScope {
     CONTRACT_FIELD("ContractField", "展开到合同字段"),
     CONTRACT_INSTANCE("ContractInstance", "展开到合同实例"),
     CONTRACT_CONFIG("ContractConfig", "展开到配置表"),
+    CONTRACT_USER("ContractUser", "展开到合同签约人"),
     BUDGET_BILL("BudgetBill", "展开到报价单"),
     SUB_ORDER("SubOrder", "展开到S单");
 

@@ -58,6 +58,25 @@ entities:
       - { name: ctime,        type: string, description: "创建时间" }
       - { name: mtime,        type: string, description: "修改时间" }
 
+  - name: ContractUser
+    displayName: "合同签约人"
+    aliases: ["签约人", "合同用户", "业主", "代理人", "代办人"]
+    description: "合同签约人信息，包含业主、代理人、公司代办人"
+    table: contract_user
+    lookupStrategies:
+      - field: contractCode
+        pattern: "^C\\d+"
+    attributes:
+      - { name: contractCode,  type: string, description: "合同编号" }
+      - { name: roleType,      type: enum,   description: "用户类型：1-业主 2-代理人 3-公司代办人" }
+      - { name: name,          type: string, description: "姓名" }
+      - { name: phone,         type: string, description: "手机号（密文）" }
+      - { name: phonePlain,    type: string, description: "手机号（明文）" }
+      - { name: ucid,          type: string, description: "用户ID" }
+      - { name: certificateNo, type: string, description: "证件号码" }
+      - { name: ctime,         type: string, description: "创建时间" }
+      - { name: mtime,         type: string, description: "更新时间" }
+
   - name: ContractField
     displayName: "合同字段"
     aliases: ["合同扩展字段", "字段数据"]
@@ -220,6 +239,12 @@ relations:
     to: ContractQuotationRelation
     domain: contract
     description: "合同签约的单据对象"
+    via: { source_field: contractCode, target_field: contractCode }
+
+  - from: Contract
+    to: ContractUser
+    domain: contract
+    description: "合同的签约人信息"
     via: { source_field: contractCode, target_field: contractCode }
 
   - from: Contract

@@ -1,4 +1,45 @@
 endpoints:
+  - id: sre-decrypt
+    name: SRE解密接口
+    description: |
+      解密手机号等敏感信息。
+      参数：
+      - text：待解密的密文
+      - app：应用标识，固定值 sreAgent
+    category: sre
+    urlTemplate: "http://utopia-nrs-sales-project.${env}.ttb.test.ke.com/sre/decrypt?text=${text}&app=sreAgent"
+    method: GET
+    parameters:
+      - name: text
+        type: string
+        description: 待解密的密文
+        required: true
+        example: "B002ɧɝĿ6502"
+    headers:
+      X-NRS-User-Id: "1000000000000000"
+      Content-Type: "application/json"
+    timeout: 10
+
+  - id: user-phone-query
+    name: 根据手机号查询用户ID
+    description: |
+      根据手机号查询对应的用户ID（ucid）。
+      参数：
+      - bizId：手机号（明文）
+    category: user
+    urlTemplate: "http://i.cms.home.ke.com/api/operate/user-phone?pageSize=50&currentPage=1&bizId=${bizId}"
+    method: GET
+    parameters:
+      - name: bizId
+        type: string
+        description: 手机号（明文）
+        required: true
+        example: "18303623350"
+    headers:
+      X-NRS-User-Id: "1000000000000000"
+      Content-Type: "application/json"
+    timeout: 10
+
   - id: sign-order-list
     name: 查询可签约子单列表(S单)
     description: |
