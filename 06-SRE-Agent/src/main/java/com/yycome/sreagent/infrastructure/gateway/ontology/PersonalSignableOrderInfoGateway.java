@@ -4,10 +4,8 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.yycome.sreagent.domain.ontology.engine.EntityDataGateway;
 import com.yycome.sreagent.domain.ontology.engine.EntityGatewayRegistry;
-import com.yycome.sreagent.domain.ontology.engine.EntitySchemaMapper;
-import com.yycome.sreagent.domain.ontology.model.OntologyEntity;
-import com.yycome.sreagent.domain.ontology.service.EntityRegistry;
 import com.yycome.sreagent.infrastructure.client.HttpEndpointClient;
+import com.yycome.sreagent.infrastructure.util.JsonMappingUtils;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -17,7 +15,20 @@ import java.util.*;
 
 /**
  * PersonalSignableOrderInfo（销售合同弹窗可签约S单）实体的数据网关
+ * <p>
  * 可签约S单属于整个订单维度，直接通过 projectOrderId 调用 sign-order-list 接口查询
+ * <p>
+ * 返回属性遵循 domain-ontology.yaml 定义：
+ * - projectOrderId: 订单号
+ * - companyName: 公司名称
+ * - companyCode: 公司编码
+ * - goodsInfo: 商品信息
+ * - orderAmount: 订单金额
+ * - orderCreateTime: 订单创建时间
+ * - bindType: 绑定类型
+ * - bindCode: 绑定编码
+ * - packageInstanceName: 套餐实例名称
+ * - mustSelect: 是否必选
  */
 @Slf4j
 @Component
@@ -27,8 +38,6 @@ public class PersonalSignableOrderInfoGateway implements EntityDataGateway {
     private final HttpEndpointClient httpEndpointClient;
     private final ObjectMapper objectMapper;
     private final EntityGatewayRegistry registry;
-    private final EntityRegistry entityRegistry;
-    private final EntitySchemaMapper schemaMapper;
 
     @PostConstruct
     public void init() {
@@ -67,25 +76,7 @@ public class PersonalSignableOrderInfoGateway implements EntityDataGateway {
                 return Collections.emptyList();
             }
 
-            // YAML 驱动的新解析方法
-            List<Map<String, Object>> newResult = parseSignableOrdersNew(rawJson, projectOrderId);
-
-            // 如果有配置，对比旧方法验证一致性
-            OntologyEntity entity = entityRegistry.getEntity("PersonalSignableOrderInfo");
-            if (entity != null && entity.getAttributes() != null) {
-                boolean hasSourceConfig = entity.getAttributes().stream()
-                        .anyMatch(attr -> attr.getSource() != null && !attr.getSource().isEmpty());
-
-                if (hasSourceConfig) {
-                    List<Map<String, Object>> oldResult = parseSignableOrdersOld(rawJson, projectOrderId);
-                    if (!equals(newResult, oldResult)) {
-                        log.error("[PersonalSignableOrderInfoGateway] 新旧方法输出一致性校验失败! newResult={}, oldResult={}",
-                                newResult, oldResult);
-                    }
-                }
-            }
-
-            return newResult;
+            return parseSignableOrders(rawJson, projectOrderId);
         } catch (Exception e) {
             log.warn("[PersonalSignableOrderInfoGateway] 查询弹窗S单失败", e);
             return Collections.emptyList();
@@ -93,67 +84,11 @@ public class PersonalSignableOrderInfoGateway implements EntityDataGateway {
     }
 
     /**
-     * 比较两个结果列表是否相等
+     * 解析弹窗可签约 S 单数据
+     * <p>
+     * 按 YAML 定义的属性组装返回
      */
-    private boolean equals(List<Map<String, Object>> list1, List<Map<String, Object>> list2) {
-        if (list1 == null && list2 == null) return true;
-        if (list1 == null || list2 == null) return false;
-        if (list1.size() != list2.size()) return false;
-
-        for (int i = 0; i < list1.size(); i++) {
-            Map<String, Object> map1 = list1.get(i);
-            Map<String, Object> map2 = list2.get(i);
-
-            if (map1.size() != map2.size()) return false;
-
-            for (String key : map1.keySet()) {
-                Object val1 = map1.get(key);
-                Object val2 = map2.get(key);
-
-                if (val1 == null && val2 == null) continue;
-                if (val1 == null || val2 == null) return false;
-
-                // 数值比较（处理 Integer/Double 类型差异）
-                if (val1 instanceof Number && val2 instanceof Number) {
-                    if (((Number) val1).doubleValue() != ((Number) val2).doubleValue()) {
-                        return false;
-                    }
-                } else if (!val1.equals(val2)) {
-                    return false;
-                }
-            }
-        }
-        return true;
-    }
-
-    /**
-     * YAML 驱动的新解析方法
-     */
-    private List<Map<String, Object>> parseSignableOrdersNew(String rawJson, String projectOrderId) {
-        OntologyEntity entity = entityRegistry.getEntity("PersonalSignableOrderInfo");
-        if (entity == null || entity.getAttributes() == null) {
-            log.warn("[PersonalSignableOrderInfoGateway] 未找到实体定义，使用旧方法");
-            return parseSignableOrdersOld(rawJson, projectOrderId);
-        }
-
-        // 检查是否有 source 配置
-        boolean hasSourceConfig = entity.getAttributes().stream()
-                .anyMatch(attr -> attr.getSource() != null && !attr.getSource().isEmpty());
-
-        if (!hasSourceConfig) {
-            return parseSignableOrdersOld(rawJson, projectOrderId);
-        }
-
-        Map<String, Object> queryParams = Map.of("projectOrderId", projectOrderId);
-        return schemaMapper.map(entity, rawJson, queryParams);
-    }
-
-    /**
-     * 旧解析方法（保留用于一致性验证）
-     * @deprecated 使用 {@link #parseSignableOrdersNew(String, String)} 代替
-     */
-    @Deprecated
-    private List<Map<String, Object>> parseSignableOrdersOld(String rawJson, String projectOrderId) {
+    private List<Map<String, Object>> parseSignableOrders(String rawJson, String projectOrderId) {
         List<Map<String, Object>> result = new ArrayList<>();
         try {
             JsonNode root = objectMapper.readTree(rawJson);
@@ -161,22 +96,22 @@ public class PersonalSignableOrderInfoGateway implements EntityDataGateway {
             if (data.isArray()) {
                 // data[] 是公司分组，真正的S单在 signableOrderInfos[] 里
                 for (JsonNode companyGroup : data) {
-                    String companyName = companyGroup.path("companyName").asText(null);
-                    String companyCode = companyGroup.path("companyCode").asText(null);
+                    String companyName = JsonMappingUtils.getText(companyGroup, "companyName");
+                    String companyCode = JsonMappingUtils.getText(companyGroup, "companyCode");
                     JsonNode infos = companyGroup.path("signableOrderInfos");
                     if (infos.isArray()) {
                         for (JsonNode item : infos) {
-                            Map<String, Object> order = new LinkedHashMap<>();
+                            Map<String, Object> order = JsonMappingUtils.newOrderedMap();
                             order.put("projectOrderId", projectOrderId);
                             order.put("companyName", companyName);
                             order.put("companyCode", companyCode);
-                            order.put("goodsInfo", item.path("goodsInfo").asText(null));
-                            order.put("orderAmount", item.path("orderAmount").asDouble());
-                            order.put("orderCreateTime", item.path("orderCreateTime").asText(null));
-                            order.put("bindType", item.path("bindType").asInt());
-                            order.put("bindCode", item.path("bindCode").asText(null));
-                            order.put("packageInstanceName", item.path("packageInstanceName").asText(null));
-                            order.put("mustSelect", item.path("mustSelect").asBoolean());
+                            order.put("goodsInfo", JsonMappingUtils.getText(item, "goodsInfo"));
+                            order.put("orderAmount", JsonMappingUtils.getText(item, "orderAmount"));
+                            order.put("orderCreateTime", JsonMappingUtils.getText(item, "orderCreateTime"));
+                            order.put("bindType", JsonMappingUtils.getInt(item, "bindType"));
+                            order.put("bindCode", JsonMappingUtils.getText(item, "bindCode"));
+                            order.put("packageInstanceName", JsonMappingUtils.getText(item, "packageInstanceName"));
+                            order.put("mustSelect", JsonMappingUtils.getInt(item, "mustSelect"));
                             result.add(order);
                         }
                     }

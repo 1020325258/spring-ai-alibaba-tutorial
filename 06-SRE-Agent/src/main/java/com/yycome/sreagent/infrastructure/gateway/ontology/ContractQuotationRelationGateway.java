@@ -1,12 +1,11 @@
 package com.yycome.sreagent.infrastructure.gateway.ontology;
 
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.yycome.sreagent.domain.ontology.engine.EntityDataGateway;
 import com.yycome.sreagent.domain.ontology.engine.EntityGatewayRegistry;
 import com.yycome.sreagent.infrastructure.client.HttpEndpointClient;
-import com.yycome.sreagent.infrastructure.util.DateTimeUtil;
+import com.yycome.sreagent.infrastructure.util.JsonMappingUtils;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -16,7 +15,17 @@ import java.util.*;
 
 /**
  * ContractQuotationRelation 实体的数据网关
+ * <p>
  * 通过 HTTP 接口查询签约单据数据
+ * <p>
+ * 返回属性遵循 domain-ontology.yaml 定义：
+ * - contractCode: 合同编号
+ * - billCode: 签约单据编号
+ * - companyCode: 公司编码
+ * - bindType: 绑定类型
+ * - status: 状态
+ * - ctime: 创建时间
+ * - mtime: 修改时间
  */
 @Slf4j
 @Component
@@ -57,30 +66,34 @@ public class ContractQuotationRelationGateway implements EntityDataGateway {
         }
     }
 
+    /**
+     * 解析签约单据数据
+     * <p>
+     * 按 YAML 定义的属性组装返回
+     */
     private List<Map<String, Object>> parseQuotations(String json) {
+        List<Map<String, Object>> result = new ArrayList<>();
         try {
             JsonNode root = objectMapper.readTree(json);
             JsonNode data = root.path("data");
             if (!data.isArray()) {
-                return Collections.emptyList();
+                return result;
             }
 
-            List<Map<String, Object>> result = new ArrayList<>();
             for (JsonNode item : data) {
-                Map<String, Object> relation = new LinkedHashMap<>();
-                relation.put("contractCode", item.path("contractCode").asText(null));
-                relation.put("billCode", item.path("billCode").asText(null));
-                relation.put("companyCode", item.path("companyCode").asText(null));
-                relation.put("bindType", item.path("bindType").asInt());
-                relation.put("status", item.path("status").asInt());
-                relation.put("ctime", DateTimeUtil.format(item.path("ctime").asLong()));
-                relation.put("mtime", DateTimeUtil.format(item.path("mtime").asLong()));
+                Map<String, Object> relation = JsonMappingUtils.newOrderedMap();
+                relation.put("contractCode", JsonMappingUtils.getText(item, "contractCode"));
+                relation.put("billCode", JsonMappingUtils.getText(item, "billCode"));
+                relation.put("companyCode", JsonMappingUtils.getText(item, "companyCode"));
+                relation.put("bindType", JsonMappingUtils.getInt(item, "bindType"));
+                relation.put("status", JsonMappingUtils.getInt(item, "status"));
+                relation.put("ctime", JsonMappingUtils.formatDateTime(item, "ctime"));
+                relation.put("mtime", JsonMappingUtils.formatDateTime(item, "mtime"));
                 result.add(relation);
             }
-            return result;
         } catch (Exception e) {
             log.warn("[ContractQuotationRelationGateway] 解析响应失败: {}", e.getMessage());
-            return Collections.emptyList();
         }
+        return result;
     }
 }

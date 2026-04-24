@@ -37,9 +37,9 @@ entities:
       - field: contractCode
         pattern: "^C\\d+"
     attributes:
-      - { name: contractCode, type: string }
-      - { name: nodeType,     type: string }
-      - { name: fireTime,     type: string }
+      - { name: contractCode, type: string, description: "合同编号" }
+      - { name: nodeType, type: int, description: "节点类型" }
+      - { name: fireTime, type: string, description: "触发时间" }
 
   - name: ContractQuotationRelation
     displayName: "签约单据"
@@ -50,13 +50,13 @@ entities:
       - field: contractCode
         pattern: "^C\\d+"
     attributes:
-      - { name: contractCode, type: string }
-      - { name: billCode,     type: string, description: "签约单据编号" }
-      - { name: companyCode,  type: string, description: "公司编码" }
-      - { name: bindType,     type: string, description: "绑定类型" }
-      - { name: status,       type: string, description: "状态" }
-      - { name: ctime,        type: string, description: "创建时间" }
-      - { name: mtime,        type: string, description: "修改时间" }
+      - { name: contractCode, type: string, description: "合同编号" }
+      - { name: billCode, type: string, description: "签约单据编号" }
+      - { name: companyCode, type: string, description: "公司编码" }
+      - { name: bindType, type: int, description: "绑定类型" }
+      - { name: status, type: int, description: "状态" }
+      - { name: ctime, type: string, description: "创建时间" }
+      - { name: mtime, type: string, description: "修改时间" }
 
   - name: ContractUser
     displayName: "合同签约人"
@@ -67,17 +67,17 @@ entities:
       - field: contractCode
         pattern: "^C\\d+"
     attributes:
-      - { name: contractCode,  type: string, description: "合同编号" }
-      - { name: roleType,      type: enum,   description: "用户类型：1-业主 2-代理人 3-公司代办人" }
-      - { name: name,          type: string, description: "姓名" }
-      - { name: phone,         type: string, description: "手机号（密文）" }
-      - { name: phonePlain,    type: string, description: "手机号（明文）" }
-      - { name: ucid,          type: string, description: "用户ID" }
+      - { name: contractCode, type: string, description: "合同编号" }
+      - { name: roleType, type: int, description: "用户类型：1-业主 2-代理人 3-公司代办人" }
+      - { name: name, type: string, description: "姓名" }
+      - { name: phone, type: string, description: "手机号（密文）" }
+      - { name: phonePlain, type: string, description: "手机号（明文）" }
+      - { name: ucid, type: string, description: "用户ID" }
       - { name: certificateNo, type: string, description: "证件号码" }
-      - { name: isSign,        type: enum,   description: "是否签约人：1-是 0-否" }
-      - { name: isAuth,        type: enum,   description: "是否认证：1-是 0-否" }
-      - { name: ctime,         type: string, description: "创建时间" }
-      - { name: mtime,         type: string, description: "更新时间" }
+      - { name: isSign, type: int, description: "是否签约人：1-是 0-否" }
+      - { name: isAuth, type: int, description: "是否认证：1-是 0-否" }
+      - { name: ctime, type: string, description: "创建时间" }
+      - { name: mtime, type: string, description: "更新时间" }
 
   - name: ContractField
     displayName: "合同字段"
@@ -88,7 +88,8 @@ entities:
       - field: contractCode
         pattern: "^C\\d+"
     attributes:
-      - { name: contractCode, type: string }
+      - { name: contractCode, type: string, description: "合同编号" }
+      - { name: fields, type: object, description: "动态字段Map，键为字段名，值为字段值" }
 
   - name: BudgetBill
     displayName: "报价单"
@@ -96,37 +97,35 @@ entities:
     description: "报价单，挂在订单下，通过 projectOrderId 调用 budget-bill-list 接口查询"
     sourceType: http
     endpoint: budget-bill-list
-    flattenPath: "decorateBudgetList,personalBudgetList"
     lookupStrategies:
       - field: projectOrderId
         pattern: "^\\d{15,}$"
     attributes:
-      - { name: projectOrderId, source: "$param.projectOrderId" }
-      - { name: billCode, source: "billCode" }
-      - { name: billType, source: "billType" }
-      - { name: billTypeDesc, source: "billTypeDesc" }
-      - { name: statusDesc, source: "statusDesc" }
-      - { name: originalBillCode, source: "originalBillCode" }
+      - { name: projectOrderId, type: string, description: "订单号" }
+      - { name: billCode, type: string, description: "报价单号" }
+      - { name: billType, type: string, description: "报价单类型" }
+      - { name: billTypeDesc, type: string, description: "报价单类型描述" }
+      - { name: statusDesc, type: string, description: "状态描述" }
+      - { name: originalBillCode, type: string, description: "原始报价单号" }
 
   - name: PersonalQuote
     displayName: "个性化报价"
     aliases: ["个性化报价数据"]
-    description: "个性化报价数据，通过签约单据(ContractQuotationRelation)的billCode和bindType查询，bindType=1映射到billCodeList，bindType=2映射到subOrderNoList，bindType=3映射到changeOrderId"
+    description: "个性化报价数据，通过签约单据(ContractQuotationRelation)的billCode和bindType查询"
     sourceType: http
     endpoint: contract-personal-data
-    flattenPath: "data.personalContractDataList[]"
     lookupStrategies:
       - field: projectOrderId
         pattern: "^\\d{15,}$"
     attributes:
-      - { name: projectOrderId,         type: string, description: "订单号", source: "$param.projectOrderId" }
-      - { name: billCode,               type: string, description: "报价单号", source: "billCode" }
-      - { name: personalContractPrice,  type: string, description: "个性化报价金额", source: "personalContractPrice" }
-      - { name: organizationCode,       type: string, description: "组织编码", source: "organizationCode" }
-      - { name: organizationName,       type: string, description: "组织名称", source: "organizationName" }
-      - { name: createTime,             type: string, description: "创建时间", source: "createTime" }
-      - { name: quoteFileUrl,           type: string, description: "报价文件URL", source: "quoteInfo.fileUrl" }
-      - { name: quotePrevUrl,           type: string, description: "报价预览URL", source: "quoteInfo.prevUrl" }
+      - { name: projectOrderId, type: string, description: "订单号" }
+      - { name: billCode, type: string, description: "报价单号" }
+      - { name: personalContractPrice, type: string, description: "个性化报价金额" }
+      - { name: organizationCode, type: string, description: "组织编码" }
+      - { name: organizationName, type: string, description: "组织名称" }
+      - { name: createTime, type: string, description: "创建时间" }
+      - { name: quoteFileUrl, type: string, description: "报价文件URL" }
+      - { name: quotePrevUrl, type: string, description: "报价预览URL" }
 
   - name: SubOrder
     displayName: "S单"
@@ -134,18 +133,17 @@ entities:
     description: "S单，从报价单拆分而来，需要 homeOrderNo + quotationOrderNo 双参数查询"
     sourceType: http
     endpoint: sub-order-info
-    flattenPath: "data[]"
     lookupStrategies:
       - field: quotationOrderNo
         pattern: ".*"
       - field: homeOrderNo
         pattern: "^\\d{15,}$"
     attributes:
-      - { name: orderNo,         type: string, description: "S单编号", source: "orderNo" }
-      - { name: projectChangeNo, type: string, description: "变更单号", source: "projectChangeNo" }
-      - { name: mdmCode,         type: string, description: "MDM编码", source: "mdmCode" }
-      - { name: dueAmount,       type: string, description: "应付金额", source: "dueAmount" }
-      - { name: status,          type: string, description: "S单状态", source: "status" }
+      - { name: orderNo, type: string, description: "S单编号" }
+      - { name: projectChangeNo, type: string, description: "变更单号" }
+      - { name: mdmCode, type: string, description: "MDM编码" }
+      - { name: dueAmount, type: string, description: "应付金额" }
+      - { name: status, type: string, description: "S单状态" }
 
   - name: PersonalSignableOrderInfo
     displayName: "销售合同弹窗可签约S单"
@@ -153,21 +151,20 @@ entities:
     description: "订单下可签约的S单列表，通过 projectOrderId 直接调用 sign-order-list 接口查询"
     sourceType: http
     endpoint: sign-order-list
-    flattenPath: "data[].signableOrderInfos[]"
     lookupStrategies:
       - field: projectOrderId
         pattern: "^\\d{15,}$"
     attributes:
-      - { name: projectOrderId, source: "$param.projectOrderId" }
-      - { name: companyName, source: "companyName" }
-      - { name: companyCode, source: "companyCode" }
-      - { name: goodsInfo, source: "goodsInfo" }
-      - { name: orderAmount, source: "orderAmount" }
-      - { name: orderCreateTime, source: "orderCreateTime" }
-      - { name: bindType, source: "bindType" }
-      - { name: bindCode, source: "bindCode" }
-      - { name: packageInstanceName, source: "packageInstanceName" }
-      - { name: mustSelect, source: "mustSelect" }
+      - { name: projectOrderId, type: string, description: "订单号" }
+      - { name: companyName, type: string, description: "公司名称" }
+      - { name: companyCode, type: string, description: "公司编码" }
+      - { name: goodsInfo, type: string, description: "商品信息" }
+      - { name: orderAmount, type: string, description: "订单金额" }
+      - { name: orderCreateTime, type: string, description: "订单创建时间" }
+      - { name: bindType, type: int, description: "绑定类型" }
+      - { name: bindCode, type: string, description: "绑定编码" }
+      - { name: packageInstanceName, type: string, description: "套餐实例名称" }
+      - { name: mustSelect, type: int, description: "是否必选" }
 
   - name: ContractInstance
     displayName: "合同实例"
@@ -177,8 +174,9 @@ entities:
       - field: instanceId
         pattern: ".*"
     attributes:
-      - { name: instanceId,   type: string, description: "协议平台实例 ID" }
-      - { name: formData,     type: object, description: "版式表单数据对象，包含 formId（版式模板ID）、cformData（表单字段内容）、cn（合同编号）、creator（创建人）、application（应用标识）等字段" }
+      - { name: instanceId, type: string, description: "协议平台实例 ID" }
+      - { name: formData, type: object, description: "版式表单数据对象" }
+      - { name: message, type: string, description: "提示信息，如合同未生成时的说明" }
 
   - name: FormalSignableOrderInfo
     displayName: "正签合同弹窗可签约S单"
@@ -186,21 +184,20 @@ entities:
     description: "订单下正签合同（type=3）可签约的S单列表，通过 projectOrderId 调用 formalQuotation/list/v2 接口查询"
     sourceType: http
     endpoint: formal-sign-order-list
-    flattenPath: "data[].signableOrderInfos[]"
     lookupStrategies:
       - field: projectOrderId
         pattern: "^\\d{15,}$"
     attributes:
-      - { name: projectOrderId, source: "$param.projectOrderId" }
-      - { name: companyName, source: "companyName" }
-      - { name: companyCode, source: "companyCode" }
-      - { name: goodsInfo, source: "goodsInfo" }
-      - { name: orderAmount, source: "orderAmount" }
-      - { name: orderCreateTime, source: "orderCreateTime" }
-      - { name: bindType, source: "bindType" }
-      - { name: bindCode, source: "bindCode" }
-      - { name: packageInstanceName, source: "packageInstanceName" }
-      - { name: mustSelect, source: "mustSelect" }
+      - { name: projectOrderId, type: string, description: "订单号" }
+      - { name: companyName, type: string, description: "公司名称" }
+      - { name: companyCode, type: string, description: "公司编码" }
+      - { name: goodsInfo, type: string, description: "商品信息" }
+      - { name: orderAmount, type: string, description: "订单金额" }
+      - { name: orderCreateTime, type: string, description: "订单创建时间" }
+      - { name: bindType, type: int, description: "绑定类型" }
+      - { name: bindCode, type: string, description: "绑定编码" }
+      - { name: packageInstanceName, type: string, description: "套餐实例名称" }
+      - { name: mustSelect, type: int, description: "是否必选" }
 
   - name: ContractConfig
     displayName: "配置表"
@@ -210,16 +207,17 @@ entities:
       - field: contractCode
         pattern: "^C\\d+"
     attributes:
-      - { name: contractCode,          type: string, description: "合同编号" }
-      - { name: projectOrderId,        type: string, description: "所属订单号" }
-      - { name: contractConfigId,      type: string, description: "配置快照ID" }
-      - { name: version,               type: number, description: "配置版本号" }
-      - { name: businessType,          type: string, description: "业务类型" }
-      - { name: gbCode,                type: string, description: "区域编码" }
-      - { name: companyCode,           type: string, description: "公司编码" }
-      - { name: type,                  type: enum,   description: "合同类型" }
-      - { name: typeName,              type: string, description: "合同类型名称" }
-      - { name: cityCompanyInfo,       type: array,  description: "城市公司配置列表，包含 formId、formKey 等版式配置字段" }
+      - { name: contractCode, type: string, description: "合同编号" }
+      - { name: projectOrderId, type: string, description: "所属订单号" }
+      - { name: contractConfigId, type: string, description: "配置快照ID" }
+      - { name: version, type: number, description: "配置版本号" }
+      - { name: businessType, type: string, description: "业务类型" }
+      - { name: gbCode, type: string, description: "区域编码" }
+      - { name: companyCode, type: string, description: "公司编码" }
+      - { name: type, type: int, description: "合同类型" }
+      - { name: typeName, type: string, description: "合同类型名称" }
+      - { name: cityCompanyInfo, type: array, description: "城市公司配置列表" }
+      - { name: signChannelType, type: int, description: "签约渠道类型" }
 
 relations:
   - from: Order

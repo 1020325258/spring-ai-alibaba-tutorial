@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.yycome.sreagent.domain.ontology.engine.EntityDataGateway;
 import com.yycome.sreagent.domain.ontology.engine.EntityGatewayRegistry;
 import com.yycome.sreagent.infrastructure.client.HttpEndpointClient;
+import com.yycome.sreagent.infrastructure.util.JsonMappingUtils;
 import com.yycome.sreagent.types.enums.ContractTypeEnum;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
@@ -15,14 +16,28 @@ import org.springframework.stereotype.Component;
 import java.util.*;
 
 /**
- * Contract 配置表数据网关（本体论版）
+ * Contract 配置表数据网关
+ * <p>
  * 通过 HTTP 接口查询 contract_city_company_info 配置表
- *
+ * <p>
  * 查询流程：
  * 1. 根据 contractCode 获取 projectOrderId、businessType、gbCode、companyCode、type
  * 2. 查询 project_config_snap 获取 contract_config_id
  * 3. 取第一个版本号
  * 4. 查询 contract_city_company_info
+ * <p>
+ * 返回属性遵循 domain-ontology.yaml 定义：
+ * - contractCode: 合同编号
+ * - projectOrderId: 所属订单号
+ * - contractConfigId: 配置快照ID
+ * - version: 配置版本号
+ * - businessType: 业务类型
+ * - gbCode: 区域编码
+ * - companyCode: 公司编码
+ * - type: 合同类型
+ * - typeName: 合同类型名称
+ * - cityCompanyInfo: 城市公司配置列表
+ * - signChannelType: 签约渠道类型
  */
 @Slf4j
 @Component
@@ -54,7 +69,7 @@ public class ContractConfigGateway implements EntityDataGateway {
         String contractCode = String.valueOf(value);
 
         try {
-            // Step 1: 查询合同配置字段（复用 sre-contract 接口）
+            // Step 1: 查询合同配置字段
             String contractJson = httpEndpointClient.callPredefinedEndpointRaw("sre-contract",
                     Map.of("contractCode", contractCode, "projectOrderId", ""));
             if (contractJson == null) {
@@ -62,17 +77,17 @@ public class ContractConfigGateway implements EntityDataGateway {
                 return Collections.emptyList();
             }
 
-            Map<String, Object> contractFields = parseDataObject(contractJson);
-            if (contractFields == null || contractFields.isEmpty()) {
+            JsonNode contractData = parseDataNode(contractJson);
+            if (contractData == null || contractData.isEmpty()) {
                 log.warn("[ContractConfigGateway] 未找到合同, contractCode={}", contractCode);
                 return Collections.emptyList();
             }
 
-            String projectOrderId = getString(contractFields, "projectOrderId");
-            Object businessType = contractFields.get("businessType");
-            Object gbCode = contractFields.get("gbCode");
-            Object companyCode = contractFields.get("companyCode");
-            Object type = contractFields.get("type");
+            String projectOrderId = JsonMappingUtils.getText(contractData, "projectOrderId");
+            String businessType = JsonMappingUtils.getText(contractData, "businessType");
+            String gbCode = JsonMappingUtils.getText(contractData, "gbCode");
+            String companyCode = JsonMappingUtils.getText(contractData, "companyCode");
+            Integer type = JsonMappingUtils.getInt(contractData, "type");
 
             // Step 2: 查询 project_config_snap
             String configSnapJson = httpEndpointClient.callPredefinedEndpointRaw("sre-project-config-snap",
@@ -82,22 +97,16 @@ public class ContractConfigGateway implements EntityDataGateway {
                 return Collections.emptyList();
             }
 
-            Map<String, Object> snapData = parseDataObject(configSnapJson);
+            JsonNode snapData = parseDataNode(configSnapJson);
             if (snapData == null || snapData.isEmpty()) {
                 log.warn("[ContractConfigGateway] 未找到 project_config_snap 记录, projectOrderId={}", projectOrderId);
-                Map<String, Object> errorResult = new LinkedHashMap<>();
-                errorResult.put("error", "未找到 project_config_snap 记录");
-                errorResult.put("projectOrderId", projectOrderId);
-                return List.of(errorResult);
+                return buildErrorResult("未找到 project_config_snap 记录", projectOrderId);
             }
 
-            String contractConfigId = getString(snapData, "contractConfigId");
+            String contractConfigId = JsonMappingUtils.getText(snapData, "contractConfigId");
             if (contractConfigId == null || contractConfigId.isEmpty() || "null".equals(contractConfigId)) {
                 log.warn("[ContractConfigGateway] contract_config_id 为空, projectOrderId={}", projectOrderId);
-                Map<String, Object> errorResult = new LinkedHashMap<>();
-                errorResult.put("error", "contract_config_id 为空");
-                errorResult.put("projectOrderId", projectOrderId);
-                return List.of(errorResult);
+                return buildErrorResult("contract_config_id 为空", projectOrderId);
             }
 
             // Step 3: 取第一个版本号
@@ -107,11 +116,11 @@ public class ContractConfigGateway implements EntityDataGateway {
             // Step 4: 查询 contract_city_company_info
             String cityCompanyInfoJson = httpEndpointClient.callPredefinedEndpointRaw("sre-contract-city-company-info",
                     Map.of(
-                            "businessType", String.valueOf(businessType),
-                            "gbCode", String.valueOf(gbCode),
-                            "companyCode", String.valueOf(companyCode),
+                            "businessType", businessType != null ? businessType : "",
+                            "gbCode", gbCode != null ? gbCode : "",
+                            "companyCode", companyCode != null ? companyCode : "",
                             "version", String.valueOf(version),
-                            "type", String.valueOf(type)
+                            "type", type != null ? String.valueOf(type) : ""
                     ));
             if (cityCompanyInfoJson == null) {
                 log.warn("[ContractConfigGateway] 查询城市公司配置失败");
@@ -121,7 +130,7 @@ public class ContractConfigGateway implements EntityDataGateway {
             List<Map<String, Object>> cityCompanyInfo = parseDataArray(cityCompanyInfoJson);
 
             // 构建结果
-            Map<String, Object> result = new LinkedHashMap<>();
+            Map<String, Object> result = JsonMappingUtils.newOrderedMap();
             result.put("contractCode", contractCode);
             result.put("projectOrderId", projectOrderId);
             result.put("contractConfigId", contractConfigId);
@@ -130,7 +139,7 @@ public class ContractConfigGateway implements EntityDataGateway {
             result.put("gbCode", gbCode);
             result.put("companyCode", companyCode);
             result.put("type", type);
-            result.put("typeName", ContractTypeEnum.getNameByCode(Byte.parseByte(String.valueOf(type))));
+            result.put("typeName", type != null ? ContractTypeEnum.getNameByCode(type.byteValue()) : null);
             result.put("signChannelType", 1);
             result.put("cityCompanyInfo", cityCompanyInfo);
 
@@ -141,17 +150,14 @@ public class ContractConfigGateway implements EntityDataGateway {
         }
     }
 
-    private Map<String, Object> parseDataObject(String json) {
+    private JsonNode parseDataNode(String json) {
         try {
             JsonNode root = objectMapper.readTree(json);
             JsonNode data = root.path("data");
-            if (data.isObject() && !data.isEmpty()) {
-                return objectMapper.readValue(data.toString(), new TypeReference<>() {});
-            }
-            return null;
+            return data.isObject() ? data : objectMapper.missingNode();
         } catch (Exception e) {
             log.warn("[ContractConfigGateway] 解析响应失败: {}", e.getMessage());
-            return null;
+            return objectMapper.missingNode();
         }
     }
 
@@ -169,8 +175,10 @@ public class ContractConfigGateway implements EntityDataGateway {
         }
     }
 
-    private String getString(Map<String, Object> map, String key) {
-        Object val = map.get(key);
-        return val != null ? val.toString() : null;
+    private List<Map<String, Object>> buildErrorResult(String error, String projectOrderId) {
+        Map<String, Object> errorResult = JsonMappingUtils.newOrderedMap();
+        errorResult.put("error", error);
+        errorResult.put("projectOrderId", projectOrderId);
+        return List.of(errorResult);
     }
 }
