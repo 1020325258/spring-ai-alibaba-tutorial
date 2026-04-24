@@ -37,6 +37,7 @@
 | 用户症状关键词 | 推荐 Skill |
 |--------------|-----------|
 | 合同弹窗、销售合同弹窗、弹窗提示报价、弹窗无数据 | sales-contract-sign-dialog-diagnosis |
+| 签约人手机号、手机号是否一致、核实手机号、手机号对比 | signer-phone-verification |
 | （其他症状） | 选择描述最相关的 Skill |
 
 ---

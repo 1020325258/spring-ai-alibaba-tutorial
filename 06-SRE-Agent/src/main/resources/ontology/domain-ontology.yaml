@@ -74,6 +74,8 @@ entities:
       - { name: phonePlain,    type: string, description: "手机号（明文）" }
       - { name: ucid,          type: string, description: "用户ID" }
       - { name: certificateNo, type: string, description: "证件号码" }
+      - { name: isSign,        type: enum,   description: "是否签约人：1-是 0-否" }
+      - { name: isAuth,        type: enum,   description: "是否认证：1-是 0-否" }
       - { name: ctime,         type: string, description: "创建时间" }
       - { name: mtime,         type: string, description: "更新时间" }
 
