@@ -16,9 +16,7 @@ import java.util.*;
 /**
  * SubOrder（S单）实体的数据网关
  * <p>
- * 支持两种查询路径：
- * 1. BudgetBill → SubOrder：从父记录获取 homeOrderNo + quotationOrderNo
- * 2. Order → SubOrder：直接按订单号查询
+ * 支持按订单号查询：Order → SubOrder
  * <p>
  * 返回属性遵循 domain-ontology.yaml 定义：
  * - orderNo: S单编号
@@ -56,12 +54,7 @@ public class SubOrderGateway implements EntityDataGateway {
     public List<Map<String, Object>> queryByFieldWithContext(String fieldName, Object value, Map<String, Object> parentRecord) {
         log.debug("[SubOrderGateway] queryByFieldWithContext: {} = {}, parentRecord keys: {}",
                 fieldName, value, parentRecord != null ? parentRecord.keySet() : "null");
-
-        if ("homeOrderNo".equals(fieldName)) {
-            return queryByHomeOrderNo(fieldName, value, parentRecord);
-        } else {
-            return queryFromBudgetBill(fieldName, value, parentRecord);
-        }
+        return queryByHomeOrderNo(fieldName, value, parentRecord);
     }
 
     private List<Map<String, Object>> queryByHomeOrderNo(String fieldName, Object value, Map<String, Object> parentRecord) {
@@ -86,36 +79,6 @@ public class SubOrderGateway implements EntityDataGateway {
             return parseSubOrders(rawJson);
         } catch (Exception e) {
             log.warn("[SubOrderGateway] 查询S单失败 homeOrderNo={}: {}", homeOrderNo, e.getMessage());
-            return Collections.emptyList();
-        }
-    }
-
-    private List<Map<String, Object>> queryFromBudgetBill(String fieldName, Object value, Map<String, Object> parentRecord) {
-        String quotationOrderNo = String.valueOf(value);
-        String homeOrderNo = parentRecord != null
-                ? String.valueOf(parentRecord.getOrDefault("projectOrderId", ""))
-                : "";
-
-        if (homeOrderNo.isEmpty() || "null".equals(homeOrderNo)) {
-            log.warn("[SubOrderGateway] 父记录缺少 projectOrderId，无法查询S单");
-            return Collections.emptyList();
-        }
-
-        try {
-            String rawJson = httpEndpointClient.callPredefinedEndpointRaw("sub-order-info",
-                    Map.of("homeOrderNo", homeOrderNo,
-                            "quotationOrderNo", quotationOrderNo,
-                            "projectChangeNo", ""));
-
-            if (rawJson == null) {
-                log.warn("[SubOrderGateway] 接口无响应 homeOrderNo={}, quotationOrderNo={}", homeOrderNo, quotationOrderNo);
-                return Collections.emptyList();
-            }
-
-            return parseSubOrders(rawJson);
-        } catch (Exception e) {
-            log.warn("[SubOrderGateway] 查询S单失败 homeOrderNo={}, quotationOrderNo={}: {}",
-                    homeOrderNo, quotationOrderNo, e.getMessage());
             return Collections.emptyList();
         }
     }

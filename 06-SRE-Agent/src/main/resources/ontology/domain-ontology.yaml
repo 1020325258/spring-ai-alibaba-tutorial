@@ -91,23 +91,6 @@ entities:
       - { name: contractCode, type: string, description: "合同编号" }
       - { name: fields, type: object, description: "动态字段Map，键为字段名，值为字段值" }
 
-  - name: BudgetBill
-    displayName: "报价单"
-    aliases: ["报价", "预算单"]
-    description: "报价单，挂在订单下，通过 projectOrderId 调用 budget-bill-list 接口查询"
-    sourceType: http
-    endpoint: budget-bill-list
-    lookupStrategies:
-      - field: projectOrderId
-        pattern: "^\\d{15,}$"
-    attributes:
-      - { name: projectOrderId, type: string, description: "订单号" }
-      - { name: billCode, type: string, description: "报价单号" }
-      - { name: billType, type: string, description: "报价单类型" }
-      - { name: billTypeDesc, type: string, description: "报价单类型描述" }
-      - { name: statusDesc, type: string, description: "状态描述" }
-      - { name: originalBillCode, type: string, description: "原始报价单号" }
-
   - name: PersonalQuote
     displayName: "个性化报价"
     aliases: ["个性化报价数据"]
@@ -225,11 +208,6 @@ relations:
     domain: Order
     via: { source_field: projectOrderId, target_field: projectOrderId }
 
-  - from: Order
-    to: BudgetBill
-    domain: quote
-    via: { source_field: projectOrderId, target_field: projectOrderId }
-
   - from: Contract
     to: ContractNode
     domain: contract
@@ -261,12 +239,6 @@ relations:
     to: ContractConfig
     domain: contract
     via: { source_field: contractCode, target_field: contractCode }
-
-  - from: BudgetBill
-    to: SubOrder
-    domain: quote
-    description: "报价单拆分形成S单"
-    via: { source_field: billCode, target_field: quotationOrderNo }
 
   - from: Order
     to: SubOrder

@@ -34,7 +34,6 @@ public class OntologyQueryTool {
           - Order: 订单（订单号）
           - Contract: 合同（合同号）
           - ContractInstance: 合同实例（instanceId）
-          - BudgetBill: 报价单（订单号）
           - 其他实体见系统提示词中的【可用实体】列表
         - value: 起始值（订单号、合同号、实例ID等，根据上下文判断）
         - queryScope: 目标实体（用户想查询什么数据，就传对应实体名）
