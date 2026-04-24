@@ -152,8 +152,8 @@ public class EndpointTemplateService {
     public String buildUrl(EndpointTemplate template, Map<String, String> params) {
         String url = template.getUrlTemplate();
 
-        // 首先替换环境占位符 ${env}
-        url = url.replace("${env}", environmentConfig.getCurrentEnv());
+        // 替换服务基础 URL 占位符 ${baseUrl} 或 ${baseUrl:serviceName}
+        url = replaceBaseUrlPlaceholder(url);
 
         // 然后替换参数占位符
         Matcher matcher = PLACEHOLDER_PATTERN.matcher(url);
@@ -265,5 +265,33 @@ public class EndpointTemplateService {
                 .filter(p -> paramName.equals(p.getName()))
                 .findFirst()
                 .orElse(null);
+    }
+
+    /**
+     * 替换基础 URL 占位符
+     * 支持格式：
+     * - ${baseUrl} -> 默认使用 sales-project 服务
+     * - ${baseUrl:order-service} -> 使用指定服务
+     */
+    private String replaceBaseUrlPlaceholder(String url) {
+        // 匹配 ${baseUrl} 或 ${baseUrl:serviceName}
+        Pattern pattern = Pattern.compile("\\$\\{baseUrl(?::(\\w+))?\\}");
+        Matcher matcher = pattern.matcher(url);
+        StringBuffer sb = new StringBuffer();
+
+        while (matcher.find()) {
+            String serviceName = matcher.group(1);
+            if (serviceName == null) {
+                serviceName = "sales-project";  // 默认使用 sales-project
+            }
+            String baseUrl = environmentConfig.getBaseUrl(serviceName);
+            if (baseUrl == null) {
+                baseUrl = "";
+                log.warn("[ENDPOINT] 未找到服务 {} 的 baseUrl", serviceName);
+            }
+            matcher.appendReplacement(sb, baseUrl);
+        }
+        matcher.appendTail(sb);
+        return sb.toString();
     }
 }

@@ -7,7 +7,7 @@ endpoints:
       - text：待解密的密文
       - app：应用标识，固定值 sreAgent
     category: sre
-    urlTemplate: "http://utopia-nrs-sales-project.${env}.ttb.test.ke.com/sre/decrypt?text=${text}&app=sreAgent"
+    urlTemplate: "${baseUrl}/sre/decrypt?text=${text}&app=sreAgent"
     method: GET
     parameters:
       - name: text
@@ -51,7 +51,7 @@ endpoints:
       - "查询826022518000001562的子单"
       注意：子单、S单、签约单是同义词，都指代可签约的子订单。
     category: contract
-    urlTemplate: "http://utopia-nrs-sales-project.${env}.ttb.test.ke.com/home/contract/getSignOrderList/V3?projectOrderId=${projectOrderId}"
+    urlTemplate: "${baseUrl}/home/contract/getSignOrderList/V3?projectOrderId=${projectOrderId}"
     method: GET
     parameters:
       - name: projectOrderId
@@ -81,7 +81,7 @@ endpoints:
       - "合同版式查询"
       注意：instanceId 是合同实例ID，form_id 是版式标识符。
     category: contract
-    urlTemplate: "http://utopia-nrs-sales-project.${env}.ttb.test.ke.com/api/contract/command/getFormData?instanceId=${instanceId}"
+    urlTemplate: "${baseUrl}/api/contract/command/getFormData?instanceId=${instanceId}"
     method: GET
     parameters:
       - name: instanceId
@@ -161,7 +161,7 @@ endpoints:
       - quotationOrderNo：报价单号（可选），GBILL前缀+数字
       - projectChangeNo：变更单号（可选）
     category: contract
-    urlTemplate: "http://nrs-order-service.${env}.ttb.test.ke.com/api/subOrder/queryBaseInfoByHomeOrderNo?homeOrderNo=${homeOrderNo}&quotationOrderNo=${quotationOrderNo}&projectChangeNo=${projectChangeNo}"
+    urlTemplate: "${baseUrl:order-service}/api/subOrder/queryBaseInfoByHomeOrderNo?homeOrderNo=${homeOrderNo}&quotationOrderNo=${quotationOrderNo}&projectChangeNo=${projectChangeNo}"
     method: GET
     parameters:
       - name: homeOrderNo
@@ -196,7 +196,7 @@ endpoints:
       - "查询某订单的正签可签约S单"
       - "订单下正签合同的可签约S单有哪些"
     category: contract
-    urlTemplate: "http://utopia-nrs-sales-project.${env}.ttb.test.ke.com/home/contract/formalQuotation/list/v2?projectOrderId=${projectOrderId}&contractType=3"
+    urlTemplate: "${baseUrl}/home/contract/formalQuotation/list/v2?projectOrderId=${projectOrderId}&contractType=3"
     method: GET
     parameters:
       - name: projectOrderId
@@ -227,7 +227,7 @@ endpoints:
       - changeOrderId：变更单号（可选），与订单号格式类似
       注意：subOrderNoList、billCodeList、changeOrderId 三个参数至少传一个。
     category: contract
-    urlTemplate: "http://utopia-nrs-sales-project.${env}.ttb.test.ke.com/api/contract/tool/getContractPersonalData?projectOrderId=${projectOrderId}&subOrderNoList=${subOrderNoList}&billCodeList=${billCodeList}&changeOrderId=${changeOrderId}"
+    urlTemplate: "${baseUrl}/api/contract/tool/getContractPersonalData?projectOrderId=${projectOrderId}&subOrderNoList=${subOrderNoList}&billCodeList=${billCodeList}&changeOrderId=${changeOrderId}"
     method: GET
     parameters:
       - name: projectOrderId

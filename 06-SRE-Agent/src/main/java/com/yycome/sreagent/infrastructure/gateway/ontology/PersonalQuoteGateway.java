@@ -1,5 +1,6 @@
 package com.yycome.sreagent.infrastructure.gateway.ontology;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.yycome.sreagent.domain.ontology.engine.EntityDataGateway;
 import com.yycome.sreagent.domain.ontology.engine.EntityGatewayRegistry;
@@ -7,7 +8,6 @@ import com.yycome.sreagent.domain.ontology.engine.EntitySchemaMapper;
 import com.yycome.sreagent.domain.ontology.model.OntologyEntity;
 import com.yycome.sreagent.domain.ontology.service.EntityRegistry;
 import com.yycome.sreagent.infrastructure.client.HttpEndpointClient;
-import com.yycome.sreagent.infrastructure.dao.ContractDao;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -30,7 +30,6 @@ public class PersonalQuoteGateway implements EntityDataGateway {
 
     private final HttpEndpointClient httpEndpointClient;
     private final EntityGatewayRegistry registry;
-    private final ContractDao contractDao;
     private final ObjectMapper objectMapper;
     private final EntitySchemaMapper schemaMapper;
     private final EntityRegistry entityRegistry;
@@ -158,9 +157,16 @@ public class PersonalQuoteGateway implements EntityDataGateway {
         }
 
         try {
-            Map<String, Object> contract = contractDao.fetchContractBase(contractCode);
-            if (contract != null && contract.containsKey("projectOrderId")) {
-                return String.valueOf(contract.get("projectOrderId"));
+            String json = httpEndpointClient.callPredefinedEndpointRaw("sre-contract",
+                    Map.of("contractCode", contractCode));
+            if (json == null) {
+                log.warn("[PersonalQuoteGateway] 查询合同 {} 失败", contractCode);
+                return null;
+            }
+            JsonNode root = objectMapper.readTree(json);
+            JsonNode data = root.path("data");
+            if (data.isObject() && data.has("projectOrderId")) {
+                return data.get("projectOrderId").asText(null);
             }
         } catch (Exception e) {
             log.warn("[PersonalQuoteGateway] 查询合同 {} 失败: {}", contractCode, e.getMessage());

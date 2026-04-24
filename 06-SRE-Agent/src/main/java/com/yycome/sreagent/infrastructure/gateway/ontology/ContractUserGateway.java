@@ -5,7 +5,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.yycome.sreagent.domain.ontology.engine.EntityDataGateway;
 import com.yycome.sreagent.domain.ontology.engine.EntityGatewayRegistry;
 import com.yycome.sreagent.infrastructure.client.HttpEndpointClient;
-import com.yycome.sreagent.infrastructure.dao.ContractDao;
 import com.yycome.sreagent.infrastructure.util.DateTimeUtil;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
@@ -16,7 +15,7 @@ import java.util.*;
 
 /**
  * ContractUser 实体的数据网关
- * 查询签约人后进行后处理：
+ * 通过 HTTP 接口查询签约人后进行后处理：
  * 1. 解密手机号
  * 2. 根据手机号查询 ucid
  */
@@ -25,10 +24,9 @@ import java.util.*;
 @RequiredArgsConstructor
 public class ContractUserGateway implements EntityDataGateway {
 
-    private final ContractDao contractDao;
-    private final EntityGatewayRegistry registry;
     private final HttpEndpointClient httpEndpointClient;
     private final ObjectMapper objectMapper;
+    private final EntityGatewayRegistry registry;
 
     @PostConstruct
     public void init() {
@@ -50,14 +48,51 @@ public class ContractUserGateway implements EntityDataGateway {
             log.warn("[ContractUserGateway] {} 的值为 null，无法查询", fieldName);
             return List.of();
         }
-        // ContractDao.fetchUsers 已经过滤 del_status = 0
-        List<Map<String, Object>> users = contractDao.fetchUsers(value.toString());
-        if (users.isEmpty()) {
-            return users;
-        }
 
-        // 后处理：解密手机号并查询 ucid
-        return enrichUsers(users);
+        try {
+            String json = httpEndpointClient.callPredefinedEndpointRaw("sre-contract-user",
+                    Map.of("contractCode", String.valueOf(value)));
+            if (json == null) {
+                log.warn("[ContractUserGateway] 查询签约人失败, contractCode={}", value);
+                return Collections.emptyList();
+            }
+            List<Map<String, Object>> users = parseUsers(json);
+            if (users.isEmpty()) {
+                return users;
+            }
+            // 后处理：解密手机号并查询 ucid
+            return enrichUsers(users);
+        } catch (Exception e) {
+            log.warn("[ContractUserGateway] 查询签约人失败", e);
+            return Collections.emptyList();
+        }
+    }
+
+    private List<Map<String, Object>> parseUsers(String json) {
+        try {
+            JsonNode root = objectMapper.readTree(json);
+            JsonNode data = root.path("data");
+            if (!data.isArray()) {
+                return Collections.emptyList();
+            }
+
+            List<Map<String, Object>> result = new ArrayList<>();
+            for (JsonNode user : data) {
+                Map<String, Object> item = new LinkedHashMap<>();
+                item.put("roleType", user.path("roleType").asInt());
+                item.put("name", user.path("name").asText(null));
+                item.put("phone", user.path("phone").asText(null));  // 密文
+                item.put("isSign", user.path("isSign").asInt());
+                item.put("isAuth", user.path("isAuth").asInt());
+                item.put("ctime", DateTimeUtil.format(user.path("ctime").asLong()));
+                item.put("mtime", DateTimeUtil.format(user.path("mtime").asLong()));
+                result.add(item);
+            }
+            return result;
+        } catch (Exception e) {
+            log.warn("[ContractUserGateway] 解析响应失败: {}", e.getMessage());
+            return Collections.emptyList();
+        }
     }
 
     /**
@@ -66,23 +101,23 @@ public class ContractUserGateway implements EntityDataGateway {
     private List<Map<String, Object>> enrichUsers(List<Map<String, Object>> users) {
         List<Map<String, Object>> result = new ArrayList<>();
         for (Map<String, Object> user : users) {
-            // 数据库字段（下划线）→ 驼峰映射
             Map<String, Object> enriched = new LinkedHashMap<>();
             enriched.put("contractCode", null); // 数据库未返回
-            enriched.put("roleType", user.get("role_type"));
+            enriched.put("roleType", user.get("roleType"));
             enriched.put("name", user.get("name"));
             enriched.put("phone", user.get("phone")); // 密文
             enriched.put("certificateNo", null); // 数据库未返回
-            enriched.put("isSign", user.get("is_sign"));
-            enriched.put("isAuth", user.get("is_auth"));
-            enriched.put("ctime", DateTimeUtil.format(user.get("ctime")));
-            enriched.put("mtime", DateTimeUtil.format(user.get("mtime")));
+            enriched.put("isSign", user.get("isSign"));
+            enriched.put("isAuth", user.get("isAuth"));
+            enriched.put("ctime", user.get("ctime"));
+            enriched.put("mtime", user.get("mtime"));
 
             // 解密手机号
             String encryptedPhone = getString(user, "phone");
             String plainPhone = decryptPhone(encryptedPhone);
             enriched.put("phonePlain", plainPhone);
             enriched.put("ucid", "空");
+
             // 查询 ucid
             if (plainPhone != null && !plainPhone.isEmpty()) {
                 String ucid = queryUcid(plainPhone);
