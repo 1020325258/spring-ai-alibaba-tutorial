@@ -3,7 +3,6 @@ package com.yycome.sreagent.domain.ontology.engine;
 import com.yycome.sreagent.domain.ontology.model.LookupStrategy;
 import com.yycome.sreagent.domain.ontology.model.OntologyEntity;
 import com.yycome.sreagent.domain.ontology.model.OntologyRelation;
-import com.yycome.sreagent.domain.ontology.model.QueryScope;
 import com.yycome.sreagent.domain.ontology.service.EntityRegistry;
 import jakarta.annotation.PreDestroy;
 import lombok.RequiredArgsConstructor;
@@ -15,6 +14,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 /**
  * 本体论查询执行引擎
@@ -24,6 +24,15 @@ import java.util.concurrent.TimeUnit;
 @Component
 @RequiredArgsConstructor
 public class OntologyQueryEngine {
+
+    // Scope 常量
+    private static final String SCOPE_DEFAULT = "default";
+    private static final String SCOPE_LIST = "list";
+
+    // 结果 key 常量
+    private static final String KEY_QUERY_ENTITY = "queryEntity";
+    private static final String KEY_QUERY_VALUE = "queryValue";
+    private static final String KEY_RECORDS = "records";
 
     private final EntityRegistry entityRegistry;
     private final EntityGatewayRegistry gatewayRegistry;
@@ -68,72 +77,44 @@ public class OntologyQueryEngine {
      * @return 层级结构的查询结果
      */
     public Map<String, Object> query(String entityName, String value, String queryScope, Map<String, String> extraParams) {
-        QueryScope scope = QueryScope.fromString(queryScope);
-        if (scope != null) {
-            return query(entityName, value, scope, extraParams);
+        if (shouldExpandRelations(queryScope)) {
+            return queryWithExpansion(entityName, value, queryScope, extraParams);
         }
-        // 未匹配到枚举，可能是自定义实体名或逗号分隔的多目标
-        return queryWithScopeString(entityName, value, queryScope, extraParams);
-    }
-
-    /**
-     * 对外唯一入口（枚举版本）
-     *
-     * @param entityName  起始实体名（Order / Contract / BudgetBill）
-     * @param value       标识值（订单号 / 合同号等）
-     * @param queryScope  查询范围枚举
-     * @return 层级结构的查询结果，起始实体无数据时返回 null
-     */
-    public Map<String, Object> query(String entityName, String value, QueryScope queryScope) {
-        return query(entityName, value, queryScope, null);
-    }
-
-    /**
-     * 对外唯一入口（枚举版本，带额外参数）
-     */
-    public Map<String, Object> query(String entityName, String value, QueryScope queryScope, Map<String, String> extraParams) {
-        if (queryScope == QueryScope.LIST || queryScope == QueryScope.DEFAULT) {
-            // 仅返回起始实体
-            return queryListOnly(entityName, value);
-        }
-        String targetEntity = queryScope.getTargetEntity();
-        return queryWithScopeString(entityName, value, targetEntity, extraParams);
+        return queryWithoutExpansion(entityName, value);
     }
 
     /**
      * 仅查询起始实体，不展开关联
      */
-    private Map<String, Object> queryListOnly(String entityName, String value) {
-        OntologyEntity entity = entityRegistry.getEntity(entityName);
-        LookupStrategy strategy = matchStrategy(entity, value);
+    private Map<String, Object> queryWithoutExpansion(String entityName, String value) {
+        List<Map<String, Object>> records = queryStartEntity(entityName, value);
+        if (records.isEmpty()) return null;
+        return buildQueryResult(entityName, value, records);
+    }
 
-        List<Map<String, Object>> records =
-            gatewayRegistry.getGateway(entityName).queryByField(strategy.getField(), value);
-
+    /**
+     * 查询起始实体并展开关联路径
+     */
+    private Map<String, Object> queryWithExpansion(String entityName, String value, String queryScope, Map<String, String> extraParams) {
+        List<Map<String, Object>> records = queryStartEntity(entityName, value);
         if (records.isEmpty()) return null;
 
-        Map<String, Object> result = new LinkedHashMap<>();
-        result.put("queryEntity", entityName);
-        result.put("queryValue", value);
-        result.put("records", records);
-        return result;
+        List<List<OntologyRelation>> paths = buildRelationPaths(entityName, queryScope);
+        logPathPlan(entityName, paths);
+        attachMultiPathResults(records, paths, extraParams);
+
+        return buildQueryResult(entityName, value, records);
     }
 
     /**
-     * 使用字符串 scope 进行查询（支持多目标）
+     * 查询起始实体
+     *
+     * @return 起始实体的记录列表
      */
-    private Map<String, Object> queryWithScopeString(String entityName, String value, String queryScope) {
-        return queryWithScopeString(entityName, value, queryScope, null);
-    }
-
-    /**
-     * 使用字符串 scope 进行查询（支持多目标和额外参数）
-     */
-    private Map<String, Object> queryWithScopeString(String entityName, String value, String queryScope, Map<String, String> extraParams) {
+    private List<Map<String, Object>> queryStartEntity(String entityName, String value) {
         OntologyEntity entity = entityRegistry.getEntity(entityName);
         LookupStrategy strategy = matchStrategy(entity, value);
 
-        // 起始节点查询
         log.debug("▶ 起始节点 {} | key={} | value={}", entityName, strategy.getField(), value);
         long startTime = System.currentTimeMillis();
 
@@ -141,82 +122,67 @@ public class OntologyQueryEngine {
             gatewayRegistry.getGateway(entityName).queryByField(strategy.getField(), value);
 
         log.debug("  ↳ 返回 {} 条记录, 耗时 {}ms", records.size(), System.currentTimeMillis() - startTime);
+        return records;
+    }
 
-        if (records.isEmpty()) return null;
-
-        // null/"default"/"list" 均表示仅返回列表，不展开关联
-        // 只有明确指定目标实体时才展开关联
-        if (queryScope != null && !"default".equals(queryScope) && !"list".equals(queryScope)) {
-            // 支持多目标查询：按逗号分隔
-            List<String> targets = Arrays.asList(queryScope.split(","));
-            List<List<OntologyRelation>> paths = new ArrayList<>();
-            for (String target : targets) {
-                List<OntologyRelation> path = entityRegistry.findRelationPath(entityName, target.trim());
-                if (path == null) {
-                    throw new IllegalArgumentException(
-                        "找不到路径: " + entityName + " -> " + target.trim() +
-                        "，请检查 domain-ontology.yaml 中的关系定义");
-                }
-                paths.add(path);
-            }
-            // 打印路径规划日志
-            logPathPlan(entityName, paths);
-            attachMultiPathResults(records, paths, extraParams);
-        }
-
+    /**
+     * 构建查询结果
+     */
+    private Map<String, Object> buildQueryResult(String entityName, String value, List<Map<String, Object>> records) {
         Map<String, Object> result = new LinkedHashMap<>();
-        result.put("queryEntity", entityName);
-        result.put("queryValue", value);
-        result.put("records", records);
+        result.put(KEY_QUERY_ENTITY, entityName);
+        result.put(KEY_QUERY_VALUE, value);
+        result.put(KEY_RECORDS, records);
         return result;
+    }
+
+    /**
+     * 判断是否需要展开关联
+     */
+    private boolean shouldExpandRelations(String queryScope) {
+        return queryScope != null
+            && !SCOPE_DEFAULT.equals(queryScope)
+            && !SCOPE_LIST.equals(queryScope);
+    }
+
+    /**
+     * 构建关系路径列表
+     *
+     * @param entityName 起始实体名
+     * @param queryScope 目标实体（支持逗号分隔的多目标）
+     * @return 关系路径列表
+     */
+    private List<List<OntologyRelation>> buildRelationPaths(String entityName, String queryScope) {
+        List<String> targets = Arrays.stream(queryScope.split(","))
+            .map(String::trim)
+            .toList();
+
+        List<List<OntologyRelation>> paths = new ArrayList<>();
+        for (String target : targets) {
+            List<OntologyRelation> path = entityRegistry.findRelationPath(entityName, target);
+            if (path == null) {
+                throw new IllegalArgumentException(
+                    "找不到路径: " + entityName + " -> " + target +
+                    "，请检查 domain-ontology.yaml 中的关系定义");
+            }
+            paths.add(path);
+        }
+        return paths;
     }
 
     /**
      * 打印路径规划日志
      */
     private void logPathPlan(String startEntity, List<List<OntologyRelation>> paths) {
-        StringBuilder sb = new StringBuilder();
-        sb.append("路径规划: ").append(startEntity);
-
-        for (List<OntologyRelation> path : paths) {
-            sb.append(" → ");
-            for (int i = 0; i < path.size(); i++) {
-                OntologyRelation rel = path.get(i);
-                if (i == 0) sb.append(" -[");
-                else sb.append(" -[");
-                sb.append(rel.getVia().get("source_field"))
-                  .append("→")
-                  .append(rel.getVia().get("target_field"))
-                  .append("]-> ")
-                  .append(rel.getTo());
-            }
-        }
-        log.debug(sb.toString());
-    }
-
-    /**
-     * 沿 path 递归挂载子结果（同层并行）
-     */
-    private void attachPathResults(List<Map<String, Object>> records,
-                                    List<OntologyRelation> path, int hop) {
-        if (hop >= path.size()) return;
-
-        OntologyRelation rel = path.get(hop);
-        String resultKey = deriveKeyFromEntity(rel.getTo());
-
-        List<CompletableFuture<Void>> futures = records.stream()
-            .map(record -> CompletableFuture.runAsync(() -> {
-                Object childValue = record.get(rel.getVia().get("source_field"));
-                if (childValue == null) return;
-                List<Map<String, Object>> children =
-                    gatewayRegistry.getGateway(rel.getTo())
-                        .queryByField(rel.getVia().get("target_field"), childValue);
-                attachPathResults(children, path, hop + 1);
-                record.put(resultKey, children);
-            }, executor))
-            .toList();
-
-        CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
+        String pathStr = paths.stream()
+            .map(path -> path.stream()
+                .map(rel -> String.format("-[%s→%s]-> %s",
+                    rel.getVia().get("source_field"),
+                    rel.getVia().get("target_field"),
+                    rel.getTo()))
+                .collect(Collectors.joining(" ")))
+            .collect(Collectors.joining(" | "));
+        log.debug("路径规划: {} → {}", startEntity, pathStr);
     }
 
     /**
